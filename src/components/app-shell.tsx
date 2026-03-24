@@ -1,13 +1,17 @@
 import * as React from "react"
-import { DotOutlineIcon, GearIcon } from "@phosphor-icons/react"
-import { setSetting } from "@/db/schema"
+import { DotOutlineIcon } from "@phosphor-icons/react"
 import { useAppBootstrap } from "@/hooks/use-app-bootstrap"
 import { useRuntimeSession } from "@/hooks/use-runtime-session"
 import { useSessionData } from "@/hooks/use-session-data"
 import { useSessionList } from "@/hooks/use-session-list"
 import { useSessionMessages } from "@/hooks/use-session-messages"
 import { getCanonicalProvider } from "@/models/catalog"
-import { formatRepoSourceLabel, setLastUsedRepoSource } from "@/repo/settings"
+import { formatRepoSourceLabel } from "@/repo/settings"
+import {
+  persistActiveSessionId,
+  persistLastUsedSessionSettings,
+  syncSessionToUrl,
+} from "@/sessions/session-selection"
 import { createSession, persistSessionSnapshot } from "@/sessions/session-service"
 import type { SessionData } from "@/types/storage"
 import { ChatThread } from "@/components/chat-thread"
@@ -17,30 +21,12 @@ import { ProviderBadge } from "@/components/provider-badge"
 import { SessionSidebar } from "@/components/session-sidebar"
 import { SettingsDialog } from "@/components/settings-dialog"
 import { Button } from "@/components/ui/button"
-
-function syncSessionToUrl(sessionId: string): void {
-  if (typeof window === "undefined") {
-    return
-  }
-
-  const url = new URL(window.location.href)
-  url.searchParams.set("session", sessionId)
-  window.history.replaceState({}, "", url)
-}
-
-function persistLastUsedSessionSettings(session: Pick<
-  SessionData,
-  "id" | "model" | "provider" | "providerGroup" | "repoSource"
->): void {
-  void setSetting("active-session-id", session.id)
-  void setSetting("last-used-model", session.model)
-  void setSetting("last-used-provider", session.provider)
-  void setSetting(
-    "last-used-provider-group",
-    session.providerGroup ?? session.provider
-  )
-  void setLastUsedRepoSource(session.repoSource)
-}
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import { Icons } from "@/components/icons"
 
 export function AppShell() {
   const bootstrap = useAppBootstrap()
@@ -97,7 +83,7 @@ function ReadyAppShell(props: {
   const setActiveSession = React.useEffectEvent(async (session: SessionData) => {
     setSelectedSessionId(session.id)
     syncSessionToUrl(session.id)
-    persistLastUsedSessionSettings(session)
+    await persistLastUsedSessionSettings(session)
   })
 
   const runningSessionIds = props.sessions
@@ -129,11 +115,11 @@ function ReadyAppShell(props: {
             )
 
             if (!selectedMetadata) {
-              void setSetting("active-session-id", sessionId)
+              void persistActiveSessionId(sessionId)
               return
             }
 
-            persistLastUsedSessionSettings({
+            void persistLastUsedSessionSettings({
               id: selectedMetadata.id,
               model: selectedMetadata.model,
               provider: selectedMetadata.provider,
@@ -164,7 +150,7 @@ function ReadyAppShell(props: {
                   }
 
                   await runtime.setModelSelection(providerGroup, model)
-                  persistLastUsedSessionSettings({
+                  void persistLastUsedSessionSettings({
                     ...activeSession,
                     model,
                     provider: getCanonicalProvider(providerGroup),
@@ -201,13 +187,19 @@ function ReadyAppShell(props: {
                 />
                 {activeSession?.isStreaming ? "Live" : "Idle"}
               </div>
-              <Button
-                onClick={() => props.setSettingsOpen(true)}
-                size="icon-sm"
-                variant="outline"
-              >
-                <GearIcon />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    aria-label="Open settings"
+                    onClick={() => props.setSettingsOpen(true)}
+                    size="icon-sm"
+                    variant="outline"
+                  >
+                    <Icons.cog />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent sideOffset={6}>Open settings</TooltipContent>
+              </Tooltip>
             </div>
           </header>
           <div className="min-h-0 flex-1">
@@ -240,7 +232,7 @@ function ReadyAppShell(props: {
             return
           }
 
-          persistLastUsedSessionSettings({
+          void persistLastUsedSessionSettings({
             ...activeSession,
             repoSource,
           })

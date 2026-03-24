@@ -1,21 +1,91 @@
+import * as React from "react"
+import {
+  ArrowUpRight,
+  BadgeCheck,
+  DollarSign,
+  GitBranch,
+  Globe,
+  Info,
+} from "lucide-react"
 import type { SessionData } from "@/types/storage"
 import { CostsPanel } from "@/components/costs-panel"
 import { ProviderSettings } from "@/components/provider-settings"
 import { ProxySettings } from "@/components/proxy-settings"
 import { RepoSettings } from "@/components/repo-settings"
+import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
 import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs"
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemMedia,
+  ItemTitle,
+} from "@/components/ui/item"
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+} from "@/components/ui/sidebar"
+
+type SettingsSection = "providers" | "repo" | "costs" | "proxy" | "about"
+type AboutDemoState = "update" | "latest"
+
+const SETTINGS_SECTIONS: Array<{
+  description: string
+  icon: React.ComponentType<{ className?: string }>
+  id: SettingsSection
+  label: string
+}> = [
+  {
+    description: "Local provider credentials and OAuth",
+    icon: BadgeCheck,
+    id: "providers",
+    label: "Providers",
+  },
+  {
+    description: "Active repository context for the session",
+    icon: GitBranch,
+    id: "repo",
+    label: "Repo",
+  },
+  {
+    description: "Session and daily usage totals",
+    icon: DollarSign,
+    id: "costs",
+    label: "Costs",
+  },
+  {
+    description: "Proxy routing for provider requests",
+    icon: Globe,
+    id: "proxy",
+    label: "Proxy",
+  },
+  {
+    description: "What gitinspect.com is and how it works",
+    icon: Info,
+    id: "about",
+    label: "About",
+  },
+]
 
 export function SettingsDialog(props: {
   onRepoSourceChange: (repoSource?: SessionData["repoSource"]) => Promise<void>
@@ -24,40 +94,241 @@ export function SettingsDialog(props: {
   session: SessionData
   settingsDisabled?: boolean
 }) {
+  const [section, setSection] = React.useState<SettingsSection>("providers")
+  const activeSection =
+    SETTINGS_SECTIONS.find((item) => item.id === section) ?? SETTINGS_SECTIONS[0]
+
   return (
     <Dialog onOpenChange={props.onOpenChange} open={props.open}>
-      <DialogContent className="max-w-3xl">
-        <DialogHeader>
-          <DialogTitle>Settings</DialogTitle>
-          <DialogDescription>
-            Manage local provider credentials, proxy behavior, and cost tracking.
-          </DialogDescription>
-        </DialogHeader>
-        <Tabs className="gap-4" defaultValue="providers">
-          <TabsList variant="line">
-            <TabsTrigger value="providers">Providers</TabsTrigger>
-            <TabsTrigger value="repo">Repo</TabsTrigger>
-            <TabsTrigger value="proxy">Proxy</TabsTrigger>
-            <TabsTrigger value="costs">Costs</TabsTrigger>
-          </TabsList>
-          <TabsContent value="providers">
-            <ProviderSettings />
-          </TabsContent>
-          <TabsContent value="repo">
-            <RepoSettings
-              disabled={props.settingsDisabled}
-              onSave={props.onRepoSourceChange}
-              session={props.session}
-            />
-          </TabsContent>
-          <TabsContent value="proxy">
-            <ProxySettings />
-          </TabsContent>
-          <TabsContent value="costs">
-            <CostsPanel session={props.session} />
-          </TabsContent>
-        </Tabs>
+      <DialogContent className="overflow-hidden p-0 md:max-h-[620px] md:max-w-5xl">
+        <DialogTitle className="sr-only">Settings</DialogTitle>
+        <SidebarProvider className="items-start">
+          <Sidebar className="hidden border-r border-foreground/10 md:flex" collapsible="none">
+            <SidebarContent>
+              <SidebarGroup>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {SETTINGS_SECTIONS.map((item) => (
+                      <SidebarMenuItem key={item.id}>
+                        <SidebarMenuButton
+                          isActive={section === item.id}
+                          onClick={() => setSection(item.id)}
+                        >
+                          <item.icon />
+                          <span>{item.label}</span>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    ))}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            </SidebarContent>
+          </Sidebar>
+          <main className="flex h-[620px] min-w-0 flex-1 flex-col overflow-hidden">
+            <header className="shrink-0 border-b border-foreground/10 px-5 pt-4 md:h-16 md:pt-0">
+              <div className="flex min-h-11 items-center">
+                <Breadcrumb>
+                  <BreadcrumbList>
+                    <BreadcrumbItem className="hidden md:block">
+                      <BreadcrumbPage>Settings</BreadcrumbPage>
+                    </BreadcrumbItem>
+                    <BreadcrumbSeparator className="hidden md:block" />
+                    <BreadcrumbItem>
+                      <BreadcrumbPage>{activeSection.label}</BreadcrumbPage>
+                    </BreadcrumbItem>
+                  </BreadcrumbList>
+                </Breadcrumb>
+              </div>
+              <Tabs
+                className="gap-0 md:hidden"
+                onValueChange={(value) => {
+                  if (isSettingsSection(value)) {
+                    setSection(value)
+                  }
+                }}
+                value={section}
+              >
+                <TabsList
+                  className="-mx-1 h-auto w-[calc(100%+0.5rem)] justify-start overflow-x-auto px-1"
+                  variant="line"
+                >
+                  {SETTINGS_SECTIONS.map((item) => (
+                    <TabsTrigger
+                      className="shrink-0 px-0 pb-2"
+                      key={item.id}
+                      value={item.id}
+                    >
+                      {item.label}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
+            </header>
+            <div className="min-h-0 flex-1 overflow-y-auto p-5">
+              <div className="mb-4 max-w-2xl">
+                <div className="text-sm font-medium">{activeSection.label}</div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  {activeSection.description}
+                </div>
+              </div>
+              <div className="max-w-3xl">
+                {section === "providers" ? <ProviderSettings /> : null}
+                {section === "repo" ? (
+                  <RepoSettings
+                    disabled={props.settingsDisabled}
+                    onSave={props.onRepoSourceChange}
+                    session={props.session}
+                  />
+                ) : null}
+                {section === "proxy" ? (
+                  <ProxySettings disabled={props.settingsDisabled} />
+                ) : null}
+                {section === "costs" ? <CostsPanel session={props.session} /> : null}
+                {section === "about" ? <AboutPanel /> : null}
+              </div>
+            </div>
+          </main>
+        </SidebarProvider>
       </DialogContent>
     </Dialog>
+  )
+}
+
+function isSettingsSection(value: string): value is SettingsSection {
+  return SETTINGS_SECTIONS.some((section) => section.id === value)
+}
+
+function AboutPanel() {
+  const [state, setState] = React.useState<AboutDemoState>("update")
+  const isUpdateAvailable = state === "update"
+
+  return (
+    <div className="space-y-5">
+      <div className="space-y-1.5">
+        <div className="text-sm font-medium">About</div>
+        <div className="text-xs text-muted-foreground">
+          What gitinspect.com is and how it works.
+        </div>
+      </div>
+
+      <div className="rounded-none border border-dashed border-foreground/15 p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div className="space-y-1">
+            <div className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+              Demo only
+            </div>
+            <div className="text-sm font-medium">Preview about states</div>
+            <div className="max-w-2xl text-xs text-muted-foreground">
+              Temporary toggle for comparing the update banner states before we
+              ship this to production.
+            </div>
+          </div>
+          <ToggleGroup
+            aria-label="About demo state"
+            onValueChange={(value) => {
+              if (value === "update" || value === "latest") {
+                setState(value)
+              }
+            }}
+            size="sm"
+            type="single"
+            value={state}
+            variant="outline"
+          >
+            <ToggleGroupItem value="update">Needs update</ToggleGroupItem>
+            <ToggleGroupItem value="latest">Latest</ToggleGroupItem>
+          </ToggleGroup>
+        </div>
+      </div>
+
+      <Item
+        variant="outline"
+        className={
+          isUpdateAvailable
+            ? "border-amber-500/35 bg-amber-500/5"
+            : "border-emerald-500/35 bg-emerald-500/5"
+        }
+      >
+        <ItemMedia variant="icon">
+          {isUpdateAvailable ? (
+            <ArrowUpRight className="size-5 text-amber-500" />
+          ) : (
+            <BadgeCheck className="size-5 text-emerald-500" />
+          )}
+        </ItemMedia>
+        <ItemContent>
+          <ItemTitle>
+            {isUpdateAvailable ? "Update Available" : "Up to date"}
+          </ItemTitle>
+          <ItemDescription>
+            {isUpdateAvailable
+              ? "A new version (0.6.11) is available."
+              : "gitinspect.com is running the latest version (1.0.0)."}
+          </ItemDescription>
+        </ItemContent>
+        <ItemActions className="ml-auto">
+          {isUpdateAvailable ? (
+            <Button size="sm" variant="outline">
+              Update
+            </Button>
+          ) : (
+            <div className="text-xs font-medium text-emerald-600">
+              Latest
+            </div>
+          )}
+        </ItemActions>
+      </Item>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        <Item variant="outline">
+          <ItemContent>
+            <ItemTitle>gitinspect.com</ItemTitle>
+            <ItemDescription>
+              A local-only browser app for inspecting repositories with
+              persistent sessions, streaming chat, model selection, and local
+              cost tracking.
+            </ItemDescription>
+          </ItemContent>
+        </Item>
+        <Item variant="outline">
+          <ItemContent>
+            <ItemTitle>Private by default</ItemTitle>
+            <ItemDescription>
+              Sessions, credentials, repo context, and usage data stay in your
+              browser.
+            </ItemDescription>
+          </ItemContent>
+        </Item>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+        {[
+          { href: "https://gitinspect.com", label: "Website" },
+          { href: "https://gitinspect.com/privacy", label: "Privacy" },
+          { href: "https://gitinspect.com/terms", label: "Terms" },
+          { href: "https://gitinspect.com/imprint", label: "Imprint" },
+        ].map((item, index) => (
+          <React.Fragment key={item.label}>
+            {index > 0 ? (
+              <span className="text-muted-foreground/50">·</span>
+            ) : null}
+            <Button
+              asChild
+              className="h-auto px-0 py-0 text-xs font-medium text-muted-foreground hover:text-foreground"
+              variant="link"
+            >
+              <a href={item.href} target="_blank" rel="noreferrer">
+                {item.label}
+              </a>
+            </Button>
+          </React.Fragment>
+        ))}
+      </div>
+
+      <div className="text-xs text-muted-foreground">
+        Sessions, credentials, repository context, and usage data stay local in
+        your browser.
+      </div>
+    </div>
   )
 }

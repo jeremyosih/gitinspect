@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 
-export function ProxySettings() {
+export function ProxySettings(props: { disabled?: boolean }) {
   const [enabled, setEnabled] = React.useState(false)
   const [url, setUrl] = React.useState(DEFAULT_PROXY_URL)
   const [isLoading, setIsLoading] = React.useState(true)
@@ -33,13 +33,6 @@ export function ProxySettings() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <div className="text-sm font-medium">Proxy</div>
-        <div className="mt-1 text-xs text-muted-foreground">
-          Sitegeist-style proxy support is enabled by default. Only requests that require it will use the proxy, and this app does not provide the proxy service itself.
-        </div>
-      </div>
-
       <div className="rounded-none border border-foreground/10 p-4">
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-1">
@@ -50,7 +43,7 @@ export function ProxySettings() {
           </div>
           <Switch
             checked={enabled}
-            disabled={isLoading || isSaving}
+            disabled={props.disabled || isLoading || isSaving}
             id="proxy-enabled"
             onCheckedChange={setEnabled}
           />
@@ -59,7 +52,7 @@ export function ProxySettings() {
         <div className="mt-4 space-y-2">
           <Label htmlFor="proxy-url">Proxy base URL</Label>
           <Input
-            disabled={isLoading || isSaving}
+            disabled={props.disabled || isLoading || isSaving}
             id="proxy-url"
             onChange={(event) => setUrl(event.target.value)}
             placeholder={DEFAULT_PROXY_URL}
@@ -72,7 +65,7 @@ export function ProxySettings() {
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <Button
-            disabled={isLoading || isSaving}
+            disabled={props.disabled || isLoading || isSaving}
             onClick={async () => {
               setIsSaving(true)
               try {
