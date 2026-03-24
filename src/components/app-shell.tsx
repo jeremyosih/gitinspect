@@ -1,13 +1,13 @@
 import * as React from "react"
 import { DotOutlineIcon, GearIcon } from "@phosphor-icons/react"
 import { setSetting } from "@/db/schema"
-import { useRuntimeState } from "@/hooks/use-runtime-state"
 import { useAppBootstrap } from "@/hooks/use-app-bootstrap"
 import { useRuntimeSession } from "@/hooks/use-runtime-session"
 import { useSessionData } from "@/hooks/use-session-data"
+import { useSessionList } from "@/hooks/use-session-list"
+import { useSessionMessages } from "@/hooks/use-session-messages"
 import { getCanonicalProvider } from "@/models/catalog"
 import { formatRepoSourceLabel, setLastUsedRepoSource } from "@/repo/settings"
-import { useSessionList } from "@/hooks/use-session-list"
 import { createSession, persistSessionSnapshot } from "@/sessions/session-service"
 import type { SessionData } from "@/types/storage"
 import { ChatThread } from "@/components/chat-thread"
@@ -28,11 +28,24 @@ function syncSessionToUrl(sessionId: string): void {
   window.history.replaceState({}, "", url)
 }
 
+function persistLastUsedSessionSettings(session: Pick<
+  SessionData,
+  "id" | "model" | "provider" | "providerGroup" | "repoSource"
+>): void {
+  void setSetting("active-session-id", session.id)
+  void setSetting("last-used-model", session.model)
+  void setSetting("last-used-provider", session.provider)
+  void setSetting(
+    "last-used-provider-group",
+    session.providerGroup ?? session.provider
+  )
+  void setLastUsedRepoSource(session.repoSource)
+}
+
 export function AppShell() {
   const bootstrap = useAppBootstrap()
   const { sessions } = useSessionList()
   const [settingsOpen, setSettingsOpen] = React.useState(false)
-  const runtimeState = useRuntimeState()
 
   if (bootstrap.status === "error") {
     return (
@@ -53,7 +66,6 @@ export function AppShell() {
   return (
     <ReadyAppShell
       initialSession={bootstrap.session}
-      runningSessionIds={runtimeState.runningSessionIds}
       sessions={sessions}
       settingsOpen={settingsOpen}
       setSettingsOpen={setSettingsOpen}
@@ -63,94 +75,34 @@ export function AppShell() {
 
 function ReadyAppShell(props: {
   initialSession: SessionData
-  runningSessionIds: string[]
   sessions: ReturnType<typeof useSessionList>["sessions"]
   setSettingsOpen: (open: boolean) => void
   settingsOpen: boolean
 }) {
-  const [cachedSessions, setCachedSessions] = React.useState<Record<string, SessionData>>(
-    () => ({
-      [props.initialSession.id]: props.initialSession,
-    })
-  )
   const [selectedSessionId, setSelectedSessionId] = React.useState(
     props.initialSession.id
   )
-  const [optimisticSession, setOptimisticSession] = React.useState<
-    SessionData | undefined
-  >(props.initialSession)
-  const selectedSession = useSessionData(selectedSessionId)
-  const cachedSession = cachedSessions[selectedSessionId]
-  const activeSession =
-    selectedSession?.id === selectedSessionId
-      ? selectedSession
-      : optimisticSession?.id === selectedSessionId
-        ? optimisticSession
-        : cachedSession?.id === selectedSessionId
-          ? cachedSession
-          : undefined
-  const runtime = useRuntimeSession(selectedSessionId, activeSession)
-
-  const cacheSession = React.useEffectEvent((session: SessionData) => {
-    setCachedSessions((current) =>
-      current[session.id] === session
-        ? current
-        : {
-            ...current,
-            [session.id]: session,
-          }
-    )
-  })
+  const activeSession = useSessionData(selectedSessionId)
+  const messages = useSessionMessages(selectedSessionId) ?? []
+  const runtime = useRuntimeSession(selectedSessionId)
 
   React.useEffect(() => {
     setSelectedSessionId(props.initialSession.id)
-    setOptimisticSession(props.initialSession)
-    cacheSession(props.initialSession)
-  }, [props.initialSession])
+  }, [props.initialSession.id])
 
   React.useEffect(() => {
     syncSessionToUrl(selectedSessionId)
   }, [selectedSessionId])
 
-  React.useEffect(() => {
-    if (selectedSession?.id !== selectedSessionId) {
-      return
-    }
-
-    cacheSession(selectedSession)
-    setOptimisticSession((current) =>
-      current?.id === selectedSessionId ? undefined : current
-    )
-  }, [cacheSession, selectedSession, selectedSessionId])
-
-  React.useEffect(() => {
-    if (!activeSession) {
-      return
-    }
-
-    void setSetting("last-used-model", activeSession.model)
-    void setSetting("last-used-provider", activeSession.provider)
-    void setSetting(
-      "last-used-provider-group",
-      activeSession.providerGroup ?? activeSession.provider
-    )
-    void setLastUsedRepoSource(activeSession.repoSource)
-  }, [
-    activeSession?.id,
-    activeSession?.model,
-    activeSession?.provider,
-    activeSession?.providerGroup,
-    activeSession?.repoSource,
-  ])
-
   const setActiveSession = React.useEffectEvent(async (session: SessionData) => {
     setSelectedSessionId(session.id)
-    setOptimisticSession(session)
-    cacheSession(session)
     syncSessionToUrl(session.id)
-
-    void setSetting("active-session-id", session.id)
+    persistLastUsedSessionSettings(session)
   })
+
+  const runningSessionIds = props.sessions
+    .filter((session) => session.isStreaming)
+    .map((session) => session.id)
 
   return (
     <>
@@ -158,27 +110,38 @@ function ReadyAppShell(props: {
         <SessionSidebar
           activeSessionId={selectedSessionId}
           onCreateSession={async () => {
-            if (!activeSession) {
-              return
-            }
-
+            const baseSession = activeSession ?? props.initialSession
             const nextSession = createSession({
-              model: activeSession.model,
+              model: baseSession.model,
               providerGroup:
-                activeSession.providerGroup ?? activeSession.provider,
-              repoSource: activeSession.repoSource,
-              thinkingLevel: activeSession.thinkingLevel,
+                baseSession.providerGroup ?? baseSession.provider,
+              repoSource: baseSession.repoSource,
+              thinkingLevel: baseSession.thinkingLevel,
             })
+            await persistSessionSnapshot(nextSession)
             await setActiveSession(nextSession)
-            void persistSessionSnapshot(nextSession)
           }}
           onSelectSession={(sessionId) => {
             setSelectedSessionId(sessionId)
-            setOptimisticSession(cachedSessions[sessionId])
             syncSessionToUrl(sessionId)
-            void setSetting("active-session-id", sessionId)
+            const selectedMetadata = props.sessions.find(
+              (session) => session.id === sessionId
+            )
+
+            if (!selectedMetadata) {
+              void setSetting("active-session-id", sessionId)
+              return
+            }
+
+            persistLastUsedSessionSettings({
+              id: selectedMetadata.id,
+              model: selectedMetadata.model,
+              provider: selectedMetadata.provider,
+              providerGroup: selectedMetadata.providerGroup,
+              repoSource: selectedMetadata.repoSource,
+            })
           }}
-          runningSessionIds={props.runningSessionIds}
+          runningSessionIds={runningSessionIds}
           sessions={props.sessions}
         />
         <div className="flex min-h-svh min-w-0 flex-1 flex-col">
@@ -193,7 +156,7 @@ function ReadyAppShell(props: {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <ModelPicker
-                disabled={runtime.isStreaming || !activeSession}
+                disabled={activeSession?.isStreaming ?? false}
                 model={activeSession?.model ?? props.initialSession.model}
                 onChange={async (providerGroup, model) => {
                   if (!activeSession) {
@@ -201,13 +164,12 @@ function ReadyAppShell(props: {
                   }
 
                   await runtime.setModelSelection(providerGroup, model)
-                  void setSetting("active-session-id", activeSession.id)
-                  void setSetting("last-used-model", model)
-                  void setSetting(
-                    "last-used-provider",
-                    getCanonicalProvider(providerGroup)
-                  )
-                  void setSetting("last-used-provider-group", providerGroup)
+                  persistLastUsedSessionSettings({
+                    ...activeSession,
+                    model,
+                    provider: getCanonicalProvider(providerGroup),
+                    providerGroup,
+                  })
                 }}
                 providerGroup={
                   activeSession?.providerGroup ??
@@ -229,13 +191,15 @@ function ReadyAppShell(props: {
               </div>
               <div
                 className={
-                  runtime.isStreaming
+                  activeSession?.isStreaming
                     ? "flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[11px] uppercase tracking-[0.16em] text-emerald-700"
                     : "flex items-center gap-1 rounded-full border border-foreground/10 px-2 py-1 text-[11px] uppercase tracking-[0.16em] text-muted-foreground"
                 }
               >
-                <DotOutlineIcon weight={runtime.isStreaming ? "fill" : "regular"} />
-                {runtime.isStreaming ? "Live" : "Idle"}
+                <DotOutlineIcon
+                  weight={activeSession?.isStreaming ? "fill" : "regular"}
+                />
+                {activeSession?.isStreaming ? "Live" : "Idle"}
               </div>
               <Button
                 onClick={() => props.setSettingsOpen(true)}
@@ -249,9 +213,8 @@ function ReadyAppShell(props: {
           <div className="min-h-0 flex-1">
             {activeSession ? (
               <ChatThread
-                draftAssistantMessage={runtime.runtimeDraft}
-                isStreaming={runtime.isStreaming}
-                messages={activeSession.messages}
+                isStreaming={activeSession.isStreaming}
+                messages={messages}
               />
             ) : (
               <div className="flex h-full items-center justify-center px-6 text-sm text-muted-foreground">
@@ -260,8 +223,8 @@ function ReadyAppShell(props: {
             )}
           </div>
           <Composer
-            error={runtime.error}
-            isStreaming={activeSession ? runtime.isStreaming : false}
+            error={runtime.error ?? activeSession?.error}
+            isStreaming={activeSession?.isStreaming ?? false}
             onAbort={runtime.abort}
             onSend={runtime.send}
           />
@@ -270,9 +233,20 @@ function ReadyAppShell(props: {
       <SettingsDialog
         onOpenChange={props.setSettingsOpen}
         open={props.settingsOpen}
-        onRepoSourceChange={runtime.setRepoSource}
+        onRepoSourceChange={async (repoSource) => {
+          await runtime.setRepoSource(repoSource)
+
+          if (!activeSession) {
+            return
+          }
+
+          persistLastUsedSessionSettings({
+            ...activeSession,
+            repoSource,
+          })
+        }}
         session={activeSession ?? props.initialSession}
-        settingsDisabled={runtime.isStreaming || !activeSession}
+        settingsDisabled={activeSession?.isStreaming ?? false}
       />
     </>
   )
