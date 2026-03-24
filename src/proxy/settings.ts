@@ -11,12 +11,19 @@ const PROXY_ENABLED_KEY = "proxy.enabled"
 const PROXY_URL_KEY = "proxy.url"
 
 export async function getProxyConfig(): Promise<ProxyConfig> {
-  const enabled = await getSetting(PROXY_ENABLED_KEY)
-  const url = await getSetting(PROXY_URL_KEY)
+  try {
+    const enabled = await getSetting(PROXY_ENABLED_KEY)
+    const url = await getSetting(PROXY_URL_KEY)
 
-  return {
-    enabled: typeof enabled === "boolean" ? enabled : true,
-    url: typeof url === "string" && url.length > 0 ? url : DEFAULT_PROXY_URL,
+    return {
+      enabled: typeof enabled === "boolean" ? enabled : true,
+      url: typeof url === "string" && url.length > 0 ? url : DEFAULT_PROXY_URL,
+    }
+  } catch {
+    return {
+      enabled: true,
+      url: DEFAULT_PROXY_URL,
+    }
   }
 }
 

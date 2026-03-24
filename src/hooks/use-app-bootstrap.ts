@@ -6,6 +6,7 @@ import {
   getProviders,
   hasModel,
 } from "@/models/catalog"
+import { getLastUsedRepoSource, setLastUsedRepoSource } from "@/repo/settings"
 import { createSession, loadMostRecentSession, loadSession } from "@/sessions/session-service"
 import type { ProviderId } from "@/types/models"
 import type { SessionData } from "@/types/storage"
@@ -55,7 +56,11 @@ export async function loadInitialSession(): Promise<SessionData> {
     return recent
   }
 
-  return createSession({ model, provider })
+  return createSession({
+    model,
+    provider,
+    repoSource: await getLastUsedRepoSource(),
+  })
 }
 
 export function useAppBootstrap(): AppBootstrapState {
@@ -73,6 +78,7 @@ export function useAppBootstrap(): AppBootstrapState {
         await setSetting("active-session-id", session.id)
         await setSetting("last-used-model", session.model)
         await setSetting("last-used-provider", session.provider)
+        await setLastUsedRepoSource(session.repoSource)
 
         if (!disposed) {
           setState({

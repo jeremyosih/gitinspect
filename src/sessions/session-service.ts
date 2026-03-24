@@ -3,13 +3,15 @@ import { createId } from "@/lib/ids"
 import { getIsoNow } from "@/lib/dates"
 import { createEmptyUsage, type ProviderId, type ThinkingLevel } from "@/types/models"
 import { getMostRecentSession, getSession, saveSession } from "@/db/schema"
-import type { SessionData } from "@/types/storage"
+import type { RepoSource, SessionData } from "@/types/storage"
 import type { Usage } from "@/types/models"
 import { buildPreview, buildSessionMetadata, generateTitle, hasPersistableExchange } from "@/sessions/session-metadata"
+import { normalizeRepoSource } from "@/repo/settings"
 
 export function createSession(params: {
   model: string
   provider: ProviderId
+  repoSource?: RepoSource
   thinkingLevel?: ThinkingLevel
 }): SessionData {
   const now = getIsoNow()
@@ -22,6 +24,7 @@ export function createSession(params: {
     model: params.model,
     preview: "",
     provider: params.provider,
+    repoSource: normalizeRepoSource(params.repoSource),
     thinkingLevel: params.thinkingLevel ?? "medium",
     title: "New chat",
     updatedAt: now,
@@ -92,6 +95,7 @@ export function buildPersistedSession(session: SessionData): SessionData {
     ...session,
     cost: usage.cost.total,
     createdAt: session.createdAt,
+    repoSource: normalizeRepoSource(session.repoSource),
     usage,
   })
 }

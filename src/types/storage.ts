@@ -2,6 +2,13 @@ import type { JsonValue } from "@/types/common"
 import type { ChatMessage } from "@/types/chat"
 import type { ProviderId, ThinkingLevel, Usage } from "@/types/models"
 
+export interface RepoSource {
+  owner: string
+  ref: string
+  repo: string
+  token?: string
+}
+
 export interface SessionData {
   cost: number
   createdAt: string
@@ -10,6 +17,7 @@ export interface SessionData {
   model: string
   preview: string
   provider: ProviderId
+  repoSource?: RepoSource
   thinkingLevel: ThinkingLevel
   title: string
   updatedAt: string
