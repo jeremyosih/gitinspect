@@ -39,7 +39,7 @@ export function ProxySettings(props: { disabled?: boolean }) {
           <div className="space-y-1">
             <Label htmlFor="proxy-enabled">Enable proxy</Label>
             <div className="text-xs text-muted-foreground">
-              When enabled, OpenAI, OpenAI Codex, OpenCode, and OpenCode Go requests use the proxy; Anthropic subscription OAuth can use it for token calls. Gemini and Copilot stay direct.
+              When enabled, OpenAI, OpenAI Codex, OpenCode, and OpenCode Go requests use the proxy; Anthropic subscription OAuth can use it for token calls. Gemini and Copilot stay direct. OpenCode Free always uses the built-in server proxy regardless of this setting.
             </div>
           </div>
           <Switch

@@ -12,6 +12,7 @@ import {
 } from "@mariozechner/pi-ai"
 import { SYSTEM_PROMPT } from "@/agent/system-prompt"
 import { resolveProviderAuthForProvider } from "@/auth/resolve-api-key"
+import { isOpencodeFreeMarker } from "@/auth/public-provider-fallbacks"
 import { createId } from "@/lib/ids"
 import { getModel } from "@/models/catalog"
 import { getProxyConfig } from "@/proxy/settings"
@@ -249,7 +250,7 @@ function applyProxyIfNeeded<TApi extends Api>(
 }
 
 export function createStreamFn(
-  getProxyUrl: () => Promise<string | undefined>
+  getProxyUrl: (apiKey: string) => Promise<string | undefined>
 ) {
   return async <TApi extends Api>(
     model: Model<TApi>,
@@ -257,9 +258,14 @@ export function createStreamFn(
     options?: SimpleStreamOptions
   ) => {
     const apiKey = options?.apiKey
-    const proxyUrl = await getProxyUrl()
 
-    if (!apiKey || !proxyUrl) {
+    if (!apiKey) {
+      return streamSimple(model, context, options)
+    }
+
+    const proxyUrl = await getProxyUrl(apiKey)
+
+    if (!proxyUrl) {
       return streamSimple(model, context, options)
     }
 
@@ -268,7 +274,11 @@ export function createStreamFn(
   }
 }
 
-const proxyAwareStreamSimple = createStreamFn(async () => {
+const proxyAwareStreamSimple = createStreamFn(async (apiKey) => {
+  if (isOpencodeFreeMarker(apiKey)) {
+    return "/api/proxy"
+  }
+
   const proxy = await getProxyConfig()
   return proxy.enabled ? proxy.url : undefined
 })
