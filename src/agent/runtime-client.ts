@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/consistent-type-imports, @typescript-eslint/require-await */
 import type { ProviderGroupId, ThinkingLevel } from "@/types/models"
 import type { RepoSource } from "@/types/storage"
 import type {
@@ -5,8 +6,7 @@ import type {
   RuntimeWorkerApi,
   WorkerMode,
 } from "@/agent/runtime-worker-types"
-
-type WorkerModule = typeof import("./runtime-worker")
+import { wrap, type Remote } from "comlink"
 
 const sharedWorkerSupported =
   typeof window !== "undefined" && "SharedWorker" in window
@@ -16,18 +16,23 @@ function createWorkerApi(): { api: RuntimeWorkerApi; mode: WorkerMode } {
     throw new Error("Worker runtime requires a browser environment")
   }
 
-  const workerUrl = new URL("./runtime-worker", import.meta.url)
-  const workerOpts = { name: "gitinspect-runtime", type: "module" as const }
-
   if (sharedWorkerSupported) {
+    const worker = new SharedWorker(
+      new URL("./runtime-worker", import.meta.url),
+      { name: "gitinspect-runtime", type: "module" }
+    )
     return {
-      api: new ComlinkSharedWorker<WorkerModule>(workerUrl, workerOpts),
+      api: wrap<RuntimeWorkerApi>(worker.port),
       mode: "shared",
     }
   }
 
+  const worker = new Worker(
+    new URL("./runtime-worker", import.meta.url),
+    { name: "gitinspect-runtime", type: "module" }
+  )
   return {
-    api: new ComlinkWorker<WorkerModule>(workerUrl, workerOpts),
+    api: wrap<RuntimeWorkerApi>(worker),
     mode: "dedicated",
   }
 }

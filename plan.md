@@ -1,1085 +1,1062 @@
-# AI Elements Chat UI Plan
+# Routes Refactor Plan
 
-## Goal
+## What You Actually Want
 
-Build the inner chat UI that replaces the current `ChatThread` + `Composer` fallback inside the already-implemented `ChatShell`, using the `ai-elements` primitives from the example you shared, but wired to this app’s real persistence/runtime layer.
+The root route should be the real layout route.
 
-This plan is only about the inner chat surface. `ChatShell`, sidebar, header, session list, and settings dialog already exist and should remain the owners of shell-level state.
+Not:
 
-The main component should be named `Chat`.
+- routes building the shell themselves
+- a second shell orchestration layer
+- a context/provider architecture just to move props around
 
----
+Yes:
 
-## Current Implementation Grounding
+- [`src/routes/__root.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/__root.tsx) renders the full app layout once
+- root layout contains the sidebar, header, settings dialog, and `<Outlet />`
+- route files only render page content
+- components like sidebar should fetch what they need themselves instead of receiving the same props from every route
 
-### What is already done
+That means the direction is:
 
-The new shell is already implemented in [src/components/new/chat-shell.tsx](/Users/jeremy/Developer/gitoverflow/src/components/new/chat-shell.tsx).
+```tsx
+<SidebarProvider>
+  <AppSidebar />
+  <SidebarInset>
+    <AppHeader />
+    <Outlet />
+  </SidebarInset>
+  <AppSettingsDialog />
+</SidebarProvider>
+```
 
-It already owns:
+## Core Refactor Goal
 
-- bootstrap/loading/error handling
-- active session selection
-- sidebar actions
-- create/delete/select session flows
-- URL sync via `?session=...`
+Refactor `src/routes` so:
+
+1. layout is defined once in root
+2. `index.tsx`, `chat.tsx`, `$owner.$repo.index.tsx`, and `$owner.$repo.$.tsx` stop mounting the shell
+3. `AppSidebar` becomes self-contained and zero-prop
+4. root-level UI state like `sidebar` and `settings` is managed from root
+5. route files only own route-specific content and redirects
+
+## Current Problem
+
+Right now every route is doing this same job again:
+
+```tsx
+<AppShellLayout
+  header={<ChatHeader ... />}
+  main={main}
+  settings={<SettingsDialog ... />}
+  sidebar={<ChatSidebar ... />}
+  sidebarOpen={search.sidebar === "open"}
+  onSidebarOpenChange={...}
+/>
+```
+
+That creates three problems:
+
+1. shell composition is duplicated
+2. root-level search state is manually re-threaded everywhere
+3. components that should be smart components are being treated like dumb prop bags
+
+The duplication is especially obvious in:
+
+- [`src/routes/index.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/index.tsx)
+- [`src/routes/chat.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/chat.tsx)
+- [`src/routes/$owner.$repo.index.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/$owner.$repo.index.tsx)
+- [`src/routes/$owner.$repo.$.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/$owner.$repo.$.tsx)
+
+## Target Shape
+
+### Root owns the entire shell
+
+The root route should render:
+
+- `SidebarProvider`
+- `AppSidebar`
+- `SidebarInset`
+- top header
+- `Outlet`
 - settings dialog
-- `useSessionData(selectedSessionId)`
-- `useSessionMessages(selectedSessionId)`
-- `useRuntimeSession(selectedSessionId)`
 
-Today, the shell renders:
+Only once.
 
-- `ChatThread` + `Composer` when no child is provided
-- `props.children` inside `<main>` when a child is provided
+### Routes render content only
 
-That means the simplest path is:
+After the refactor:
 
-1. keep `ChatShell` as the owner of active session/runtime state
-2. mount a child `Chat`
-3. pass the already-resolved session/messages/runtime into `Chat`
+- `/` renders landing page content only
+- `/chat` renders the shared `Chat` component
+- `/$owner/$repo/` renders the same shared `Chat` component with repo context
+- `/$owner/$repo/$` renders the same shared `Chat` component with repo context for non-main refs
 
-### What should change in the route
+## Correct Ownership Boundaries
 
-`ChatPage` should mount the shell with the new inner component:
+### `__root.tsx`
 
-```tsx
-import { ChatShell } from "@/components/new/chat-shell"
-import { Chat } from "@/components/new/chat"
+Should own:
 
-export function ChatPage() {
-  return (
-    <ChatShell>
-      <Chat />
-    </ChatShell>
-  )
-}
-```
+- document shell
+- theme/tooltip/toaster providers
+- root search validation for `settings` and `sidebar`
+- root-owned search types for `settings` and `sidebar`
+- the actual layout route
+- sidebar open/close sync
+- settings dialog open/close sync
+- rendering `<Outlet />`
 
-### Recommended shell change
+Should not own:
 
-Right now `ChatShell` accepts generic `children`. That makes the child blind to the active session state the shell already owns.
+- selected session messages
+- repo-specific route content
+- empty chat vs active chat decisions
 
-The simplest design is to let the shell pass resolved props into `Chat`, either by:
+### `AppSidebar`
 
-- render prop
-- React context
-- or direct composition inside `ReadyChatShell`
+Should own:
 
-Recommendation: direct composition with explicit props. It is the least abstract option and matches the current codebase.
+- loading session metadata
+- active session detection
+- create/select/delete session actions
+- persistence of last-used session settings when navigating
 
----
+The key point is:
 
-## What Must Stay True
+- everything the sidebar needs should live in `AppSidebar`
 
-- No separate chat state machine in React.
-- No `useChat()` / AI SDK transport as source of truth.
-- No fake local streaming loop like the demo.
-- No bypass around the SharedWorker runtime.
-- Dexie remains the durable source of truth for messages/sessions.
-- Proxy behavior stays untouched.
+### `AppHeader`
 
-Runtime boundary stays:
+Should own:
 
-```text
-Chat
-  -> useRuntimeSession(sessionId) via ChatShell-owned state
-  -> runtimeClient
-  -> SharedWorker runtime
-  -> AgentHost
-  -> Dexie
-  -> useLiveQuery hooks
-```
+- breadcrumb rendering
+- reading current route/session/repo information needed for the header
+- opening settings
 
-The key difference from the previous draft is that `Chat` does **not** need to be independently query-param-driven anymore. `ChatShell` already owns that concern.
+### `AppSettingsDialog`
 
----
+Should own:
 
-## Real Schema vs Demo Shape
+- reading root search state
+- active section
+- reading current selected session if needed for costs or GitHub settings
 
-The demo uses a presentation-specific message shape. This repo does not.
+### Route files
 
-### Current persisted message model
+Should own:
 
-```ts
-export type ChatMessage = AssistantMessage | ToolResultMessage | UserMessage
-```
+- route-local `session` validation
+- route-local `session` search types
+- invalid session redirects
+- passing only minimal route context into the shared `Chat` component
 
-### Current assistant content blocks
-
-```ts
-export type AssistantContent = TextContent | ThinkingContent | ToolCall
-```
-
-### Consequences
-
-- `reasoning` exists, but as `thinking` content blocks inside assistant messages
-- `tools` exist, but as:
-  - assistant `toolCall` blocks
-  - separate `toolResult` messages
-- `versions` do not exist
-- `sources` do not exist
-- attachments exist in the input primitives, but the runtime currently only accepts `string` input
-- search toggle has no runtime/session contract
-
-So `Chat` needs a small adapter layer. It should not try to store demo-style message objects.
-
----
-
-## Scope
-
-### In scope
-
-- ai-elements conversation rendering
-- ai-elements prompt input
-- ai-elements model selector
-- reasoning rendering
-- tool call/result rendering
-- empty-state suggestions
-- streaming state from Dexie/runtime
-- text send/abort
-
-### Explicitly out of scope for the first pass
-
-- message branching/version UI
-- source citations UI
-- attachment sending
-- search toggle with real effect
-
-If any unsupported demo feature is rendered, it should be clearly disabled, adapter-backed, or hidden only when there is no honest way to represent it.
-
----
-
-## Visual Target
-
-The end result should read as the same overall interface shape as the example you provided, even if it is implemented through multiple smaller components and backed by the real persistence/runtime layer.
-
-### Required visual structure
-
-`Chat` should still compose into this overall layout:
-
-```tsx
-<div className="relative flex size-full flex-col divide-y overflow-hidden">
-  <Conversation>
-    <ConversationContent>{/* mapped messages */}</ConversationContent>
-    <ConversationScrollButton />
-  </Conversation>
-
-  <div className="grid shrink-0 gap-4 pt-4">
-    <Suggestions />
-    <div className="w-full px-4 pb-4">
-      <PromptInput>
-        <PromptInputHeader>{/* attachments area */}</PromptInputHeader>
-        <PromptInputBody>{/* textarea */}</PromptInputBody>
-        <PromptInputFooter>
-          <PromptInputTools>
-            {/* attachment menu */}
-            {/* speech input */}
-            {/* search button */}
-            {/* model selector */}
-          </PromptInputTools>
-          <PromptInputSubmit />
-        </PromptInputFooter>
-      </PromptInput>
-    </div>
-  </div>
-</div>
-```
-
-### Visual parity requirements
-
-- Keep the split layout:
-  - scrolling conversation on top
-  - suggestion strip above the prompt
-  - prompt input footer fixed at the bottom of the inner pane
-- Use the same ai-elements families as the example:
-  - `attachments`
-  - `conversation`
-  - `message`
-  - `model-selector`
-  - `prompt-input`
-  - `reasoning`
-  - `sources`
-  - `speech-input`
-  - `suggestion`
-- Preserve the same control ordering in the footer:
-  - attachment menu
-  - speech input
-  - search toggle/button
-  - model selector
-  - submit button
-- Preserve the same message presentation hierarchy:
-  - sources first
-  - reasoning second
-  - message content third
-  - branch selector after message content when applicable
-
-### Feature-shape guidance
-
-- `MessageBranch*` should remain part of the design surface, but only render controls when a message actually has more than one version.
-- `Sources*` should stay in the message composition, but render only when source data exists.
-- attachment UI should remain visible in the prompt surface even if actual attachment submission is disabled in v1.
-- `SpeechInput` should stay in the footer if it can safely append text without changing the runtime contract.
-- search toggle/button should remain in the footer for shape parity, but may be disabled or no-op until there is a real runtime flag behind it.
-
----
-
-## Proposed Files
-
-```text
-src/components/new/
-  chat.tsx
-  chat-message.tsx
-  chat-composer.tsx
-  chat-model-selector.tsx
-  chat-adapter.ts
-```
-
-### Responsibilities
-
-- `chat.tsx`
-  - top-level inner surface
-  - receives active session/messages/runtime from `ChatShell`
-  - composes conversation + suggestions + composer
-- `chat-message.tsx`
-  - renders one persisted message with ai-elements components
-- `chat-composer.tsx`
-  - prompt input + submit/stop + optional suggestions/model selector composition
-- `chat-model-selector.tsx`
-  - ai-elements model picker backed by the catalog/runtime
-- `chat-adapter.ts`
-  - pure helpers for converting persisted messages into renderable pieces
-
----
-
-## Phase 1: Let `ChatShell` Render `Chat`
-
-### Objective
-
-Stop treating the child as opaque content and instead wire it to the session/runtime state the shell already has.
-
-### Recommended shape
-
-Add a dedicated render path in `ReadyChatShell`:
-
-```tsx
-import { Chat } from "@/components/new/chat"
-
-<main className="min-h-0 flex-1">
-  {activeSession ? (
-    <Chat
-      error={runtime.error ?? activeSession.error}
-      messages={messages}
-      runtime={runtime}
-      session={activeSession}
-    />
-  ) : (
-    <div className="flex h-full items-center justify-center px-6 text-sm text-muted-foreground">
-      Loading session...
-    </div>
-  )}
-</main>
-```
-
-### Why this is simpler
-
-- no duplicate URL/session resolution logic
-- no custom event plumbing
-- no prop-drilling through unrelated layers
-- no confusion about whether the shell or child owns the active session
-
-`ChatShell` already has the correct data. Reuse it.
-
-### Detailed todo list
-
-- [ ] Decide whether `ChatShell` will render `Chat` directly or pass it via a typed child composition path.
-- [ ] Add a stable prop contract for `Chat`:
-  - `session`
-  - `messages`
-  - `runtime`
-  - `error`
-- [ ] Replace the current fallback branch in `ReadyChatShell` that renders `ChatThread` + `Composer`.
-- [ ] Keep the existing loading state in `ChatShell` unchanged when `activeSession` is missing.
-- [ ] Verify that `ChatHeader` title behavior does not need any changes after replacing the inner pane.
-- [ ] Verify that `SettingsDialog` and sidebar actions remain untouched after the swap.
-- [ ] Leave the old `ChatThread` + `Composer` in place until the new `Chat` is complete, then remove the fallback path only when parity is reached.
-
----
-
-## Phase 2: Add A Pure Adapter Layer For Persisted Messages
-
-### Objective
-
-Convert the persisted `ChatMessage` union into the parts needed by the ai-elements renderer.
-
-### Suggested helpers
-
-```ts
-import type {
-  AssistantMessage,
-  ChatMessage,
-  ToolCall,
-  ToolResultMessage,
-  UserMessage,
-} from "@/types/chat"
-
-export function getUserText(message: UserMessage): string {
-  if (typeof message.content === "string") {
-    return message.content
-  }
-
-  return message.content
-    .filter((part) => part.type === "text")
-    .map((part) => part.text)
-    .join("\n")
-}
-
-export function getAssistantText(message: AssistantMessage): string {
-  return message.content
-    .filter((part) => part.type === "text")
-    .map((part) => part.text)
-    .join("")
-}
-
-export function getAssistantThinking(message: AssistantMessage): string {
-  return message.content
-    .filter((part) => part.type === "thinking")
-    .map((part) => part.thinking)
-    .join("\n")
-}
-
-export function getAssistantToolCalls(message: AssistantMessage): ToolCall[] {
-  return message.content.filter(
-    (part): part is ToolCall => part.type === "toolCall"
-  )
-}
-
-export function isToolResultMessage(
-  message: ChatMessage
-): message is ToolResultMessage {
-  return message.role === "toolResult"
-}
-```
-
-### Important rule
-
-Do not reshape persisted messages into the demo’s `versions/sources/tools` object model. The adapter should stay read-only and local to the renderer.
-
-### Detailed todo list
-
-- [ ] Create `src/components/new/chat-adapter.ts`.
-- [ ] Add helper for extracting user text from the persisted union.
-- [ ] Add helper for extracting assistant markdown text.
-- [ ] Add helper for extracting assistant thinking blocks.
-- [ ] Add helper for extracting assistant tool calls.
-- [ ] Add helper for locating tool results associated with tool calls if grouped rendering becomes necessary.
-- [ ] Add helper for deriving a UI-facing message shape with fields like:
-  - `from`
-  - `content`
-  - `reasoning`
-  - `sources`
-  - `versions`
-  - `toolCalls`
-  - `toolResults`
-- [ ] Decide whether message versions should always be a one-item array in v1 for schema parity with the visual design.
-- [ ] Add tests for empty text, mixed content blocks, and assistant messages that contain both thinking and tool calls.
-
----
-
-## Phase 3: Build `Chat`
-
-### Objective
-
-Create the top-level inner surface using the same high-level composition as the demo:
-
-- conversation area
-- optional suggestions
-- prompt input footer
-
-### Suggested props
-
-```ts
-import type { ChatMessage } from "@/types/chat"
-import type { SessionData } from "@/types/storage"
-import type { useRuntimeSession } from "@/hooks/use-runtime-session"
-
-export interface ChatProps {
-  error?: string
-  messages: ChatMessage[]
-  runtime: ReturnType<typeof useRuntimeSession>
-  session: SessionData
-}
-```
-
-### Component skeleton
+Should not own:
+
+- sidebar data
+- header data
+- settings dialog wiring
+- shell JSX
+- special repo chat view logic
+- special “new chat” page logic
+- loading chat messages if `Chat` can do it itself
+
+## Proposed Component Structure
+
+### Root layout route
+
+The root route itself should look like this shape:
 
 ```tsx
 import {
-  Conversation,
-  ConversationContent,
-  ConversationScrollButton,
-} from "@/components/ai-elements/conversation"
-import { Suggestions, Suggestion } from "@/components/ai-elements/suggestion"
-import { ChatComposer } from "./chat-composer"
-import { ChatMessage } from "./chat-message"
+  HeadContent,
+  Outlet,
+  Scripts,
+  createRootRoute,
+  useNavigate,
+  useRouterState,
+} from "@tanstack/react-router"
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
+import { AppSidebar } from "@/components/app-sidebar"
+import { AppHeader } from "@/components/app-header"
+import { AppSettingsDialog } from "@/components/app-settings-dialog"
 
-const suggestions = [
-  "Summarize this repository",
-  "Explain the current runtime architecture",
-  "Find the session persistence flow",
-  "How does model switching work here?",
-]
+export const Route = createRootRoute({
+  validateSearch: (search) => ({
+    settings: isSettingsSection(search.settings) ? search.settings : undefined,
+    sidebar: search.sidebar === "open" ? "open" : undefined,
+  }),
+  shellComponent: RootDocument,
+  component: RootLayout,
+})
 
-export function Chat(props: ChatProps) {
-  return (
-    <div className="relative flex h-full min-h-0 flex-col overflow-hidden">
-      <Conversation>
-        <ConversationContent className="mx-auto w-full max-w-4xl px-4 py-6">
-          {props.messages.map((message) => (
-            <ChatMessage
-              isStreaming={props.session.isStreaming}
-              key={message.id}
-              message={message}
-            />
-          ))}
-        </ConversationContent>
-        <ConversationScrollButton />
-      </Conversation>
-
-      <div className="shrink-0 border-t">
-        {props.messages.length === 0 ? (
-          <Suggestions className="px-4 pt-4">
-            {suggestions.map((suggestion) => (
-              <Suggestion
-                key={suggestion}
-                onClick={() => void props.runtime.send(suggestion)}
-                suggestion={suggestion}
-              />
-            ))}
-          </Suggestions>
-        ) : null}
-
-        <ChatComposer
-          error={props.error}
-          isStreaming={props.session.isStreaming}
-          model={props.session.model}
-          onAbort={props.runtime.abort}
-          onSelectModel={props.runtime.setModelSelection}
-          onSend={props.runtime.send}
-          providerGroup={props.session.providerGroup ?? props.session.provider}
-        />
-      </div>
-    </div>
-  )
-}
-```
-
-### Detailed todo list
-
-- [ ] Create `src/components/new/chat.tsx`.
-- [ ] Make the root wrapper match the example’s `relative flex size-full flex-col divide-y overflow-hidden`.
-- [ ] Ensure the top region is a `Conversation` surface and the bottom region is a prompt/suggestions grid.
-- [ ] Keep the conversation region `min-h-0` so it scrolls correctly inside `ChatShell`.
-- [ ] Add empty-state suggestions above the prompt, not inside the scrollable conversation body.
-- [ ] Ensure suggestions disappear after the first persisted message exists, or decide to keep them visible if that better matches the target look.
-- [ ] Pass `session.isStreaming` through to all subcomponents that need it.
-- [ ] Keep `runtime.send`, `runtime.abort`, and `runtime.setModelSelection` as the only mutation entry points.
-- [ ] Surface runtime/session errors below or within the prompt area in a way that does not break the example’s vertical rhythm.
-
----
-
-## Phase 4: Render Messages With `ai-elements`
-
-### Objective
-
-Use the actual `ai-elements` primitives that match the example:
-
-- `Conversation`
-- `Message`
-- `MessageContent`
-- `MessageResponse`
-- `Reasoning`
-- `ReasoningTrigger`
-- `ReasoningContent`
-
-### Message renderer
-
-```tsx
-import {
-  Message,
-  MessageContent,
-  MessageResponse,
-} from "@/components/ai-elements/message"
-import {
-  Reasoning,
-  ReasoningContent,
-  ReasoningTrigger,
-} from "@/components/ai-elements/reasoning"
-import { ToolCallBubble } from "@/components/tool-call-bubble"
-import { ToolResultBubble } from "@/components/tool-result-bubble"
-import type { ChatMessage } from "@/types/chat"
-import {
-  getAssistantText,
-  getAssistantThinking,
-  getAssistantToolCalls,
-  getUserText,
-} from "./chat-adapter"
-
-export function ChatMessage(props: {
-  isStreaming: boolean
-  message: ChatMessage
-}) {
-  const { message } = props
-
-  if (message.role === "user") {
-    return (
-      <Message from="user">
-        <MessageContent>
-          <MessageResponse>{getUserText(message)}</MessageResponse>
-        </MessageContent>
-      </Message>
-    )
-  }
-
-  if (message.role === "toolResult") {
-    return <ToolResultBubble message={message} />
-  }
-
-  const text = getAssistantText(message)
-  const thinking = getAssistantThinking(message)
-  const toolCalls = getAssistantToolCalls(message)
-
-  return (
-    <Message from="assistant">
-      <div>
-        {thinking ? (
-          <Reasoning isStreaming={props.isStreaming}>
-            <ReasoningTrigger />
-            <ReasoningContent>{thinking}</ReasoningContent>
-          </Reasoning>
-        ) : null}
-
-        <MessageContent>
-          <MessageResponse>{text}</MessageResponse>
-        </MessageContent>
-
-        {toolCalls.map((toolCall) => (
-          <ToolCallBubble key={toolCall.id} toolCall={toolCall} />
-        ))}
-      </div>
-    </Message>
-  )
-}
-```
-
-### Notes
-
-- The current schema does not support `MessageBranch*`, so do not render branch controls.
-- The current schema does not support `Sources`, so do not render source controls.
-- Keep tool results as separate rows. That matches the runtime’s persisted structure.
-
-### Detailed todo list
-
-- [ ] Create `src/components/new/chat-message.tsx`.
-- [ ] Render user messages with `Message` + `MessageContent` + `MessageResponse`.
-- [ ] Render assistant messages with the example’s nested order:
-  - sources
-  - reasoning
-  - message content
-  - branch selector
-- [ ] Add a branch wrapper shape using `MessageBranch` and `MessageBranchContent`.
-- [ ] Represent v1 persisted messages as a single version by default.
-- [ ] Only show `MessageBranchSelector` when the derived versions array length is greater than 1.
-- [ ] Add `Sources`, `SourcesTrigger`, `SourcesContent`, and `Source` rendering hooks even if source arrays are empty in v1.
-- [ ] Decide whether tool calls live inside the assistant message body or immediately below it in the same message cell.
-- [ ] Replace or wrap `ToolCallBubble` if needed so it better matches the example’s inline tool presentation.
-- [ ] Replace or wrap `ToolResultBubble` if needed so tool outputs visually harmonize with the ai-elements message stack.
-- [ ] Confirm markdown/code rendering still works through `MessageResponse`.
-- [ ] Confirm reasoning duration handling:
-  - use real duration if available
-  - otherwise fall back safely without lying
-- [ ] Add tests for:
-  - user message
-  - assistant text-only message
-  - assistant message with thinking
-  - assistant message with tool calls
-  - tool result message
-  - single-version vs multi-version rendering
-
----
-
-## Phase 5: Build The ai-elements Composer
-
-### Objective
-
-Replace the old plain `Composer` with the richer prompt surface from the example.
-
-### First-pass behavior
-
-- text send
-- stop while streaming
-- model selector
-- optional suggestions
-- attachment UI present but not fully wired for submission
-- search toggle visually present but not functionally wired
-
-### Composer skeleton
-
-```tsx
-import * as React from "react"
-import type { PromptInputMessage } from "@/components/ai-elements/prompt-input"
-import {
-  PromptInput,
-  PromptInputBody,
-  PromptInputFooter,
-  PromptInputSubmit,
-  PromptInputTextarea,
-  PromptInputTools,
-} from "@/components/ai-elements/prompt-input"
-import type { ProviderGroupId } from "@/types/models"
-import { ChatModelSelector } from "./chat-model-selector"
-
-export function ChatComposer(props: {
-  error?: string
-  isStreaming: boolean
-  model: string
-  onAbort: () => void
-  onSelectModel: (providerGroup: ProviderGroupId, modelId: string) => Promise<void> | void
-  onSend: (value: string) => Promise<void> | void
-  providerGroup: ProviderGroupId
-}) {
-  const [text, setText] = React.useState("")
-
-  const handleSubmit = React.useEffectEvent(async (message: PromptInputMessage) => {
-    const next = message.text.trim()
-
-    if (!next || props.isStreaming) {
-      return
-    }
-
-    await props.onSend(next)
-    setText("")
+function RootLayout() {
+  const search = Route.useSearch()
+  const navigate = useNavigate()
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
   })
 
+  if (pathname === "/auth/callback") {
+    return <Outlet />
+  }
+
   return (
-    <div className="px-4 py-4">
-      <div className="mx-auto grid w-full max-w-4xl gap-4">
-        <PromptInput onSubmit={handleSubmit}>
-          <PromptInputBody>
-            <PromptInputTextarea
-              onChange={(event) => setText(event.target.value)}
-              value={text}
-            />
-          </PromptInputBody>
-
-          <PromptInputFooter>
-            <PromptInputTools>
-              <ChatModelSelector
-                disabled={props.isStreaming}
-                model={props.model}
-                onSelect={props.onSelectModel}
-                providerGroup={props.providerGroup}
-              />
-            </PromptInputTools>
-
-            <PromptInputSubmit
-              disabled={!text.trim()}
-              status={props.isStreaming ? "streaming" : "ready"}
-            />
-          </PromptInputFooter>
-        </PromptInput>
-
-        {props.error ? (
-          <div className="text-xs text-destructive">{props.error}</div>
-        ) : null}
-      </div>
-    </div>
+    <SidebarProvider
+      onOpenChange={(open) => {
+        void navigate({
+          search: (prev) => ({
+            ...prev,
+            sidebar: open ? "open" : undefined,
+          }),
+        })
+      }}
+      open={search.sidebar === "open"}
+    >
+      <AppSidebar />
+      <SidebarInset className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <AppHeader />
+        <main className="flex min-h-0 flex-1 overflow-hidden">
+          <Outlet />
+        </main>
+      </SidebarInset>
+      <AppSettingsDialog />
+    </SidebarProvider>
   )
 }
 ```
 
-### Stop behavior
+That is the main architectural change.
 
-If `PromptInputSubmit` is too limited to expose stop behavior cleanly, add an explicit stop button next to it and wire it to `props.onAbort`. Keep abort support even if the final UI differs slightly from the demo.
+No extra shell provider is needed.
 
-### Detailed todo list
+## Replace `AppShellLayout`
 
-- [ ] Create `src/components/new/chat-composer.tsx`.
-- [ ] Reproduce the example’s vertical structure:
-  - `PromptInputHeader`
-  - `PromptInputBody`
-  - `PromptInputFooter`
-- [ ] Keep the footer tool ordering identical to the example.
-- [ ] Add local text state for the textarea value.
-- [ ] Map submit status from real app state:
-  - `submitted`
-  - `streaming`
-  - `ready`
-  - `error`
-- [ ] Decide whether `submitted` should be a transient local state or whether `ready/streaming/error` is sufficient from real runtime state.
-- [ ] Add the attachment header display surface using `usePromptInputAttachments()`.
-- [ ] Add the attachment action menu with `PromptInputActionMenu*`.
-- [ ] Decide v1 attachment behavior:
-  - disabled control
-  - local-only previews
-  - or allow selection but prevent submit
-- [ ] Add `SpeechInput` in the footer if it can safely append transcript text into the textarea.
-- [ ] Add the search toggle button with `GlobeIcon`.
-- [ ] Decide the v1 search button behavior:
-  - disabled
-  - cosmetic local toggle only
-  - or hidden behind feature flag
-- [ ] Ensure `PromptInputSubmit` visually reflects streaming/ready/error state.
-- [ ] Add explicit stop behavior if submit cannot switch into a stop affordance cleanly.
-- [ ] Ensure the prompt area remains anchored and non-jumpy while messages stream.
-- [ ] Add error display in the prompt area without breaking the example’s spacing.
-- [ ] Add tests for:
-  - text submit
-  - empty submit ignored
-  - streaming disables or changes submit action
-  - model selector remains interactive only when allowed
-  - attachment UI presence
-  - optional speech input text append flow if enabled
+[`src/components/app-shell-layout.tsx`](/Users/jeremy/Developer/gitinspect/src/components/app-shell-layout.tsx) should be deleted
 
----
+Reason:
 
-## Phase 6: Adapt The Model Selector To The Real Catalog
+- root can render the layout directly
+- keeping `AppShellLayout` risks preserving the current abstraction that caused the duplication in the first place
 
-### Objective
+## One Chat Surface Everywhere
 
-Use the example’s `ModelSelector` composition, but feed it from the app’s real model/provider catalog.
+This is an important correction to the plan.
 
-### Real data source
+There should not be:
 
-- `getProviderGroups()`
-- `getProviderGroupMetadata()`
-- `getModelsForGroup(providerGroup)`
-- `runtime.setModelSelection(providerGroup, modelId)`
+- a repo-specific chat content component
+- a separate “new chat” view
+- one component for empty chat and another for active chat
 
-### Suggested component
+There should be one shared chat surface.
+
+That means:
+
+- [`src/components/chat.tsx`](/Users/jeremy/Developer/gitinspect/src/components/chat.tsx) becomes the single chat UI for all chat routes
+- the component must support both empty and active states
+- repo routes use the same component as `/chat`
+- the difference between routes is only the input data:
+- optional `repoSource`
+- optional search-driven inputs like `initialQuery` if that feature is needed
+
+### What this replaces
+
+This should replace the current split between:
+
+- [`src/components/chat.tsx`](/Users/jeremy/Developer/gitinspect/src/components/chat.tsx)
+- [`src/components/empty-chat-content.tsx`](/Users/jeremy/Developer/gitinspect/src/components/empty-chat-content.tsx)
+
+The “new chat” experience should not be a different product surface. It should simply be the empty state of the same `Chat` component.
+
+### Target behavior
+
+`/chat`
+
+- no `session` in search
+- render the normal chat layout with an empty transcript
+- show the composer in-place
+- first send creates the session and continues in the same chat UI
+
+`/chat?session=...`
+
+- render the exact same `Chat` component
+- show transcript + composer
+
+`/$owner/$repo`
+
+- render the exact same `Chat` component
+- if no session, show empty chat with repo context
+- if session exists, show transcript + composer
+
+`/$owner/$repo/$ref`
+
+- same as above, with `repoSource.ref` taken from params
+
+### Desired `Chat` direction
+
+The exact API can change, but the component should move toward something like:
 
 ```tsx
-import type { ProviderGroupId } from "@/types/models"
-import {
-  getModelsForGroup,
-  getProviderGroupMetadata,
-  getProviderGroups,
-} from "@/models/catalog"
-import {
-  ModelSelector,
-  ModelSelectorContent,
-  ModelSelectorGroup,
-  ModelSelectorInput,
-  ModelSelectorItem,
-  ModelSelectorList,
-  ModelSelectorLogo,
-  ModelSelectorName,
-  ModelSelectorTrigger,
-} from "@/components/ai-elements/model-selector"
-import { PromptInputButton } from "@/components/ai-elements/prompt-input"
+type ChatProps = {
+  repoSource?: RepoSource
+}
+```
 
-export function ChatModelSelector(props: {
-  disabled?: boolean
-  model: string
-  onSelect: (providerGroup: ProviderGroupId, modelId: string) => void
-  providerGroup: ProviderGroupId
+Inside `Chat`, the component should own:
+
+- reading `session` from router search
+- loading session + messages from Dexie
+- loading defaults needed for the empty-chat state
+- `useRuntimeSession(session?.id)`
+- navigation to `settings=github`
+- empty-state rendering when `session` is missing
+
+If the product needs an `initialQuery` behavior, prefer a search param for it rather than a prop-heavy route API.
+
+Example direction:
+
+```text
+/chat?initialQuery=fix%20this
+/$owner/$repo?initialQuery=explain%20this%20repo
+```
+
+That keeps route-to-chat handoff URL-driven instead of inventing another prop channel.
+
+The only tricky part is first-send session creation when `session` does not exist yet.
+
+That should be solved in the smallest possible way:
+
+- preferred: `Chat` owns it directly
+- acceptable fallback: `Chat` receives one narrowly-scoped first-send callback
+
+What should not happen:
+
+- a broad route-control prop API
+- a separate `sessionId` prop when `session` already exists
+- a `runtime` prop pushed in from routes
+- a prop just to open GitHub settings
+- routes loading messages only to immediately pass them into `Chat`
+
+The important part is:
+
+- one component
+- one layout
+- one empty state
+- one active state
+- repo support is just optional context, not a separate view
+
+## Sidebar Refactor
+
+### Current problem
+
+[`src/components/chat-sidebar.tsx`](/Users/jeremy/Developer/gitinspect/src/components/chat-sidebar.tsx) currently depends on route-owned props:
+
+```tsx
+export function ChatSidebar(props: {
+  activeSessionId: string
+  onCreateSession: () => void
+  onDeleteSession: (sessionId: string) => void
+  onSelectSession: (sessionId: string) => void
+  runningSessionIds: string[]
+  sessions: SessionMetadata[]
 }) {
-  const providerGroups = getProviderGroups()
+  ...
+}
+```
+
+This is exactly what needs to go away.
+
+### Target
+
+Rename it to `AppSidebar` and make it self-contained.
+
+Example target:
+
+```tsx
+export function AppSidebar() {
+  const navigate = useNavigate()
+  const search = useSearch({ strict: false })
+  const sessions = useLiveQuery(async () => await listSessionMetadata(), [])
+
+  const sessionList = sessions ?? []
+  const runningSessionIds = sessionList
+    .filter((session) => session.isStreaming)
+    .map((session) => session.id)
+  const activeSessionId =
+    typeof search.session === "string" ? search.session : ""
+
+  const handleCreateSession = () => {
+    void navigate({
+      to: "/chat",
+      search: (prev) => ({
+        ...prev,
+        session: undefined,
+      }),
+    })
+  }
+
+  const handleSelectSession = async (sessionId: string) => {
+    const session = sessionList.find((item) => item.id === sessionId)
+    if (!session) return
+
+    await persistLastUsedSessionSettings({
+      model: session.model,
+      provider: session.provider,
+      providerGroup: session.providerGroup,
+    })
+
+    void navigate({
+      ...sessionDestination({
+        id: session.id,
+        repoSource: session.repoSource,
+      }),
+      search: (prev) => ({
+        ...prev,
+        session: session.id,
+      }),
+    })
+  }
 
   return (
-    <ModelSelector>
-      <ModelSelectorTrigger asChild>
-        <PromptInputButton disabled={props.disabled}>
-          <ModelSelectorName>{props.model}</ModelSelectorName>
-        </PromptInputButton>
-      </ModelSelectorTrigger>
-
-      <ModelSelectorContent>
-        <ModelSelectorInput placeholder="Search models..." />
-        <ModelSelectorList>
-          {providerGroups.map((providerGroup) => (
-            <ModelSelectorGroup
-              heading={getProviderGroupMetadata(providerGroup).label}
-              key={providerGroup}
-            >
-              {getModelsForGroup(providerGroup).map((model) => (
-                <ModelSelectorItem
-                  key={`${providerGroup}:${model.id}`}
-                  onSelect={() => props.onSelect(providerGroup, model.id)}
-                  value={`${providerGroup}:${model.id}`}
-                >
-                  <ModelSelectorLogo provider={model.provider} />
-                  <ModelSelectorName>{model.name}</ModelSelectorName>
-                </ModelSelectorItem>
-              ))}
-            </ModelSelectorGroup>
-          ))}
-        </ModelSelectorList>
-      </ModelSelectorContent>
-    </ModelSelector>
+    <Sidebar className="border-r-0">
+      ...
+    </Sidebar>
   )
 }
 ```
 
-### Persistence
+The exact helper names can change, but the ownership should not.
 
-Let `ChatShell` and the runtime continue owning persistence. `Chat` only calls the runtime mutation.
+### Important consequence
 
-### Detailed todo list
+After this refactor, route files should no longer pass:
 
-- [ ] Create `src/components/new/chat-model-selector.tsx`.
-- [ ] Group models visually the same way as the example:
-  - provider family heading
-  - rows inside each group
-- [ ] Decide the displayed provider grouping vocabulary:
-  - use provider group labels from catalog
-  - or derive “chef” groupings that better match the example
-- [ ] Show the selected model in the trigger with logo + name.
-- [ ] Add trailing selected-state affordance matching the example’s checkmark pattern.
-- [ ] Add provider logo grouping if multiple providers for one model should be shown.
-- [ ] Ensure selecting a model closes the selector.
-- [ ] Ensure model changes go through `runtime.setModelSelection(...)`.
-- [ ] Decide whether additional settings persistence is needed in the shell after runtime mutation succeeds.
-- [ ] Add tests for:
-  - trigger rendering
-  - grouped list rendering
-  - selected-state marker
-  - mutation callback arguments
+- `sessions`
+- `runningSessionIds`
+- `activeSessionId`
+- `onCreateSession`
+- `onDeleteSession`
+- `onSelectSession`
 
----
+into the sidebar.
 
-## Phase 7: Suggestions And Empty State
+## Sidebar Simplicity Rule
 
-### Objective
+The sidebar should not change shape based on the current page as part of this refactor.
 
-Mirror the example’s suggestions section, but keep it as a UI convenience layer only.
+That means:
 
-### Recommendation
+- no `current-route-info.ts`
+- no route-scope orchestration layer
+- no repo-vs-global sidebar modes
 
-Only show suggestions when the conversation is empty.
+If the sidebar needs router state at all, keep it minimal:
+
+- `useSearch({ strict: false })` for `session`
+- direct router hooks for navigation
+
+If some later behavior truly needs path params, read them directly in the component with router hooks. Do not introduce an app-wide route-info abstraction just to make the sidebar work.
+
+## Header Refactor
+
+`ChatHeader` should become `AppHeader` and read what it needs itself.
+
+It should not be passed:
+
+- `repoSource`
+- `settingsDisabled`
+- `onOpenSettings`
+
+It can derive these internally:
+
+- repo breadcrumb from current route or selected session
+- settings disabled from current selected session
+- settings open action via `useNavigate()`
+
+Example shape:
 
 ```tsx
-const suggestions = [
-  "Summarize this repository",
-  "Explain the current runtime architecture",
-  "Find the session persistence flow",
-  "How does model switching work here?",
-]
+export function AppHeader() {
+  const navigate = useNavigate()
+  const search = useSearch({ strict: false })
+  const selectedSession = useSelectedSessionSummary(
+    typeof search.session === "string" ? search.session : undefined
+  )
+  const params = useParams({ strict: false })
+
+  const repoSource = selectedSession?.repoSource
+    ? selectedSession.repoSource
+    : "owner" in params && "repo" in params
+      ? {
+          owner: params.owner,
+          repo: params.repo,
+          ref:
+            "_splat" in params && typeof params._splat === "string"
+              ? params._splat
+              : "main",
+        }
+      : undefined
+
+  return (
+    <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b bg-background">
+      <div className="flex min-w-0 flex-1 items-center gap-2 px-3">
+        <SidebarTrigger />
+        ...
+      </div>
+      <Button
+        disabled={selectedSession?.isStreaming ?? false}
+        onClick={() => {
+          void navigate({
+            search: (prev) => ({
+              ...prev,
+              settings: "providers",
+            }),
+          })
+        }}
+      />
+    </header>
+  )
+}
 ```
 
-Then wire them directly to `runtime.send(...)`.
+## Settings Dialog Refactor
 
-These should not be persisted separately.
+`SettingsDialog` should become `AppSettingsDialog`.
 
-### Detailed todo list
+It should not be driven by props from route files.
 
-- [ ] Decide the initial suggestion set for this product instead of the demo topic set.
-- [ ] Create a dedicated suggestions constant or helper.
-- [ ] Render suggestions in the same area as the example: above the prompt, below the conversation.
-- [ ] Ensure clicking a suggestion routes through the normal send flow.
-- [ ] Decide whether suggestions should be hidden after the first message or remain available throughout the session.
-- [ ] Add tests for suggestion rendering and click-to-send behavior.
+Instead it should derive:
 
----
+- `open`
+- `section`
+- selected session
+- `settingsDisabled`
 
-## Phase 8: Unsupported Demo Features
+internally.
 
-### Attachments
+Example shape:
 
-Current blocker:
+```tsx
+export function AppSettingsDialog() {
+  const search = useSearch({ strict: false })
+  const navigate = useNavigate()
+  const selectedSession = useSelectedSessionSummary(
+    typeof search.session === "string" ? search.session : undefined
+  )
 
-- `useRuntimeSession.send()` only accepts `string`
-- `runtimeClient.send()` only accepts `string`
-- `AgentHost.prompt()` only creates string user messages
+  const section = search.settings ?? "providers"
+  const open = search.settings !== undefined
+  const settingsDisabled = selectedSession?.isStreaming ?? false
 
-Recommendation:
+  return (
+    <Dialog
+      onOpenChange={(nextOpen) => {
+        void navigate({
+          search: (prev) => ({
+            ...prev,
+            settings: nextOpen ? section : undefined,
+          }),
+        })
+      }}
+      open={open}
+    >
+      ...
+    </Dialog>
+  )
+}
+```
 
-- keep the affordance visible for shape parity
-- if sending is unsupported in v1, show the control as disabled or local-only with clear UX feedback
+## Search Param Strategy
 
-### Search toggle
+### Root search params stay in root
 
-Current blocker:
+Keep this split:
 
-- no session field
-- no runtime flag
-- no provider execution path
+- root owns `settings`
+- root owns `sidebar`
+- route files own `session`
 
-Recommendation:
+That also means the old combined app-shell search typing should go away.
 
-- keep the button visible for shape parity, but disable or local-toggle it until a runtime flag exists
+[`src/routes/app-shell-search.ts`](/Users/jeremy/Developer/gitinspect/src/routes/app-shell-search.ts) is expected to become obsolete because the refactor removes the old pattern of bundling shell state and route state together.
 
-### Sources
+### Use functional search updates everywhere
 
-Current blocker:
+This is the key cleanup:
 
-- no citation/source metadata in the persisted assistant schema
+Stop doing this:
 
-Recommendation:
+```tsx
+navigate({
+  search: {
+    settings: search.settings,
+    sidebar: search.sidebar,
+    session: search.session,
+  },
+})
+```
 
-- keep the rendering slot in place, but render nothing until source data exists
+Do this instead:
 
-### Branching / versions
+```tsx
+navigate({
+  search: (prev) => ({
+    ...prev,
+    session: nextSessionId,
+  }),
+})
+```
 
-Current blocker:
+This preserves root search state without re-threading it manually.
 
-- no message version model
+### Simplify `navigateToSession`
 
-Recommendation:
+[`src/sessions/session-actions.ts`](/Users/jeremy/Developer/gitinspect/src/sessions/session-actions.ts) should stop accepting shell state.
 
-- keep the wrapper shape in the message renderer, but only render controls when versions are present
+Current smell:
 
-### Detailed todo list
+```ts
+navigateToSession(target, {
+  settings: search.settings,
+  sidebar: search.sidebar,
+})
+```
 
-- [ ] Document which example elements are fully functional in v1.
-- [ ] Document which example elements are present-but-disabled in v1.
-- [ ] Decide the exact UX copy/tooltips for disabled attachment/search controls.
-- [ ] Ensure no disabled control implies functionality that does not exist.
-- [ ] Confirm that unsupported features do not leak into persisted session state accidentally.
+Target:
 
----
+```ts
+export function sessionDestination(target: SessionRouteTarget) {
+  if (target.repoSource) {
+    return {
+      to: "/$owner/$repo/$" as const,
+      params: {
+        owner: target.repoSource.owner,
+        repo: target.repoSource.repo,
+        _splat: target.repoSource.ref,
+      },
+    }
+  }
 
-## Test Plan
+  return {
+    to: "/chat" as const,
+  }
+}
+```
 
-### Unit tests
+Then use:
 
-- adapter helpers
-  - text extraction
-  - thinking extraction
-  - tool-call extraction
-- composer
-  - trims input
-  - disables send while streaming
-- model selector
-  - selecting a model calls the right runtime mutation
+```tsx
+void navigate({
+  ...sessionDestination(target),
+  search: (prev) => ({
+    ...prev,
+    session: target.id,
+  }),
+})
+```
 
-### Integration tests
+## Route-by-Route Plan
 
-- `ChatShell` renders `Chat` instead of the fallback thread/composer
-- changing sessions in the shell updates `Chat` props
-- sending a prompt through the ai-elements composer persists a user message
-- assistant streaming updates the visible conversation
-- model selection mutates the active session
+### `src/routes/__root.tsx`
 
-### Manual QA
+Refactor into the real layout route.
 
-- switch sessions from the sidebar and confirm `Chat` updates immediately
-- reload a deep link like `/chat?session=abc`
-- stop a streaming response
-- change model mid-session
-- confirm tool calls and tool results still render
+Changes:
 
-### Detailed todo list
+- keep `validateSearch`
+- keep `RootDocument`
+- add `component: RootLayout`
+- render `SidebarProvider`
+- render `AppSidebar`
+- render `AppHeader`
+- render `<Outlet />`
+- render `AppSettingsDialog`
+- bypass shell for `/auth/callback`
 
-- [ ] Add adapter unit tests.
-- [ ] Add message renderer unit tests.
-- [ ] Add composer unit tests.
-- [ ] Add model selector unit tests.
-- [ ] Add shell-to-chat integration tests.
-- [ ] Add visual/manual QA checklist for:
-  - empty session
-  - active streaming session
-  - session with tool calls/results
-  - session switched from sidebar
-  - long markdown response
-  - reasoning block present
-  - disabled attachment/search controls visible
-  - mobile-width layout
+### `src/routes/index.tsx`
 
----
+After refactor this should be very small:
+
+```tsx
+export const Route = createFileRoute("/")({
+  component: HomePage,
+})
+
+function HomePage() {
+  return <LandingPage />
+}
+```
+
+Remove:
+
+- `AppShellLayout`
+- `ChatSidebar`
+- `ChatHeader`
+- `SettingsDialog`
+- session metadata list query
+- sidebar handlers
+- settings handlers
+
+### `src/routes/chat.tsx`
+
+Keep:
+
+- `session` validation
+- invalid-session redirect
+- rendering the shared `Chat` component
+
+Remove:
+
+- all shell imports
+- all sidebar imports
+- all settings dialog imports
+- all session-list sidebar action code
+- any route-level swap between `Chat` and a separate empty-chat page
+- selected session/messages loading if `Chat` owns that directly
+
+This file should become content-only.
+
+### `src/routes/$owner.$repo.index.tsx`
+
+Keep:
+
+- repo intent for `ref: "main"`
+- invalid-session redirect
+- rendering the shared `Chat` component with `repoSource`
+
+Remove:
+
+- shell composition
+- sidebar prop wiring
+- settings prop wiring
+- any repo-specific chat surface
+- selected session/messages loading if `Chat` owns that directly
+
+### `src/routes/$owner.$repo.$.tsx`
+
+Same as repo index route except `ref` comes from `_splat`.
+
+## Suggested New Small Helpers
+
+These are small helpers, not a shell framework.
+
+- `src/hooks/use-selected-session-summary.ts`
+  - tiny Dexie helper for session metadata/session summary by `sessionId`
+
+These are acceptable because they reduce duplication directly.
+
+What should not be introduced:
+
+- `AppShellProvider`
+- `useConfigureAppShell`
+- route registration into a shell controller
+
+That is too much abstraction for the problem.
+
+## Implementation Order
+
+### Stage 1. Move the shell into root
+
+First make [`src/routes/__root.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/__root.tsx) render the full layout route with `<Outlet />`.
+
+Do not refactor route logic yet.
+
+Success criteria:
+
+- root owns the shell
+- app still renders
+
+### Stage 2. Make sidebar self-contained
+
+Create `AppSidebar` and move into it:
+
+- session list query
+- active session detection
+- create/select/delete actions
+
+Success criteria:
+
+- sidebar has no props
+- route files no longer know how sidebar works
+
+### Stage 3. Make header self-contained
+
+Create `AppHeader` and move into it:
+
+- repo breadcrumb logic
+- settings-open action
+- settings disabled logic
+
+Success criteria:
+
+- route files stop importing header
+
+### Stage 4. Make settings dialog self-contained
+
+Create `AppSettingsDialog` and move into it:
+
+- `open`
+- `section`
+- current selected session
+- GitHub token refresh callback
+
+Success criteria:
+
+- route files stop importing settings dialog
+
+### Stage 5. Remove shell JSX from all routes
+
+Shrink:
+
+- [`src/routes/index.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/index.tsx)
+- [`src/routes/chat.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/chat.tsx)
+- [`src/routes/$owner.$repo.index.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/$owner.$repo.index.tsx)
+- [`src/routes/$owner.$repo.$.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/$owner.$repo.$.tsx)
+
+They should only return content.
+
+### Stage 6. Unify chat into one shared surface
+
+- expand [`src/components/chat.tsx`](/Users/jeremy/Developer/gitinspect/src/components/chat.tsx) so it supports empty and active states
+- remove the need for a separate empty-chat screen
+- make `/chat` and repo routes render the same `Chat` component
+- pass `repoSource` optionally for repo-backed chat
+- preserve first-send session creation from within the shared chat flow
+
+### Stage 7. Clean up navigation helpers
+
+Refactor session navigation to stop carrying root shell state.
 
 ## Detailed Todo List
 
-### Phase 1: Shell integration
+### Phase 0. Pre-refactor audit
 
-- [ ] Define the final `ChatProps` contract.
-- [ ] Decide exact composition point inside `ReadyChatShell`.
-- [ ] Wire `ChatShell` to render `Chat` with resolved props.
-- [ ] Update `ChatPage` to mount the shell + `Chat`.
-- [ ] Keep the old fallback until parity is complete.
+- [x] Re-read [`src/routes/__root.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/__root.tsx) and confirm exactly which parts must stay document-level only.
+- [x] Re-read [`src/routes/index.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/index.tsx) and note all shell-specific imports and handlers to remove.
+- [x] Re-read [`src/routes/chat.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/chat.tsx) and mark which logic is route content vs shell wiring.
+- [x] Re-read [`src/routes/$owner.$repo.index.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/$owner.$repo.index.tsx) and mark route-specific vs shell-specific code.
+- [x] Re-read [`src/routes/$owner.$repo.$.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/$owner.$repo.$.tsx) and mark route-specific vs shell-specific code.
+- [x] Re-read [`src/components/app-shell-layout.tsx`](/Users/jeremy/Developer/gitinspect/src/components/app-shell-layout.tsx) to confirm nothing in it needs to survive as a reusable abstraction.
+- [x] Re-read [`src/components/chat-sidebar.tsx`](/Users/jeremy/Developer/gitinspect/src/components/chat-sidebar.tsx) and list every prop that must be eliminated.
+- [x] Re-read [`src/components/chat-header.tsx`](/Users/jeremy/Developer/gitinspect/src/components/chat-header.tsx) and list every prop that must be eliminated.
+- [x] Re-read [`src/components/settings-dialog.tsx`](/Users/jeremy/Developer/gitinspect/src/components/settings-dialog.tsx) and list every prop that must be eliminated.
+- [x] Re-read [`src/sessions/session-actions.ts`](/Users/jeremy/Developer/gitinspect/src/sessions/session-actions.ts) and identify helpers that still carry root shell state.
 
-### Phase 2: Adapter and message view model
+### Phase 1. Move layout ownership to root
 
-- [ ] Create `chat-adapter.ts`.
-- [ ] Implement text extraction helpers.
-- [ ] Implement thinking extraction helpers.
-- [ ] Implement tool-call extraction helpers.
-- [ ] Implement optional version/source placeholders in the derived UI shape.
-- [ ] Add adapter tests.
+- [x] Add a real route component to [`src/routes/__root.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/__root.tsx), e.g. `RootLayout`.
+- [x] Keep `RootDocument` focused on HTML, providers, `HeadContent`, `Scripts`, and devtools.
+- [x] Keep `validateSearch` for `settings` and `sidebar` in root.
+- [x] Import `Outlet` into root.
+- [x] Import `SidebarProvider` and `SidebarInset` into root.
+- [x] Render the full layout from root: sidebar, header, main outlet, settings dialog.
+- [x] Wire sidebar open state from root search to `SidebarProvider.open`.
+- [x] Wire `SidebarProvider.onOpenChange` to functional search updates in root.
+- [x] Add the `/auth/callback` shell bypass in root so that route still renders plain.
+- [x] Verify root is now the only route intended to own shell chrome.
 
-### Phase 3: Conversation surface
+### Phase 2. Create root-owned shell components
 
-- [ ] Create `chat.tsx`.
-- [ ] Implement top-level flex/divide-y layout to match the example.
-- [ ] Implement `Conversation` + `ConversationContent` + `ConversationScrollButton`.
-- [ ] Add mapped message rendering loop.
-- [ ] Add suggestion strip region.
-- [ ] Add prompt region container.
+- [x] Decide final component names:
+- [x] `AppSidebar`
+- [x] `AppHeader`
+- [x] `AppSettingsDialog`
+- [x] Create or rename sidebar component file from [`src/components/chat-sidebar.tsx`](/Users/jeremy/Developer/gitinspect/src/components/chat-sidebar.tsx) to an app-level sidebar component.
+- [x] Create or rename header component file from [`src/components/chat-header.tsx`](/Users/jeremy/Developer/gitinspect/src/components/chat-header.tsx) to an app-level header component.
+- [x] Create or rename settings component file from [`src/components/settings-dialog.tsx`](/Users/jeremy/Developer/gitinspect/src/components/settings-dialog.tsx) to an app-level settings dialog component, or keep the file name if only the export changes.
+- [x] Update all root imports to use the new component names.
+- [x] Make sure none of these components require route props by the end of the phase.
 
-### Phase 4: Message renderer
+### Phase 3. Make the sidebar self-contained
 
-- [ ] Create `chat-message.tsx`.
-- [ ] Implement user message rendering.
-- [ ] Implement assistant message rendering.
-- [ ] Implement reasoning rendering.
-- [ ] Implement source rendering slot.
-- [ ] Implement single-version `MessageBranch` wrapper.
-- [ ] Implement conditional branch selector rendering.
-- [ ] Integrate tool call rendering.
-- [ ] Integrate tool result rendering.
-- [ ] Add message renderer tests.
+- [x] Remove all route-owned props from the sidebar component API.
+- [x] Move the session metadata query into the sidebar component using `useLiveQuery`.
+- [x] Read the active `session` directly from router search in the sidebar.
+- [x] Compute `runningSessionIds` directly in the sidebar.
+- [x] Move new-chat navigation logic into the sidebar.
+- [x] Decide and codify the new-chat destination behavior:
+- [x] sidebar new chat should go to `/chat`
+- [x] it should clear `session`
+- [x] it should preserve root search using functional updates
+- [x] Move session-selection navigation logic into the sidebar.
+- [x] Move session deletion logic into the sidebar.
+- [x] Preserve `persistLastUsedSessionSettings` when selecting the next session from the sidebar.
+- [x] Preserve `deleteSessionAndResolveNext` behavior when deleting from the sidebar.
+- [x] Keep `ChatSessionList` unchanged initially unless the prop surface becomes awkward.
+- [x] If needed, leave `ChatSessionList` prop-based but fed entirely by the sidebar component.
+- [x] Update footer links in [`src/components/chat-footer.tsx`](/Users/jeremy/Developer/gitinspect/src/components/chat-footer.tsx) only if root search handling needs to switch to functional updates.
 
-### Phase 5: Composer
+### Phase 4. Make the header self-contained
 
-- [ ] Create `chat-composer.tsx`.
-- [ ] Implement textarea state.
-- [ ] Implement submit handling.
-- [ ] Implement status mapping.
-- [ ] Implement attachments header display.
-- [ ] Implement attachment action menu.
-- [ ] Implement speech input.
-- [ ] Implement search button.
-- [ ] Implement submit/stop affordance.
-- [ ] Implement error display.
-- [ ] Add composer tests.
+- [x] Remove `onOpenSettings` from the header props.
+- [x] Remove `repoSource` from the header props.
+- [x] Remove `settingsDisabled` from the header props.
+- [x] Read `session` from router search inside the header.
+- [x] Add a small selected-session summary hook if the header needs metadata without loading full messages.
+- [x] Read path params directly inside the header if breadcrumb fallback requires owner/repo/ref.
+- [x] Preserve the current breadcrumb behavior:
+- [x] no repo source should show the logo/home-style breadcrumb
+- [x] repo source should show owner/repo breadcrumb links
+- [x] Preserve settings disabled behavior while a selected session is streaming.
+- [x] Move the settings-open navigation into the header using functional search updates.
+- [x] Keep the existing visual structure and button behavior unless there is a clear reason to simplify it during implementation.
 
-### Phase 6: Model selector
+### Phase 5. Make the settings dialog self-contained
 
-- [ ] Create `chat-model-selector.tsx`.
-- [ ] Map catalog data into grouped ai-elements items.
-- [ ] Implement selected-state indicator.
-- [ ] Implement trigger with logo + name.
-- [ ] Implement mutation callback wiring.
-- [ ] Add selector tests.
+- [x] Remove `open` from the settings dialog props.
+- [x] Remove `section` from the settings dialog props.
+- [x] Remove `onOpenChange` from the settings dialog props.
+- [x] Remove `onSectionChange` from the settings dialog props.
+- [x] Remove `session` from the settings dialog props.
+- [x] Remove `settingsDisabled` from the settings dialog props.
+- [x] Remove `onGithubTokenSaved` from the settings dialog props.
+- [x] Read `settings` from root search inside the settings dialog.
+- [x] Derive `open` from whether `settings` exists.
+- [x] Derive current section from `search.settings ?? "providers"`.
+- [x] Update open/close behavior using functional search updates.
+- [x] Update section-tab changes using functional search updates.
+- [x] Read selected session summary directly based on `search.session`.
+- [x] Preserve costs panel behavior using the selected session.
+- [x] Preserve GitHub token refresh behavior by calling `runtimeClient.refreshGithubToken(search.session)` directly when applicable.
+- [x] Preserve disabling rules when the active session is streaming.
 
-### Phase 7: Unsupported feature handling
+### Phase 6. Remove shell composition from routes
 
-- [ ] Decide disabled vs local-only behavior for attachments.
-- [ ] Decide disabled vs cosmetic-toggle behavior for search.
-- [ ] Decide whether speech input ships in v1 or is gated.
-- [ ] Keep source and branch rendering slots in place.
-- [ ] Ensure unsupported features do not mutate persisted state.
+- [x] Remove `AppShellLayout` import from [`src/routes/index.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/index.tsx).
+- [x] Remove sidebar imports from [`src/routes/index.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/index.tsx).
+- [x] Remove header imports from [`src/routes/index.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/index.tsx).
+- [x] Remove settings dialog imports from [`src/routes/index.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/index.tsx).
+- [x] Remove session list query from [`src/routes/index.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/index.tsx).
+- [x] Reduce [`src/routes/index.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/index.tsx) to landing-page content only.
+- [x] Remove `AppShellLayout` import from [`src/routes/chat.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/chat.tsx).
+- [x] Remove sidebar/header/settings imports from [`src/routes/chat.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/chat.tsx).
+- [x] Remove session list query from [`src/routes/chat.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/chat.tsx) if it only existed for the sidebar.
+- [x] Remove sidebar create/select/delete handlers from [`src/routes/chat.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/chat.tsx).
+- [x] Remove settings open/change handlers from [`src/routes/chat.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/chat.tsx).
+- [x] Keep session validation, session loading, empty draft loading, and content rendering in [`src/routes/chat.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/chat.tsx).
+- [x] Remove `AppShellLayout` import from [`src/routes/$owner.$repo.index.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/$owner.$repo.index.tsx).
+- [x] Remove sidebar/header/settings imports from [`src/routes/$owner.$repo.index.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/$owner.$repo.index.tsx).
+- [x] Remove session list query from [`src/routes/$owner.$repo.index.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/$owner.$repo.index.tsx) if it only existed for the sidebar.
+- [x] Remove shell composition JSX from [`src/routes/$owner.$repo.index.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/$owner.$repo.index.tsx).
+- [x] Keep repo intent, selected session loading, invalid-session redirect, and content rendering in [`src/routes/$owner.$repo.index.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/$owner.$repo.index.tsx).
+- [x] Remove `AppShellLayout` import from [`src/routes/$owner.$repo.$.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/$owner.$repo.$.tsx).
+- [x] Remove sidebar/header/settings imports from [`src/routes/$owner.$repo.$.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/$owner.$repo.$.tsx).
+- [x] Remove session list query from [`src/routes/$owner.$repo.$.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/$owner.$repo.$.tsx) if it only existed for the sidebar.
+- [x] Remove shell composition JSX from [`src/routes/$owner.$repo.$.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/$owner.$repo.$.tsx).
+- [x] Keep repo intent, selected session loading, invalid-session redirect, and content rendering in [`src/routes/$owner.$repo.$.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/$owner.$repo.$.tsx).
 
-### Phase 8: Verification
+### Phase 7. Unify chat into one shared surface
 
-- [ ] Run unit tests for adapter, messages, composer, selector.
-- [ ] Run integration tests for shell-to-chat handoff.
-- [ ] Perform manual QA for all major states.
-- [ ] Compare the final inner surface visually against the reference example.
-- [ ] Remove the old fallback once parity is acceptable.
+- [x] Rework [`src/components/chat.tsx`](/Users/jeremy/Developer/gitinspect/src/components/chat.tsx) so it can render both empty and active chat states.
+- [x] Audit the current `Chat` API and identify which props assume a session always exists.
+- [x] Change the `Chat` API so routes do not need to pass session data or messages into it.
+- [x] Add optional `repoSource` support to the shared `Chat` component.
+- [x] Move session lookup into [`src/components/chat.tsx`](/Users/jeremy/Developer/gitinspect/src/components/chat.tsx) by reading `search.session` directly.
+- [x] Move message loading into [`src/components/chat.tsx`](/Users/jeremy/Developer/gitinspect/src/components/chat.tsx).
+- [x] Move empty-chat defaults loading into [`src/components/chat.tsx`](/Users/jeremy/Developer/gitinspect/src/components/chat.tsx) if practical.
+- [x] Remove `runtime` from the public `Chat` props and call `useRuntimeSession(session?.id)` inside `Chat`.
+- [x] Remove `onOpenGithubSettings` from the public `Chat` props and navigate to `settings=github` inside `Chat`.
+- [x] Do not introduce a separate `sessionId` prop if `session` is already available.
+- [x] Decide the smallest solution for first-send session creation when `session` is missing.
+- [x] Preferred: keep first-send behavior internal to `Chat` if practical.
+- [x] Acceptable fallback: use one narrowly-scoped first-send callback rather than a broad route-control prop.
+- [x] Decide whether `initialQuery` is needed as a feature.
+- [x] If `initialQuery` is needed, add it as a search param rather than a direct `Chat` prop.
+- [x] Preserve normal in-session send behavior for existing chats.
+- [x] Preserve model selection / thinking level behavior in the shared chat UI.
+- [x] Decide how suggestions should work when there is no session yet and keep that behavior inside the shared chat component.
+- [x] Remove the need for a visually separate “new chat” surface.
+- [x] Audit [`src/components/empty-chat-content.tsx`](/Users/jeremy/Developer/gitinspect/src/components/empty-chat-content.tsx).
+- [x] Move any useful logic from [`src/components/empty-chat-content.tsx`](/Users/jeremy/Developer/gitinspect/src/components/empty-chat-content.tsx) into [`src/components/chat.tsx`](/Users/jeremy/Developer/gitinspect/src/components/chat.tsx) if needed.
+- [x] Delete [`src/components/empty-chat-content.tsx`](/Users/jeremy/Developer/gitinspect/src/components/empty-chat-content.tsx) if it becomes fully obsolete.
+- [x] Update [`src/routes/chat.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/chat.tsx) to always render [`src/components/chat.tsx`](/Users/jeremy/Developer/gitinspect/src/components/chat.tsx).
+- [x] Update [`src/routes/$owner.$repo.index.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/$owner.$repo.index.tsx) to always render [`src/components/chat.tsx`](/Users/jeremy/Developer/gitinspect/src/components/chat.tsx).
+- [x] Update [`src/routes/$owner.$repo.$.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/$owner.$repo.$.tsx) to always render [`src/components/chat.tsx`](/Users/jeremy/Developer/gitinspect/src/components/chat.tsx).
+- [x] Preserve `touchRecentRepo(repoSource)` behavior in repo routes.
+- [x] Preserve invalid-session redirect behavior in chat and repo routes.
+- [x] Preserve “selected session belongs to another repo” redirect behavior if it is still needed after the route simplification.
 
----
+### Phase 8. Simplify navigation helpers
 
-## Final Recommendation
+- [x] Replace `navigateToSession` with a simpler helper such as `sessionDestination`, or rename the existing helper while simplifying it.
+- [x] Remove `settings` from session navigation helper inputs.
+- [x] Remove `sidebar` from session navigation helper inputs.
+- [x] Update all call sites to use functional `search` updates.
+- [x] Confirm the helper only decides destination path and params.
+- [x] Confirm callers are responsible only for setting `session`.
+- [x] Confirm no call site manually reconstructs `{ settings, sidebar, session }` anymore.
 
-Use `ChatShell` as the owner of active session/runtime state and build `Chat` as the inner ai-elements surface on top of that.
+### Phase 9. Delete obsolete abstractions
 
-That is the simplest design now that the shell already exists:
+- [x] Delete [`src/components/app-shell-layout.tsx`](/Users/jeremy/Developer/gitinspect/src/components/app-shell-layout.tsx).
+- [x] Audit [`src/routes/app-shell-search.ts`](/Users/jeremy/Developer/gitinspect/src/routes/app-shell-search.ts) after the refactor.
+- [x] Move any still-needed root search types into [`src/routes/__root.tsx`](/Users/jeremy/Developer/gitinspect/src/routes/__root.tsx) or a root-local type location.
+- [x] Keep route-local `session` search typing inside the route files that use it.
+- [x] Delete [`src/routes/app-shell-search.ts`](/Users/jeremy/Developer/gitinspect/src/routes/app-shell-search.ts) if it is redundant after the search type split.
+- [x] Remove any unused imports left behind in routes and components.
+- [x] Remove any obsolete types tied to sidebar prop threading.
+- [x] Remove any obsolete types tied to settings dialog prop threading.
+- [x] Remove any obsolete route-local helpers that existed only to assemble shell props.
+- [x] Regenerate the route tree if the router plugin requires it after file-level changes.
 
-- one owner for session state
-- one owner for runtime mutations
-- no duplicate query-param logic
-- no custom event bridge
-- no ambiguity about responsibility
+### Phase 10. Verification and cleanup
 
-The ai-elements migration should stay focused on presentation and input UX, not on re-solving shell/session coordination that is already implemented.
+- [x] Run `bun run typecheck`.
+- [x] Fix all type errors introduced by component/API changes.
+- [x] Run `bun run test`.
+- [x] Fix any broken tests.
+- [x] Run `bun run lint`.
+- [ ] Fix lint errors.
+- [ ] Manually test `/`.
+- [ ] Manually test `/chat`.
+- [ ] Manually test `/chat` with no session and confirm it looks like an empty chat, not a separate new-chat page.
+- [ ] Manually test `/chat?session=<existing>`.
+- [ ] Manually test `/$owner/$repo`.
+- [ ] Manually test `/$owner/$repo` with no session and confirm it uses the same empty chat surface with repo context.
+- [ ] Manually test `/$owner/$repo/$ref`.
+- [ ] Manually test opening settings from home and chat routes.
+- [ ] Manually test closing settings and preserving unrelated search params.
+- [ ] Manually test sidebar open/close on desktop.
+- [ ] Manually test sidebar behavior on mobile layout if possible.
+- [ ] Manually test selecting a session from the sidebar.
+- [ ] Manually test deleting the selected session from the sidebar.
+- [ ] Manually test deleting a non-selected session from the sidebar.
+- [ ] Manually test creating a new chat from the sidebar.
+- [ ] Manually test `/auth/callback` to confirm it still bypasses the shell.
+
+Phase 10 note:
+- Targeted lint for the refactor surface is clean.
+- Repo-wide `bun run lint` still fails on thousands of unrelated pre-existing issues in `docs/pi-mono/**`, `src/components/ui/**`, `src/db/**`, `src/models/**`, `tests/**`, and other untouched files.
+- Browser QA is still blocked in this environment because the sandbox denied binding the local dev server, and the escalation request to start it outside the sandbox was rejected.
+
+## Verification Checklist
+
+After each stage:
+
+1. `bun run typecheck`
+2. `bun run test`
+3. `bun run lint`
+
+Manual checks:
+
+1. `/` renders with the root layout and sidebar
+2. `/chat` renders with the same root layout
+3. repo routes render with the same root layout
+4. creating a new chat from the sidebar goes to the correct empty route
+5. selecting a session navigates correctly
+6. deleting the current session falls back correctly
+7. settings dialog still works from every page
+8. `/auth/callback` still bypasses the shell
+
+## Definition Of Done
+
+This refactor is done when:
+
+- root is the only place that renders the app layout
+- route files no longer assemble the shell
+- `AppSidebar` is zero-prop and self-contained
+- `AppHeader` is self-contained
+- `AppSettingsDialog` is self-contained
+- route files are mostly content and redirects
+- repo and global chat routes use one shared `Chat` surface
