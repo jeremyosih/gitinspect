@@ -60,7 +60,7 @@ function ChatComposerInner(props: {
   const { textInput } = usePromptInputController()
   const text = textInput.value
 
-  const handleSubmit = React.useEffectEvent(
+  const handleSubmit = React.useCallback(
     (message: PromptInputMessage) => {
       const next = message.text.trim()
 
@@ -69,7 +69,8 @@ function ChatComposerInner(props: {
       }
 
       void props.onSend(next)
-    }
+    },
+    [props.isStreaming, props.onSend]
   )
 
   const submitStatus: ChatStatus = props.error

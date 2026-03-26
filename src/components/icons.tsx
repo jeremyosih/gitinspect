@@ -190,6 +190,16 @@ export const Icons = {
       <polygon points="23 5 23 15 22 15 22 14 21 14 21 13 20 13 20 12 18 12 18 13 17 13 17 14 16 14 16 15 15 15 15 16 14 16 14 17 13 17 13 18 12 18 12 19 10 19 10 18 9 18 9 17 8 17 8 16 7 16 7 15 5 15 5 16 4 16 4 17 1 17 1 14 2 14 2 13 3 13 3 12 4 12 4 11 5 11 5 10 7 10 7 11 8 11 8 12 9 12 9 13 10 13 10 14 12 14 12 13 13 13 13 12 14 12 14 11 15 11 15 10 16 10 16 8 15 8 15 7 14 7 14 6 13 6 13 5 23 5" />
     </IconBase>
   ),
+  clock: (props: IconProps) => (
+    <IconBase
+      aria-label="Clock"
+      id="clock-solid"
+      viewBox="0 0 24 24"
+      {...props}
+    >
+      <path d="m22,9v-2h-1v-2h-1v-1h-1v-1h-2v-1h-2v-1h-6v1h-2v1h-2v1h-1v1h-1v2h-1v2h-1v6h1v2h1v2h1v1h1v1h2v1h2v1h6v-1h2v-1h2v-1h1v-1h1v-2h1v-2h1v-6h-1Zm-9,7v-1h-1v-1h-1V5h2v8h1v1h1v1h1v1h-1v1h-1v-1h-1Z" />
+    </IconBase>
+  ),
   writing: (props: IconProps) => (
     <IconBase
       aria-label="Writing"

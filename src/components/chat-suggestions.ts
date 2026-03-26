@@ -1,6 +1,6 @@
 export const CHAT_SUGGESTIONS: readonly string[] = [
-  "Summarize this repository",
-  "Explain the current runtime architecture",
-  "Find the session persistence flow",
-  "How does model switching work here?",
+  "What is the project structure?",
+  "How does the main entry point work?",
+  "What are the key abstractions?",
+  "Show me the testing patterns",
 ]

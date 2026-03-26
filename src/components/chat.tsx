@@ -5,8 +5,9 @@ import { useLiveQuery } from "dexie-react-hooks"
 import { useNavigate, useSearch } from "@tanstack/react-router"
 import { getFoldedToolResultIds } from "./chat-adapter"
 import { ChatComposer } from "./chat-composer"
+import { ChatEmptyState } from "./chat-empty-state"
 import { ChatMessage as ChatMessageBlock } from "./chat-message"
-import { CHAT_SUGGESTIONS } from "./chat-suggestions"
+import { RepoCombobox } from "./repo-combobox"
 import type { CSSProperties } from "react"
 import type { ProviderGroupId, ThinkingLevel } from "@/types/models"
 import type { ChatMessage } from "@/types/chat"
@@ -16,7 +17,7 @@ import {
   ConversationContent,
   ConversationScrollButton,
 } from "@/components/ai-elements/conversation"
-import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion"
+import type { RepoComboboxHandle } from "./repo-combobox"
 import { getRuntimeCommandErrorMessage } from "@/agent/runtime-command-errors"
 import { runtimeClient } from "@/agent/runtime-client"
 import { touchRepository } from "@/db/schema"
@@ -152,6 +153,7 @@ export function Chat(props: ChatProps) {
   const [isStartingSession, setIsStartingSession] = React.useState(false)
   const runtime = useRuntimeSession(sessionId)
   const promptRef = React.useRef<HTMLDivElement | null>(null)
+  const repoComboboxRef = React.useRef<RepoComboboxHandle>(null)
   const [promptHeight, setPromptHeight] = React.useState(0)
 
   React.useEffect(() => {
@@ -365,47 +367,49 @@ export function Chat(props: ChatProps) {
       style={{ "--chat-input-height": `${promptHeight}px` } as CSSProperties}
     >
       <Conversation className="min-h-0 flex-1">
-        <ConversationContent className="mx-auto w-full max-w-4xl px-4 py-6">
-          {messages.map((message, index) => {
-            if (
-              message.role === "toolResult" &&
-              foldedToolResultIds.has(message.id)
-            ) {
-              return null
-            }
+        {messages.length === 0 ? (
+          <ChatEmptyState
+            onSuggestionClick={(text) => void handleSend(text)}
+            onSwitchRepo={() => repoComboboxRef.current?.focusAndClear()}
+            repoSource={props.repoSource}
+          />
+        ) : (
+          <ConversationContent className="mx-auto w-full max-w-4xl px-4 py-6">
+            {messages.map((message, index) => {
+              if (
+                message.role === "toolResult" &&
+                foldedToolResultIds.has(message.id)
+              ) {
+                return null
+              }
 
-            return (
-              <ChatMessageBlock
-                followingMessages={messages.slice(index + 1)}
-                isStreamingReasoning={
-                  activeSession?.isStreaming === true &&
-                  message.role === "assistant" &&
-                  lastAssistantMessageId === message.id
-                }
-                key={message.id}
-                message={message}
-              />
-            )
-          })}
-        </ConversationContent>
+              return (
+                <ChatMessageBlock
+                  followingMessages={messages.slice(index + 1)}
+                  isStreamingReasoning={
+                    activeSession?.isStreaming === true &&
+                    message.role === "assistant" &&
+                    lastAssistantMessageId === message.id
+                  }
+                  key={message.id}
+                  message={message}
+                />
+              )
+            })}
+          </ConversationContent>
+        )}
         <ConversationScrollButton />
       </Conversation>
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10">
         <div className="pointer-events-auto bg-background">
           <div className="mx-auto w-full max-w-4xl px-4 pb-4">
-            <div ref={promptRef} className="grid gap-4 pt-4">
-              {messages.length === 0 ? (
-                <Suggestions>
-                  {CHAT_SUGGESTIONS.map((suggestion) => (
-                    <Suggestion
-                      key={suggestion}
-                      onClick={() => void handleSend(suggestion)}
-                      suggestion={suggestion}
-                    />
-                  ))}
-                </Suggestions>
-              ) : null}
+            <div ref={promptRef} className="grid gap-3 pt-4">
+              <RepoCombobox
+                ref={repoComboboxRef}
+                autoFocus={!sessionId && !props.repoSource}
+                repoSource={props.repoSource}
+              />
 
               <ChatComposer
                 error={currentError}
