@@ -1,5 +1,7 @@
 import * as React from "react"
+import { useLiveQuery } from "dexie-react-hooks"
 import { CheckIcon } from "lucide-react"
+import { db } from "@/db/schema"
 import type { ProviderGroupId } from "@/types/models"
 import {
   ModelSelector,
@@ -14,12 +16,13 @@ import {
 } from "@/components/ai-elements/model-selector"
 import { PromptInputButton } from "@/components/ai-elements/prompt-input"
 import {
+  getConnectedProviders,
   getDefaultModelForGroup,
   getModelForGroup,
   getModelsForGroup,
   getProviderGroupMetadata,
+  getVisibleProviderGroups,
 } from "@/models/catalog"
-import { useVisibleProviderGroups } from "@/hooks/use-visible-provider-groups"
 import { cn } from "@/lib/utils"
 
 export function ChatModelSelector(props: {
@@ -29,7 +32,10 @@ export function ChatModelSelector(props: {
   providerGroup: ProviderGroupId
 }) {
   const [open, setOpen] = React.useState(false)
-  const providerGroups = useVisibleProviderGroups()
+  const providerKeys = useLiveQuery(() => db.providerKeys.toArray(), []) ?? []
+  const providerGroups = getVisibleProviderGroups(
+    getConnectedProviders(providerKeys)
+  )
   const activeProviderGroup = providerGroups.includes(props.providerGroup)
     ? props.providerGroup
     : providerGroups[0] ?? "opencode-free"
@@ -38,17 +44,6 @@ export function ChatModelSelector(props: {
       ? props.model
       : getDefaultModelForGroup(activeProviderGroup).id
   const selectedModel = getModelForGroup(activeProviderGroup, activeModelId)
-
-  React.useEffect(() => {
-    if (props.disabled || props.providerGroup === activeProviderGroup) {
-      return
-    }
-
-    void props.onSelect(
-      activeProviderGroup,
-      getDefaultModelForGroup(activeProviderGroup).id
-    )
-  }, [activeProviderGroup, props.disabled, props.onSelect, props.providerGroup])
 
   return (
     <ModelSelector onOpenChange={setOpen} open={open}>
