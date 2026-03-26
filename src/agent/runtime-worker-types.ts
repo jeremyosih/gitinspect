@@ -1,6 +1,8 @@
 import type { ProviderGroupId, ThinkingLevel } from "@/types/models"
 import type { RepoSource } from "@/types/storage"
 
+export type WorkerMode = "shared" | "dedicated"
+
 export type RuntimeCommandError = "busy" | "missing-session"
 
 export interface RuntimeMutationResult {

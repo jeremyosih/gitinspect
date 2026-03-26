@@ -3,20 +3,33 @@ import type { RepoSource } from "@/types/storage"
 import type {
   RuntimeMutationResult,
   RuntimeWorkerApi,
+  WorkerMode,
 } from "@/agent/runtime-worker-types"
 
-function createWorkerApi(): RuntimeWorkerApi {
-  if (typeof window === "undefined" || typeof SharedWorker === "undefined") {
-    throw new Error("SharedWorker runtime is only available in Chromium browsers")
+type WorkerModule = typeof import("./runtime-worker")
+
+const sharedWorkerSupported =
+  typeof window !== "undefined" && "SharedWorker" in window
+
+function createWorkerApi(): { api: RuntimeWorkerApi; mode: WorkerMode } {
+  if (typeof window === "undefined") {
+    throw new Error("Worker runtime requires a browser environment")
   }
 
-  return new ComlinkSharedWorker<typeof import("./runtime-shared-worker")>(
-    new URL("./runtime-shared-worker", import.meta.url),
-    {
-      name: "gitinspect-runtime",
-      type: "module",
+  const workerUrl = new URL("./runtime-worker", import.meta.url)
+  const workerOpts = { name: "gitinspect-runtime", type: "module" as const }
+
+  if (sharedWorkerSupported) {
+    return {
+      api: new ComlinkSharedWorker<WorkerModule>(workerUrl, workerOpts),
+      mode: "shared",
     }
-  )
+  }
+
+  return {
+    api: new ComlinkWorker<WorkerModule>(workerUrl, workerOpts),
+    mode: "dedicated",
+  }
 }
 
 export class RuntimeClient {
@@ -34,7 +47,8 @@ export class RuntimeClient {
     }
 
     this.connectPromise = (async () => {
-      this.api = createWorkerApi()
+      const result = createWorkerApi()
+      this.api = result.api
     })().catch((error) => {
       this.connectError =
         error instanceof Error ? error : new Error(String(error))

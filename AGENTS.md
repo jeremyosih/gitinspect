@@ -15,6 +15,7 @@ This repo is a strictly client-side browser app that recreates the core Sitegeis
 
 - Always use Bun to add packages, run test etc. 
 - Must implement proxy like behavior exactly like sitegeist !
+- Works on both desktop and mobile browsers. On browsers with `SharedWorker` support the runtime is shared across tabs; on browsers without it (e.g. Chrome Android) the runtime falls back to a dedicated `Worker` per tab.
 - Sessions survive reloads and browser restarts.
 - Auth supports API keys and local OAuth credentials, including refresh.
 - Model choice persists and can change mid-session.
