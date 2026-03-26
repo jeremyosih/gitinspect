@@ -10,10 +10,10 @@ import {
 } from "@tanstack/react-router"
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools"
 import { TanStackDevtools } from "@tanstack/react-devtools"
+import appCss from "../styles.css?url"
 import {
   AppSettingsDialog,
   isSettingsSection,
-  type SettingsSection,
 } from "@/components/settings-dialog"
 import { AppHeader } from "@/components/app-header"
 import { AppSidebar } from "@/components/app-sidebar"
@@ -24,7 +24,6 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { Toaster } from "@/components/ui/sonner"
 import { ThemeProvider } from "@/components/theme-provider"
 
-import appCss from "../styles.css?url"
 
 type RootSearchInput = {
   settings?: string
@@ -35,7 +34,7 @@ export const Route = createRootRoute({
   validateSearch: (search: RootSearchInput) => ({
     settings:
       typeof search.settings === "string" && isSettingsSection(search.settings)
-        ? (search.settings as SettingsSection)
+        ? (search.settings)
         : undefined,
     sidebar: search.sidebar === "open" ? "open" : undefined,
   }),
@@ -145,22 +144,22 @@ function RootLayout() {
         if (currentRouteTarget.to === "/") {
           void navigate({
             to: "/",
-            search: {
-              settings: search.settings,
+            search: (prev) => ({
+              settings: prev.settings,
               sidebar: open ? "open" : undefined,
-            },
+            }),
           })
           return
         }
 
         void navigate({
           ...currentRouteTarget,
-          search: {
-            initialQuery: undefined,
-            session: undefined,
-            settings: search.settings,
+          search: (prev) => ({
+            initialQuery: prev.initialQuery,
+            session: prev.session,
+            settings: prev.settings,
             sidebar: open ? "open" : undefined,
-          },
+          }),
         })
       }}
       open={search.sidebar === "open"}
