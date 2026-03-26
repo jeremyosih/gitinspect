@@ -1,8 +1,8 @@
 import { fireEvent, render, screen } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
-import { ChatComposer } from "@/components/new/chat-composer"
+import { ChatComposer } from "@/components/chat-composer"
 
-vi.mock("@/components/new/chat-model-selector", () => ({
+vi.mock("@/components/chat-model-selector", () => ({
   ChatModelSelector: () => <span data-testid="model-selector">Model</span>,
 }))
 
@@ -17,7 +17,9 @@ describe("ChatComposer", () => {
         onAbort={() => {}}
         onSelectModel={() => {}}
         onSend={onSend}
+        onThinkingLevelChange={() => {}}
         providerGroup="openai-codex"
+        thinkingLevel="medium"
       />
     )
 
@@ -42,12 +44,14 @@ describe("ChatComposer", () => {
         onAbort={() => {}}
         onSelectModel={() => {}}
         onSend={onSend}
+        onThinkingLevelChange={() => {}}
         providerGroup="openai-codex"
+        thinkingLevel="medium"
       />
     )
 
     const submit = screen.getByRole("button", { name: /submit/i })
-    expect(submit).toBeDisabled()
+    expect((submit as HTMLButtonElement).disabled).toBe(true)
     fireEvent.click(submit)
     expect(onSend).not.toHaveBeenCalled()
   })
@@ -60,12 +64,14 @@ describe("ChatComposer", () => {
         onAbort={() => {}}
         onSelectModel={() => {}}
         onSend={vi.fn()}
+        onThinkingLevelChange={() => {}}
         providerGroup="openai-codex"
+        thinkingLevel="medium"
       />
     )
 
     const submit = screen.getByRole("button", { name: /stop/i })
-    expect(submit).not.toBeDisabled()
+    expect((submit as HTMLButtonElement).disabled).toBe(false)
   })
 
   it("renders model selector slot", () => {
@@ -76,10 +82,14 @@ describe("ChatComposer", () => {
         onAbort={() => {}}
         onSelectModel={() => {}}
         onSend={vi.fn()}
+        onThinkingLevelChange={() => {}}
         providerGroup="openai-codex"
+        thinkingLevel="medium"
       />
     )
 
-    expect(screen.getByTestId("model-selector")).toBeInTheDocument()
+    expect(document.body.contains(screen.getByTestId("model-selector"))).toBe(
+      true
+    )
   })
 })

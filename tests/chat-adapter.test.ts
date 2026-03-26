@@ -6,7 +6,7 @@ import {
   getAssistantToolCalls,
   getUserText,
   isToolResultMessage,
-} from "@/components/new/chat-adapter"
+} from "@/components/chat-adapter"
 import { createEmptyUsage } from "@/types/models"
 import type {
   AssistantMessage,

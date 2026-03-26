@@ -5,9 +5,9 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar"
 import type { SessionMetadata } from "@/types/storage"
-import { ChatFooter } from "@/components/new/chat-footer"
-import { ChatLogo } from "@/components/new/chat-logo"
-import { ChatSessionList } from "@/components/new/chat-session-list"
+import { ChatFooter } from "@/components/chat-footer"
+import { ChatLogo } from "@/components/chat-logo"
+import { ChatSessionList } from "@/components/chat-session-list"
 
 export function ChatSidebar(props: {
   activeSessionId: string

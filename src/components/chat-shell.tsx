@@ -1,5 +1,6 @@
 import * as React from "react"
-import type { SessionData } from "@/types/storage"
+import { useRouterState } from "@tanstack/react-router"
+import type { MessageRow, SessionData } from "@/types/storage"
 import { runtimeClient } from "@/agent/runtime-client"
 import { deleteSession } from "@/db/schema"
 import { useAppBootstrap } from "@/hooks/use-app-bootstrap"
@@ -12,67 +13,60 @@ import {
   persistLastUsedSessionSettings,
   syncSessionToUrl,
 } from "@/sessions/session-selection"
+import { normalizeRepoSource } from "@/repo/settings"
+import { parsedPathToRepoSource, parseRepoPathname } from "@/repo/url"
 import {
   createSession,
   loadSession,
   persistSessionSnapshot,
 } from "@/sessions/session-service"
-import { Chat } from "@/components/new/chat"
-import { ChatHeader } from "@/components/new/chat-header"
-import { ChatSidebar } from "@/components/new/chat-sidebar"
+import { Chat } from "@/components/chat"
+import { ChatHeader } from "@/components/chat-header"
+import { ChatSidebar } from "@/components/chat-sidebar"
 import { SettingsDialog } from "@/components/settings-dialog"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 
-export function ChatShell() {
-  const bootstrap = useAppBootstrap()
-  const { sessions } = useSessionList()
-  const [settingsOpen, setSettingsOpen] = React.useState(false)
-
-  if (bootstrap.status === "error") {
-    return (
-      <div className="flex min-h-svh items-center justify-center px-6 text-sm text-destructive">
-        {bootstrap.error}
-      </div>
-    )
-  }
-
-  if (bootstrap.status === "loading" || !bootstrap.session) {
-    return (
-      <div className="flex min-h-svh items-center justify-center text-sm text-muted-foreground">
-        Loading local session state...
-      </div>
-    )
-  }
-
-  return (
-    <ReadyChatShell
-      initialSession={bootstrap.session}
-      sessions={sessions}
-      settingsOpen={settingsOpen}
-      setSettingsOpen={setSettingsOpen}
-    />
-  )
+export type ChatShellMainContext = {
+  activeSession: SessionData | undefined
+  displayedIsStreaming: boolean
+  messages: MessageRow[]
+  runtime: ReturnType<typeof useRuntimeSession>
+  selectedSessionId: string
 }
 
-function ReadyChatShell(props: {
+export type ChatShellChromeProps = {
   initialSession: SessionData
+  renderMain: (ctx: ChatShellMainContext) => React.ReactNode
   sessions: ReturnType<typeof useSessionList>["sessions"]
   setSettingsOpen: (open: boolean) => void
   settingsOpen: boolean
-}) {
+}
+
+export function ChatShellChrome(props: ChatShellChromeProps) {
+  const pathname = useRouterState({ select: (s) => s.location.pathname })
   const [selectedSessionId, setSelectedSessionId] = React.useState(
     props.initialSession.id
   )
   const activeSession = useSessionData(selectedSessionId)
   const messages = useSessionMessages(selectedSessionId) ?? []
   const runtime = useRuntimeSession(selectedSessionId)
+  const parsedRepoPath = parseRepoPathname(pathname)
+  const sessionsInRepo = React.useMemo(() => {
+    if (!parsedRepoPath) {
+      return props.sessions
+    }
+
+    return props.sessions.filter((session) => {
+      const source = session.repoSource
+      return (
+        source?.owner === parsedRepoPath.owner &&
+        source?.repo === parsedRepoPath.repo
+      )
+    })
+  }, [parsedRepoPath, props.sessions])
   const selectedSessionMetadata = props.sessions.find(
     (session) => session.id === selectedSessionId
   )
-  const displayedTitle =
-    activeSession?.title ??
-    selectedSessionMetadata?.title ??
-    props.initialSession.title
   const displayedIsStreaming =
     activeSession?.isStreaming ?? selectedSessionMetadata?.isStreaming ?? false
 
@@ -113,16 +107,22 @@ function ReadyChatShell(props: {
     })()
   }, [props.sessions, selectedSessionId])
 
-  const runningSessionIds = props.sessions
+  const runningSessionIds = sessionsInRepo
     .filter((session) => session.isStreaming)
     .map((session) => session.id)
 
   const handleCreateSession = React.useEffectEvent(async () => {
     const baseSession = activeSession ?? props.initialSession
+    const path =
+      typeof window !== "undefined" ? window.location.pathname : ""
+    const parsed = parseRepoPathname(path)
+    const repoFromPath = parsed
+      ? normalizeRepoSource(parsedPathToRepoSource(parsed))
+      : undefined
     const nextSession = createSession({
       model: baseSession.model,
       providerGroup: baseSession.providerGroup ?? baseSession.provider,
-      repoSource: baseSession.repoSource,
+      repoSource: repoFromPath ?? baseSession.repoSource,
       thinkingLevel: baseSession.thinkingLevel,
     })
 
@@ -153,7 +153,19 @@ function ReadyChatShell(props: {
   })
 
   const handleDeleteSession = React.useEffectEvent(async (sessionId: string) => {
-    const remainingSessions = props.sessions.filter((session) => session.id !== sessionId)
+    const path =
+      typeof window !== "undefined" ? window.location.pathname : ""
+    const parsed = parseRepoPathname(path)
+    const pool = !parsed
+      ? props.sessions
+      : props.sessions.filter(
+          (session) =>
+            session.repoSource?.owner === parsed.owner &&
+            session.repoSource?.repo === parsed.repo
+        )
+    const remainingSessions = pool.filter(
+      (session) => session.id !== sessionId
+    )
 
     try {
       await runtimeClient.releaseSession(sessionId)
@@ -182,10 +194,13 @@ function ReadyChatShell(props: {
     }
 
     const baseSession = activeSession ?? props.initialSession
+    const repoFromPathForEmpty = parsed
+      ? normalizeRepoSource(parsedPathToRepoSource(parsed))
+      : undefined
     const nextSession = createSession({
       model: baseSession.model,
       providerGroup: baseSession.providerGroup ?? baseSession.provider,
-      repoSource: baseSession.repoSource,
+      repoSource: repoFromPathForEmpty ?? baseSession.repoSource,
       thinkingLevel: baseSession.thinkingLevel,
     })
 
@@ -194,6 +209,14 @@ function ReadyChatShell(props: {
     syncSessionToUrl(nextSession.id)
     await persistLastUsedSessionSettings(nextSession)
   })
+
+  const mainContext: ChatShellMainContext = {
+    activeSession,
+    displayedIsStreaming,
+    messages,
+    runtime,
+    selectedSessionId,
+  }
 
   return (
     <SidebarProvider>
@@ -204,29 +227,15 @@ function ReadyChatShell(props: {
           onDeleteSession={handleDeleteSession}
           onSelectSession={handleSelectSession}
           runningSessionIds={runningSessionIds}
-          sessions={props.sessions}
+          sessions={sessionsInRepo}
         />
         <SidebarInset className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <ChatHeader
             onOpenSettings={() => props.setSettingsOpen(true)}
-            title={displayedTitle}
+            settingsDisabled={displayedIsStreaming}
           />
           <main className="flex min-h-0 flex-1 overflow-hidden">
-            {activeSession ? (
-              <Chat
-                error={runtime.error ?? activeSession.error}
-                messages={messages}
-                runtime={runtime}
-                session={{
-                  ...activeSession,
-                  isStreaming: displayedIsStreaming,
-                }}
-              />
-            ) : (
-              <div className="flex h-full items-center justify-center px-6 text-sm text-muted-foreground">
-                Loading session...
-              </div>
-            )}
+            {props.renderMain(mainContext)}
           </main>
         </SidebarInset>
       </div>
@@ -234,17 +243,63 @@ function ReadyChatShell(props: {
         <SettingsDialog
           onOpenChange={props.setSettingsOpen}
           open={props.settingsOpen}
-          onRepoSourceChange={async (repoSource) => {
-            await runtime.setRepoSource(repoSource)
-            await persistLastUsedSessionSettings({
-              ...activeSession,
-              repoSource,
-            })
-          }}
           session={activeSession}
           settingsDisabled={displayedIsStreaming}
         />
       ) : null}
     </SidebarProvider>
+  )
+}
+
+export function ChatShell() {
+  const bootstrap = useAppBootstrap()
+  const { sessions } = useSessionList()
+  const [settingsOpen, setSettingsOpen] = React.useState(false)
+
+  if (bootstrap.status === "error") {
+    return (
+      <div className="flex min-h-svh items-center justify-center px-6 text-sm text-destructive">
+        {bootstrap.error}
+      </div>
+    )
+  }
+
+  if (bootstrap.status === "loading" || !bootstrap.session) {
+    return (
+      <div className="flex min-h-svh items-center justify-center text-sm text-muted-foreground">
+        Loading local session state...
+      </div>
+    )
+  }
+
+  return (
+    <ChatShellChrome
+      initialSession={bootstrap.session}
+      sessions={sessions}
+      settingsOpen={settingsOpen}
+      setSettingsOpen={setSettingsOpen}
+      renderMain={({
+        activeSession: session,
+        displayedIsStreaming,
+        messages: sessionMessages,
+        runtime: sessionRuntime,
+      }) =>
+        session ? (
+          <Chat
+            error={sessionRuntime.error ?? session.error}
+            messages={sessionMessages}
+            runtime={sessionRuntime}
+            session={{
+              ...session,
+              isStreaming: displayedIsStreaming,
+            }}
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center px-6 text-sm text-muted-foreground">
+            Loading session...
+          </div>
+        )
+      }
+    />
   )
 }
