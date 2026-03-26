@@ -1,17 +1,16 @@
-/* eslint-disable @typescript-eslint/consistent-type-imports, @typescript-eslint/require-await */
+/* eslint-disable @typescript-eslint/require-await */
+import { wrap } from "comlink"
+import {
+  MissingSessionRuntimeError,
+  reviveRuntimeCommandError,
+} from "@/agent/runtime-command-errors"
+import type { RuntimeWorkerApi } from "@/agent/runtime-worker-types"
 import type { ProviderGroupId, ThinkingLevel } from "@/types/models"
-import type { RepoSource } from "@/types/storage"
-import type {
-  RuntimeMutationResult,
-  RuntimeWorkerApi,
-  WorkerMode,
-} from "@/agent/runtime-worker-types"
-import { wrap, type Remote } from "comlink"
 
 const sharedWorkerSupported =
   typeof window !== "undefined" && "SharedWorker" in window
 
-function createWorkerApi(): { api: RuntimeWorkerApi; mode: WorkerMode } {
+function createWorkerApi(): RuntimeWorkerApi {
   if (typeof window === "undefined") {
     throw new Error("Worker runtime requires a browser environment")
   }
@@ -21,20 +20,14 @@ function createWorkerApi(): { api: RuntimeWorkerApi; mode: WorkerMode } {
       new URL("./runtime-worker", import.meta.url),
       { name: "gitinspect-runtime", type: "module" }
     )
-    return {
-      api: wrap<RuntimeWorkerApi>(worker.port),
-      mode: "shared",
-    }
+    return wrap<RuntimeWorkerApi>(worker.port)
   }
 
   const worker = new Worker(
     new URL("./runtime-worker", import.meta.url),
     { name: "gitinspect-runtime", type: "module" }
   )
-  return {
-    api: wrap<RuntimeWorkerApi>(worker),
-    mode: "dedicated",
-  }
+  return wrap<RuntimeWorkerApi>(worker)
 }
 
 export class RuntimeClient {
@@ -52,8 +45,7 @@ export class RuntimeClient {
     }
 
     this.connectPromise = (async () => {
-      const result = createWorkerApi()
-      this.api = result.api
+      this.api = createWorkerApi()
     })().catch((error) => {
       this.connectError =
         error instanceof Error ? error : new Error(String(error))
@@ -64,81 +56,107 @@ export class RuntimeClient {
     return await this.connectPromise
   }
 
-  async ensureSession(sessionId: string): Promise<boolean> {
+  private async call<T>(
+    invoke: (api: RuntimeWorkerApi) => Promise<T>
+  ): Promise<T> {
     await this.ensureConnected()
-    return (await this.api?.ensureSession(sessionId)) ?? false
-  }
 
-  async send(sessionId: string, content: string): Promise<RuntimeMutationResult> {
-    await this.ensureConnected()
-    await this.ensureSession(sessionId)
-    return (await this.api?.send(sessionId, content)) ?? {
-      error: "missing-session",
-      ok: false,
+    if (!this.api) {
+      throw new Error("Runtime connection unavailable")
+    }
+
+    try {
+      return await invoke(this.api)
+    } catch (error) {
+      if (error instanceof Error) {
+        throw reviveRuntimeCommandError(error)
+      }
+
+      throw error
     }
   }
 
+  private async callSession(
+    sessionId: string,
+    invoke: (api: RuntimeWorkerApi) => Promise<void>
+  ): Promise<void> {
+    await this.call(async (api) => {
+      const exists = await api.ensureSession(sessionId)
+
+      if (!exists) {
+        throw new MissingSessionRuntimeError(sessionId)
+      }
+
+      await invoke(api)
+    })
+  }
+
+  private async callSessionAction(
+    sessionId: string,
+    invoke: (api: RuntimeWorkerApi) => Promise<void>
+  ): Promise<void> {
+    await this.call(async (api) => {
+      const exists = await api.ensureSession(sessionId)
+
+      if (!exists) {
+        return
+      }
+
+      await invoke(api)
+    })
+  }
+
+  async ensureSession(sessionId: string): Promise<boolean> {
+    return await this.call(async (api) => await api.ensureSession(sessionId))
+  }
+
+  async send(sessionId: string, content: string): Promise<void> {
+    await this.callSession(
+      sessionId,
+      async (api) => await api.send(sessionId, content)
+    )
+  }
+
   async abort(sessionId: string): Promise<void> {
-    await this.ensureConnected()
-    await this.ensureSession(sessionId)
-    await this.api?.abort(sessionId)
+    await this.callSessionAction(
+      sessionId,
+      async (api) => await api.abort(sessionId)
+    )
   }
 
   async releaseSession(sessionId: string): Promise<void> {
-    await this.ensureConnected()
-    await this.api?.releaseSession(sessionId)
+    await this.call(async (api) => await api.releaseSession(sessionId))
   }
 
   async refreshGithubToken(
     sessionId: string
-  ): Promise<RuntimeMutationResult> {
-    await this.ensureConnected()
-    await this.ensureSession(sessionId)
-    return (await this.api?.refreshGithubToken(sessionId)) ?? {
-      error: "missing-session",
-      ok: false,
-    }
+  ): Promise<void> {
+    await this.callSession(
+      sessionId,
+      async (api) => await api.refreshGithubToken(sessionId)
+    )
   }
 
   async setModelSelection(
     sessionId: string,
     providerGroup: ProviderGroupId,
     modelId: string
-  ): Promise<RuntimeMutationResult> {
-    await this.ensureConnected()
-    await this.ensureSession(sessionId)
-    return (await this.api?.setModelSelection(
+  ): Promise<void> {
+    await this.callSession(
       sessionId,
-      providerGroup,
-      modelId
-    )) ?? {
-      error: "missing-session",
-      ok: false,
-    }
-  }
-
-  async setRepoSource(
-    sessionId: string,
-    repoSource?: RepoSource
-  ): Promise<RuntimeMutationResult> {
-    await this.ensureConnected()
-    await this.ensureSession(sessionId)
-    return (await this.api?.setRepoSource(sessionId, repoSource)) ?? {
-      error: "missing-session",
-      ok: false,
-    }
+      async (api) =>
+        await api.setModelSelection(sessionId, providerGroup, modelId)
+    )
   }
 
   async setThinkingLevel(
     sessionId: string,
     thinkingLevel: ThinkingLevel
-  ): Promise<RuntimeMutationResult> {
-    await this.ensureConnected()
-    await this.ensureSession(sessionId)
-    return (await this.api?.setThinkingLevel(sessionId, thinkingLevel)) ?? {
-      error: "missing-session",
-      ok: false,
-    }
+  ): Promise<void> {
+    await this.callSession(
+      sessionId,
+      async (api) => await api.setThinkingLevel(sessionId, thinkingLevel)
+    )
   }
 }
 

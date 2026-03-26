@@ -12,5 +12,4 @@ export const releaseSession = async (
   registry.releaseSession(sessionId)
 }
 export const setModelSelection = registry.setModelSelection.bind(registry)
-export const setRepoSource = registry.setRepoSource.bind(registry)
 export const setThinkingLevel = registry.setThinkingLevel.bind(registry)

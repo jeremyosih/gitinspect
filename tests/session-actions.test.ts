@@ -9,7 +9,6 @@ const setSetting = vi.fn(async () => {})
 const persistSessionSnapshot = vi.fn(async () => {})
 const createSession = vi.fn()
 const releaseSession = vi.fn(async () => {})
-const send = vi.fn()
 
 vi.mock("@/db/schema", () => ({
   deleteSession,
@@ -26,7 +25,6 @@ vi.mock("@/sessions/session-service", () => ({
 vi.mock("@/agent/runtime-client", () => ({
   runtimeClient: {
     releaseSession,
-    send,
   },
 }))
 
@@ -77,7 +75,6 @@ describe("session-actions", () => {
     listProviderKeys.mockReset()
     persistSessionSnapshot.mockReset()
     releaseSession.mockReset()
-    send.mockReset()
     setSetting.mockReset()
   })
 
@@ -165,25 +162,29 @@ describe("session-actions", () => {
     expect(session.repoSource?.ref).toBe("dev")
   })
 
-  it("creates a session, persists defaults, and sends on first submit", async () => {
-    const created = buildSession("session-first")
-    createSession.mockReturnValue(created)
-    send.mockResolvedValue({ ok: true })
+  it("persists last-used session settings", async () => {
+    const { persistLastUsedSessionSettings } = await import(
+      "@/sessions/session-actions"
+    )
 
-    const { createSessionAndSend } = await import("@/sessions/session-actions")
-    const session = await createSessionAndSend({
-      base: {
-        model: created.model,
-        provider: created.provider,
-        providerGroup: created.providerGroup,
-        thinkingLevel: created.thinkingLevel,
-      },
-      content: "hello",
+    await persistLastUsedSessionSettings({
+      model: "gpt-5.1-codex-mini",
+      provider: "openai-codex",
+      providerGroup: "openai-codex",
     })
 
-    expect(send).toHaveBeenCalledWith("session-first", "hello")
-    expect(setSetting).toHaveBeenCalledWith("last-used-model", created.model)
-    expect(session.id).toBe("session-first")
+    expect(setSetting).toHaveBeenCalledWith(
+      "last-used-model",
+      "gpt-5.1-codex-mini"
+    )
+    expect(setSetting).toHaveBeenCalledWith(
+      "last-used-provider",
+      "openai-codex"
+    )
+    expect(setSetting).toHaveBeenCalledWith(
+      "last-used-provider-group",
+      "openai-codex"
+    )
   })
 
   it("deletes the session and falls back to a sibling", async () => {

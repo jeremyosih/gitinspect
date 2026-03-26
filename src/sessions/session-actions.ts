@@ -211,32 +211,6 @@ export async function createSessionForRepo(params: {
   return session
 }
 
-export async function createSessionAndSend(params: {
-  base: SessionCreationBase
-  content: string
-  repoSource?: RepoSource
-}): Promise<SessionData> {
-  const session = params.repoSource
-    ? await createSessionForRepo({
-        base: params.base,
-        owner: params.repoSource.owner,
-        ref: params.repoSource.ref,
-        repo: params.repoSource.repo,
-      })
-    : await createSessionForChat(params.base)
-
-  await persistLastUsedSessionSettings(session)
-
-  const result = await runtimeClient.send(session.id, params.content)
-
-  if (!result.ok) {
-    await deleteSession(session.id)
-    throw new Error(result.error ?? "missing-session")
-  }
-
-  return session
-}
-
 export async function deleteSessionAndResolveNext(params: {
   sessionId: string
   siblingSessions: Array<SessionData>

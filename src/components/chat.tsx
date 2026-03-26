@@ -17,19 +17,23 @@ import {
   ConversationScrollButton,
 } from "@/components/ai-elements/conversation"
 import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion"
+import { getRuntimeCommandErrorMessage } from "@/agent/runtime-command-errors"
+import { runtimeClient } from "@/agent/runtime-client"
 import { touchRepository } from "@/db/schema"
-import {
-  getRuntimeActionErrorMessage,
-  useRuntimeSession,
-} from "@/hooks/use-runtime-session"
+import { useRuntimeSession } from "@/hooks/use-runtime-session"
+import { getIsoNow } from "@/lib/dates"
 import { getCanonicalProvider, getDefaultProviderGroup } from "@/models/catalog"
 import {
-  createSessionAndSend,
+  createSessionForChat,
+  createSessionForRepo,
   persistLastUsedSessionSettings,
   resolveProviderDefaults,
   sessionDestination,
 } from "@/sessions/session-actions"
-import { loadSessionWithMessages } from "@/sessions/session-service"
+import {
+  loadSessionWithMessages,
+  persistSessionSnapshot,
+} from "@/sessions/session-service"
 
 type EmptyChatDraft = {
   model: string
@@ -88,6 +92,24 @@ function repoDestination(repoSource: RepoSource) {
     },
     to: "/$owner/$repo/$" as const,
   }
+}
+
+async function persistDetachedSendError(
+  sessionId: string,
+  error: Error | undefined
+) {
+  const loaded = await loadSessionWithMessages(sessionId)
+
+  if (!loaded || loaded.session.error || loaded.messages.length > 0) {
+    return
+  }
+
+  await persistSessionSnapshot({
+    ...loaded.session,
+    error: getRuntimeCommandErrorMessage(error),
+    isStreaming: false,
+    updatedAt: getIsoNow(),
+  })
 }
 
 export function Chat(props: ChatProps) {
@@ -172,7 +194,6 @@ export function Chat(props: ChatProps) {
     loadedSessionState?.kind === "active" ? loadedSessionState.session : undefined
   const messages =
     loadedSessionState?.kind === "active" ? loadedSessionState.messages : []
-  const displayedRepoSource = activeSession?.repoSource ?? props.repoSource
   const foldedToolResultIds = React.useMemo(
     () => getFoldedToolResultIds(messages),
     [messages]
@@ -244,16 +265,22 @@ export function Chat(props: ChatProps) {
       setIsStartingSession(true)
 
       try {
-        const session = await createSessionAndSend({
-          base: {
-            model: draft.model,
-            provider: getCanonicalProvider(draft.providerGroup),
-            providerGroup: draft.providerGroup,
-            thinkingLevel: draft.thinkingLevel,
-          },
-          content,
-          repoSource: props.repoSource,
-        })
+        const base = {
+          model: draft.model,
+          provider: getCanonicalProvider(draft.providerGroup),
+          providerGroup: draft.providerGroup,
+          thinkingLevel: draft.thinkingLevel,
+        }
+        const session = props.repoSource
+          ? await createSessionForRepo({
+              base,
+              owner: props.repoSource.owner,
+              ref: props.repoSource.ref,
+              repo: props.repoSource.repo,
+            })
+          : await createSessionForChat(base)
+
+        await persistLastUsedSessionSettings(session)
 
         await navigate({
           ...sessionDestination({
@@ -267,9 +294,18 @@ export function Chat(props: ChatProps) {
             sidebar: prev.sidebar,
           }),
         })
+
+        void runtimeClient.send(session.id, content).catch(async (error) => {
+          await persistDetachedSendError(
+            session.id,
+            error instanceof Error ? error : undefined
+          )
+        })
       } catch (error) {
         setDraftError(
-          getRuntimeActionErrorMessage(error instanceof Error ? error : undefined)
+          getRuntimeCommandErrorMessage(
+            error instanceof Error ? error : undefined
+          )
         )
       } finally {
         setIsStartingSession(false)
@@ -403,12 +439,6 @@ export function Chat(props: ChatProps) {
                 providerGroup={currentProviderGroup}
                 thinkingLevel={currentThinkingLevel}
               />
-              {messages.length === 0 && displayedRepoSource ? (
-                <div className="text-center text-xs text-muted-foreground">
-                  Your first message will create a repo-backed session for{" "}
-                  {displayedRepoSource.owner}/{displayedRepoSource.repo}@{displayedRepoSource.ref}.
-                </div>
-              ) : null}
             </div>
           </div>
         </div>

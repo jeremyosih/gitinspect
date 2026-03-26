@@ -1,78 +1,68 @@
-import { Agent, type AgentEvent } from "@mariozechner/pi-agent-core"
+import { Agent } from "@mariozechner/pi-agent-core"
+import type { AgentEvent } from "@mariozechner/pi-agent-core"
 import type { Message } from "@mariozechner/pi-ai"
-import {
-  getSessionMessages,
-  putMessage,
-  putMessages,
-  putSession,
-  putSessionAndMessages,
-  recordUsage,
-} from "@/db/schema"
-import { createId } from "@/lib/ids"
-import { getIsoNow } from "@/lib/dates"
-import { getCanonicalProvider, getModel } from "@/models/catalog"
-import { resolveApiKeyForProvider } from "@/auth/resolve-api-key"
-import {
-  buildInitialAgentState,
-  inferMessageStatus,
-  normalizeAssistantDraft,
-  normalizeMessages,
-  toMessageRow,
-} from "@/agent/session-adapter"
-import {
-  buildSystemMessage,
-  classifyRuntimeError,
-} from "@/agent/runtime-errors"
-import { streamChatWithPiAgent } from "@/agent/live-runtime"
-import { webMessageTransformer } from "@/agent/message-transformer"
-import { createRepoRuntime } from "@/repo/repo-runtime"
-import { normalizeRepoSource } from "@/repo/settings"
-import { buildPersistedSession } from "@/sessions/session-service"
-import { createRepoTools } from "@/tools"
+import type { TerminalAssistantStatus } from "@/agent/session-persistence"
 import type { AssistantMessage } from "@/types/chat"
 import type { ProviderGroupId, ProviderId, ThinkingLevel } from "@/types/models"
 import type { MessageRow, RepoSource, SessionData } from "@/types/storage"
-
-type TerminalAssistantStatus = "aborted" | "error" | undefined
-
-function sortByTimestamp(left: MessageRow, right: MessageRow): number {
-  return left.timestamp - right.timestamp
-}
+import { putSession } from "@/db/schema"
+import { webMessageTransformer } from "@/agent/message-transformer"
+import { streamChatWithPiAgent } from "@/agent/provider-stream"
+import { SessionPersistence } from "@/agent/session-persistence"
+import { buildInitialAgentState, toMessageRow } from "@/agent/session-adapter"
+import { RuntimeNoticeService } from "@/agent/runtime-notice-service"
+import { resolveApiKeyForProvider } from "@/auth/resolve-api-key"
+import { getIsoNow } from "@/lib/dates"
+import { createId } from "@/lib/ids"
+import { getCanonicalProvider, getModel } from "@/models/catalog"
+import { createRepoRuntime } from "@/repo/repo-runtime"
+import { normalizeRepoSource } from "@/repo/settings"
+import { createRepoTools } from "@/tools"
 
 export class AgentHost {
   readonly agent: Agent
 
   private currentAssistantMessageId?: string
   private lastDraftAssistant?: AssistantMessage
-  private lastTerminalStatus: TerminalAssistantStatus
-  private readonly persistedMessageIds = new Set<string>()
-  private readonly recordedAssistantMessageIds = new Set<string>()
+  private lastTerminalStatus: TerminalAssistantStatus = undefined
   private disposed = false
-  private persistQueue = Promise.resolve()
   private promptPending = false
   private githubRuntimeTokenSnapshot?: string
   private getGithubToken?: () => Promise<string | undefined>
-  private readonly systemNoticeFingerprints: string[] = []
+  private readonly notices = new RuntimeNoticeService()
+  private readonly persistence: SessionPersistence
   private repoRuntime
-  private session: SessionData
   private unsubscribe?: () => void
 
   constructor(
     session: SessionData,
-    messages: MessageRow[],
+    messages: Array<MessageRow>,
     options?: {
       getGithubToken?: () => Promise<string | undefined>
       githubRuntimeToken?: string
     }
   ) {
-    this.lastTerminalStatus = undefined
-    this.session = session
     this.githubRuntimeTokenSnapshot = options?.githubRuntimeToken
     this.getGithubToken = options?.getGithubToken
     this.repoRuntime = this.createRuntime(session.repoSource)
-    this.seedRecordedCosts(messages)
+    this.persistence = new SessionPersistence(
+      session,
+      {
+        getCurrentAssistantId: () => this.currentAssistantMessageId,
+        getError: () => this.agent.state.error,
+        getLastDraftAssistant: () => this.lastDraftAssistant,
+        getLastTerminalStatus: () => this.lastTerminalStatus,
+        getMessages: () => this.agent.state.messages,
+        getStreamMessage: () => this.agent.state.streamMessage,
+        isStreaming: () => this.agent.state.isStreaming,
+        setLastDraftAssistant: (message) => {
+          this.lastDraftAssistant = message
+        },
+      },
+      messages
+    )
 
-    const model = getModel(session.provider, session.model)
+    const model = getModel(this.session.provider, this.session.model)
 
     this.agent = new Agent({
       convertToLlm: webMessageTransformer,
@@ -82,7 +72,7 @@ export class AgentHost {
           this.session.providerGroup
         ),
       initialState: buildInitialAgentState(
-        session,
+        this.session,
         messages,
         model,
         this.getAgentTools(this.repoRuntime)
@@ -90,15 +80,23 @@ export class AgentHost {
       streamFn: streamChatWithPiAgent,
       toolExecution: "sequential",
     })
-    this.agent.sessionId = session.id
+    this.agent.sessionId = this.session.id
     this.unsubscribe = this.agent.subscribe((event) => {
       void this.handleEvent(event).catch((error) => {
         console.error(
-          `[agent-host] Unhandled error in event handler (session ${session.id}):`,
+          `[agent-host] Unhandled error in event handler (session ${this.session.id}):`,
           error
         )
       })
     })
+  }
+
+  private get session(): SessionData {
+    return this.persistence.getSession()
+  }
+
+  private set session(session: SessionData) {
+    this.persistence.setSession(session)
   }
 
   isBusy(): boolean {
@@ -108,11 +106,7 @@ export class AgentHost {
   async prompt(content: string): Promise<void> {
     const trimmed = content.trim()
 
-    if (!trimmed) {
-      return
-    }
-
-    if (this.disposed) {
+    if (!trimmed || this.disposed) {
       return
     }
 
@@ -159,37 +153,26 @@ export class AgentHost {
       "streaming",
       this.currentAssistantMessageId
     )
-    await this.persistSessionBoundary(
-      {
-        error: undefined,
-        isStreaming: true,
-      },
-      [userRow, assistantRow],
-      [
-        ...this.buildCompletedRows(),
-        userRow,
-        assistantRow,
-      ]
-    )
-    this.persistedMessageIds.add(userRow.id)
-    this.persistedMessageIds.add(assistantRow.id)
+    await this.persistence.persistPromptStart(userRow, assistantRow)
 
     try {
       await this.agent.prompt(userMessage)
     } catch (error) {
-      if (this.disposed) {
+      if (this.isDisposed()) {
         return
       }
+
       await this.appendSystemNoticeFromError(error)
       this.lastTerminalStatus = "error"
       this.session = {
         ...this.session,
         error: error instanceof Error ? error.message : "Request failed",
       }
-      const currentAssistantRow = this.buildCurrentAssistantRow()
-      const currentRows = this.buildCurrentRows()
 
-      await this.persistSessionBoundary(
+      const currentAssistantRow = this.persistence.buildCurrentAssistantRow()
+      const currentRows = this.persistence.buildCurrentRows()
+
+      await this.persistence.persistSessionBoundary(
         {
           error: this.session.error,
           isStreaming: false,
@@ -201,13 +184,9 @@ export class AgentHost {
     } finally {
       this.promptPending = false
 
-      await this.persistQueue
+      await this.persistence.flush()
 
-      if (this.disposed) {
-        return
-      }
-
-      if (this.session.isStreaming) {
+      if (!this.isDisposed() && this.session.isStreaming) {
         console.warn(
           `[agent-host] Safety net: session ${this.session.id} still marked isStreaming after prompt resolved, forcing off`
         )
@@ -234,6 +213,7 @@ export class AgentHost {
     if (this.disposed) {
       return
     }
+
     const provider = getCanonicalProvider(providerGroup)
     const model = getModel(provider, modelId)
 
@@ -264,24 +244,6 @@ export class AgentHost {
     await putSession(this.session)
   }
 
-  async setRepoSource(repoSource?: RepoSource): Promise<SessionData> {
-    if (this.disposed) {
-      return this.session
-    }
-    const token = await this.getGithubToken?.()
-    this.githubRuntimeTokenSnapshot = token
-    this.repoRuntime = this.createRuntime(repoSource, token)
-    this.session = {
-      ...this.session,
-      repoSource: normalizeRepoSource(repoSource),
-      updatedAt: getIsoNow(),
-    }
-    this.agent.setTools(this.getAgentTools(this.repoRuntime))
-    await putSession(this.session)
-    return this.session
-  }
-
-  /** Re-read PAT from local storage and rebuild repo tools (e.g. after saving token in settings). */
   async refreshGithubToken(): Promise<void> {
     if (this.disposed) {
       return
@@ -297,101 +259,11 @@ export class AgentHost {
     if (this.disposed) {
       return
     }
+
     this.disposed = true
     this.unsubscribe?.()
     this.unsubscribe = undefined
     this.abort()
-  }
-
-  private buildCompletedRows(): MessageRow[] {
-    const normalizedMessages = normalizeMessages(this.agent.state.messages)
-    let lastAssistantIndex = -1
-
-    for (let index = normalizedMessages.length - 1; index >= 0; index -= 1) {
-      if (normalizedMessages[index]?.role === "assistant") {
-        lastAssistantIndex = index
-        break
-      }
-    }
-
-    return normalizedMessages.map((message, index) => {
-      const id =
-        message.role === "assistant" &&
-        this.currentAssistantMessageId &&
-        index === lastAssistantIndex
-          ? this.currentAssistantMessageId
-          : message.id
-
-      return toMessageRow(
-        this.session.id,
-        message,
-        inferMessageStatus(message),
-        id
-      )
-    })
-  }
-
-  private buildCurrentAssistantRow(): MessageRow | undefined {
-    const draft = normalizeAssistantDraft(this.agent.state.streamMessage)
-
-    if (draft) {
-      this.lastDraftAssistant = draft
-    }
-
-    if (!this.currentAssistantMessageId || !this.lastDraftAssistant) {
-      return undefined
-    }
-
-    if (this.agent.state.isStreaming) {
-      return toMessageRow(
-        this.session.id,
-        {
-          ...this.lastDraftAssistant,
-          id: this.currentAssistantMessageId,
-          model: this.session.model,
-          provider: this.session.provider,
-        },
-        "streaming",
-        this.currentAssistantMessageId
-      )
-    }
-
-    if (!this.lastTerminalStatus) {
-      return undefined
-    }
-
-    return toMessageRow(
-      this.session.id,
-      {
-        ...this.lastDraftAssistant,
-        errorMessage:
-          this.lastTerminalStatus === "error"
-            ? this.agent.state.error ?? this.lastDraftAssistant.errorMessage
-            : this.lastDraftAssistant.errorMessage,
-        id: this.currentAssistantMessageId,
-        model: this.session.model,
-        provider: this.session.provider,
-        stopReason: this.lastTerminalStatus === "aborted" ? "aborted" : "error",
-      },
-      this.lastTerminalStatus,
-      this.currentAssistantMessageId
-    )
-  }
-
-  private buildCurrentRows(): MessageRow[] {
-    const rowsById = new Map<string, MessageRow>()
-
-    for (const row of this.buildCompletedRows()) {
-      rowsById.set(row.id, row)
-    }
-
-    const currentAssistantRow = this.buildCurrentAssistantRow()
-
-    if (currentAssistantRow) {
-      rowsById.set(currentAssistantRow.id, currentAssistantRow)
-    }
-
-    return [...rowsById.values()].sort(sortByTimestamp)
   }
 
   private async handleEvent(event: AgentEvent): Promise<void> {
@@ -401,9 +273,7 @@ export class AgentHost {
 
     if (!this.agent.state.isStreaming && this.agent.state.error) {
       this.lastTerminalStatus ??= "error"
-      void this.appendSystemNoticeFromError(
-        new Error(this.agent.state.error)
-      )
+      void this.appendSystemNoticeFromError(new Error(this.agent.state.error))
     }
 
     if (event.type === "message_end" && event.message.role === "assistant") {
@@ -413,35 +283,26 @@ export class AgentHost {
           ? event.message.id
           : undefined)
 
-      if (
-        recordedId &&
-        event.message.usage.cost.total > 0 &&
-        !this.recordedAssistantMessageIds.has(recordedId)
-      ) {
-        this.recordedAssistantMessageIds.add(recordedId)
-        await recordUsage(
-          event.message.usage,
-          this.session.provider,
-          this.session.model,
-          event.message.timestamp
-        )
+      if (recordedId) {
+        await this.persistence.recordAssistantUsage(event.message, recordedId)
       }
     }
 
     if (this.agent.state.isStreaming) {
-      const currentAssistantRow = this.buildCurrentAssistantRow()
-      const newlyCompletedRows = this.buildCompletedRows().filter(
-        (message) => !this.persistedMessageIds.has(message.id)
-      )
+      const currentAssistantRow = this.persistence.buildCurrentAssistantRow()
+      const newlyCompletedRows = this.persistence.getNewlyCompletedRows()
 
       if (currentAssistantRow || newlyCompletedRows.length > 0) {
-        await this.persistStreamingProgress(currentAssistantRow, newlyCompletedRows)
+        await this.persistence.persistStreamingProgress(
+          currentAssistantRow,
+          newlyCompletedRows
+        )
       }
       return
     }
 
-    const currentAssistantRow = this.buildCurrentAssistantRow()
-    const currentRows = this.buildCurrentRows()
+    const currentAssistantRow = this.persistence.buildCurrentAssistantRow()
+    const currentRows = this.persistence.buildCurrentRows()
     const changedMessages =
       currentAssistantRow
         ? [currentAssistantRow]
@@ -449,7 +310,7 @@ export class AgentHost {
           ? currentRows.filter((row) => row.id === this.currentAssistantMessageId)
           : []
 
-    await this.persistSessionBoundary(
+    await this.persistence.persistSessionBoundary(
       {
         error: this.agent.state.error,
         isStreaming: false,
@@ -460,103 +321,14 @@ export class AgentHost {
     this.clearActiveStreamPointers()
   }
 
-  private async persistStreamingProgress(
-    currentAssistantRow: MessageRow | undefined,
-    newlyCompletedRows: MessageRow[]
-  ): Promise<void> {
-    if (this.disposed) {
-      return
-    }
-
-    this.persistQueue = this.persistQueue.then(async () => {
-      if (this.disposed) {
-        return
-      }
-
-      if (newlyCompletedRows.length > 0) {
-        await putMessages(newlyCompletedRows)
-
-        for (const message of newlyCompletedRows) {
-          this.persistedMessageIds.add(message.id)
-        }
-      }
-
-      if (currentAssistantRow) {
-        await putMessage(currentAssistantRow)
-        this.persistedMessageIds.add(currentAssistantRow.id)
-      }
-    })
-
-    await this.persistQueue
-  }
-
-  private async persistSessionBoundary(
-    overrides: Pick<SessionData, "error" | "isStreaming">,
-    changedMessages: MessageRow[],
-    rowsForDerivation?: MessageRow[]
-  ): Promise<void> {
-    if (this.disposed) {
-      return
-    }
-
-    const nextSessionBase = {
-      ...this.session,
-      error: overrides.error,
-      isStreaming: overrides.isStreaming,
-      updatedAt: getIsoNow(),
-    }
-
-    const allRows =
-      rowsForDerivation ??
-      (await getSessionMessages(this.session.id)).map((message) => {
-        const changedMessage = changedMessages.find(
-          (candidate) => candidate.id === message.id
-        )
-        return changedMessage ?? message
-      })
-
-    this.session = buildPersistedSession(nextSessionBase, allRows)
-
-    this.persistQueue = this.persistQueue.then(async () => {
-      if (this.disposed) {
-        return
-      }
-
-      if (changedMessages.length > 0) {
-        await putSessionAndMessages(this.session, changedMessages)
-
-        for (const message of changedMessages) {
-          this.persistedMessageIds.add(message.id)
-        }
-        return
-      }
-
-      await putSession(this.session)
-    })
-
-    await this.persistQueue
-  }
-
   private clearActiveStreamPointers(): void {
     this.currentAssistantMessageId = undefined
     this.lastDraftAssistant = undefined
     this.lastTerminalStatus = undefined
   }
 
-  private seedRecordedCosts(messages: MessageRow[]): void {
-    for (const message of messages) {
-      this.persistedMessageIds.add(message.id)
-
-      if (
-        message.role !== "assistant" ||
-        message.status !== "completed" ||
-        message.usage.cost.total <= 0
-      ) {
-        continue
-      }
-
-      this.recordedAssistantMessageIds.add(message.id)
-    }
+  private isDisposed(): boolean {
+    return this.disposed
   }
 
   private createRuntime(repoSource?: RepoSource, token?: string) {
@@ -578,22 +350,8 @@ export class AgentHost {
     }
 
     return createRepoTools(runtime, {
-      onRepoError: (err) => this.appendSystemNoticeFromError(err),
+      onRepoError: (error) => this.appendSystemNoticeFromError(error),
     }).agentTools
-  }
-
-  private rememberSystemNoticeFingerprint(fingerprint: string): boolean {
-    if (this.systemNoticeFingerprints.includes(fingerprint)) {
-      return false
-    }
-
-    this.systemNoticeFingerprints.push(fingerprint)
-
-    if (this.systemNoticeFingerprints.length > 20) {
-      this.systemNoticeFingerprints.shift()
-    }
-
-    return true
   }
 
   private async appendSystemNoticeFromError(error: unknown): Promise<void> {
@@ -601,37 +359,12 @@ export class AgentHost {
       return
     }
 
-    const classified = classifyRuntimeError(error)
+    const row = this.notices.toSystemRow(this.session.id, error)
 
-    if (!this.rememberSystemNoticeFingerprint(classified.fingerprint)) {
+    if (!row) {
       return
     }
 
-    const systemMessage = buildSystemMessage(
-      classified,
-      createId(),
-      Date.now()
-    )
-    const row = toMessageRow(this.session.id, systemMessage)
-
-    this.persistQueue = this.persistQueue.then(async () => {
-      if (this.disposed) {
-        return
-      }
-
-      const existing = await getSessionMessages(this.session.id)
-      const merged = [...existing, row].sort(sortByTimestamp)
-      this.session = buildPersistedSession(
-        {
-          ...this.session,
-          updatedAt: getIsoNow(),
-        },
-        merged
-      )
-      await putSessionAndMessages(this.session, [row])
-      this.persistedMessageIds.add(row.id)
-    })
-
-    await this.persistQueue
+    await this.persistence.appendSystemRow(row)
   }
 }

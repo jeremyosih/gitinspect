@@ -1,19 +1,6 @@
 import * as React from "react"
+import { getRuntimeCommandErrorMessage } from "@/agent/runtime-command-errors"
 import { runtimeClient } from "@/agent/runtime-client"
-
-export function getRuntimeActionErrorMessage(error: Error | undefined): string {
-  if (!error) {
-    return "Runtime request failed"
-  }
-  switch (error.message) {
-    case "busy":
-      return "This session is already streaming."
-    case "missing-session":
-      return "This session could not be loaded from local storage."
-    default:
-      return error.message
-  }
-}
 
 export function useRuntimeSession(sessionId: string | undefined) {
   const [actionError, setActionError] = React.useState<string | undefined>(undefined)
@@ -30,7 +17,9 @@ export function useRuntimeSession(sessionId: string | undefined) {
         await action(sessionId)
       } catch (error) {
         setActionError(
-          getRuntimeActionErrorMessage(error instanceof Error ? error : undefined)
+          getRuntimeCommandErrorMessage(
+            error instanceof Error ? error : undefined
+          )
         )
       }
     }
@@ -38,11 +27,7 @@ export function useRuntimeSession(sessionId: string | undefined) {
 
   const send = React.useEffectEvent(async (content: string) => {
     await runMutation(async (currentSessionId) => {
-      const result = await runtimeClient.send(currentSessionId, content)
-
-      if (!result.ok) {
-        throw new Error(result.error ?? "missing-session")
-      }
+      await runtimeClient.send(currentSessionId, content)
     })
   })
 
@@ -61,30 +46,11 @@ export function useRuntimeSession(sessionId: string | undefined) {
       model: string
     ) => {
       await runMutation(async (currentSessionId) => {
-        const result = await runtimeClient.setModelSelection(
+        await runtimeClient.setModelSelection(
           currentSessionId,
           providerGroup,
           model
         )
-
-        if (!result.ok) {
-          throw new Error(result.error ?? "missing-session")
-        }
-      })
-    }
-  )
-
-  const setRepoSource = React.useEffectEvent(
-    async (repoSource?: Parameters<typeof runtimeClient.setRepoSource>[1]) => {
-      await runMutation(async (currentSessionId) => {
-        const result = await runtimeClient.setRepoSource(
-          currentSessionId,
-          repoSource
-        )
-
-        if (!result.ok) {
-          throw new Error(result.error ?? "missing-session")
-        }
       })
     }
   )
@@ -94,14 +60,10 @@ export function useRuntimeSession(sessionId: string | undefined) {
       thinkingLevel: Parameters<typeof runtimeClient.setThinkingLevel>[1]
     ) => {
       await runMutation(async (currentSessionId) => {
-        const result = await runtimeClient.setThinkingLevel(
+        await runtimeClient.setThinkingLevel(
           currentSessionId,
           thinkingLevel
         )
-
-        if (!result.ok) {
-          throw new Error(result.error ?? "missing-session")
-        }
       })
     }
   )
@@ -111,7 +73,6 @@ export function useRuntimeSession(sessionId: string | undefined) {
     error: actionError,
     send,
     setModelSelection,
-    setRepoSource,
     setThinkingLevel,
   }
 }

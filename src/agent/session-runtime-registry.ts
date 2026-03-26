@@ -1,77 +1,75 @@
+import type { ProviderGroupId, ThinkingLevel } from "@/types/models"
 import { AgentHost } from "@/agent/agent-host"
-import type {
-  RuntimeMutationResult,
-} from "@/agent/runtime-worker-types"
+import {
+  BusyRuntimeError,
+  MissingSessionRuntimeError,
+} from "@/agent/runtime-command-errors"
 import { getGithubPersonalAccessToken } from "@/repo/github-token"
 import { loadSessionWithMessages } from "@/sessions/session-service"
-import type { ProviderGroupId, ThinkingLevel } from "@/types/models"
-import type { RepoSource } from "@/types/storage"
 
 export class SessionRuntimeRegistry {
   private readonly sessionHosts = new Map<string, AgentHost>()
 
-  async ensureSession(sessionId: string): Promise<boolean> {
+  private async getOrCreateHost(
+    sessionId: string
+  ): Promise<AgentHost | undefined> {
     if (this.sessionHosts.has(sessionId)) {
-      return true
+      return this.sessionHosts.get(sessionId)
     }
 
     const loaded = await loadSessionWithMessages(sessionId)
 
     if (!loaded) {
-      return false
+      return undefined
     }
 
     const githubRuntimeToken = await getGithubPersonalAccessToken()
+    const host = new AgentHost(loaded.session, loaded.messages, {
+      getGithubToken: getGithubPersonalAccessToken,
+      githubRuntimeToken,
+    })
     this.sessionHosts.set(
       sessionId,
-      new AgentHost(loaded.session, loaded.messages, {
-        getGithubToken: getGithubPersonalAccessToken,
-        githubRuntimeToken,
-      })
+      host
     )
 
-    return true
+    return host
+  }
+
+  private async getHostForCommand(
+    sessionId: string,
+    options: {
+      requireIdle?: boolean
+    } = {}
+  ): Promise<AgentHost> {
+    const host = await this.getOrCreateHost(sessionId)
+
+    if (!host) {
+      throw new MissingSessionRuntimeError(sessionId)
+    }
+
+    if (options.requireIdle && host.isBusy()) {
+      throw new BusyRuntimeError(sessionId)
+    }
+
+    return host
+  }
+
+  async ensureSession(sessionId: string): Promise<boolean> {
+    return (await this.getOrCreateHost(sessionId)) !== undefined
   }
 
   async send(
     sessionId: string,
     content: string
-  ): Promise<RuntimeMutationResult> {
-    const exists = await this.ensureSession(sessionId)
-
-    if (!exists) {
-      return {
-        error: "missing-session",
-        ok: false,
-      }
-    }
-
-    const host = this.sessionHosts.get(sessionId)
-
-    if (!host) {
-      return {
-        error: "missing-session",
-        ok: false,
-      }
-    }
-
-    if (host.isBusy()) {
-      return {
-        error: "busy",
-        ok: false,
-      }
-    }
-
+  ): Promise<void> {
+    const host = await this.getHostForCommand(sessionId, { requireIdle: true })
     await host.prompt(content)
-
-    return {
-      ok: true,
-    }
   }
 
   async abort(sessionId: string): Promise<void> {
-    await this.ensureSession(sessionId)
-    this.sessionHosts.get(sessionId)?.abort()
+    const host = await this.getOrCreateHost(sessionId)
+    host?.abort()
   }
 
   releaseSession(sessionId: string): void {
@@ -89,144 +87,24 @@ export class SessionRuntimeRegistry {
     sessionId: string,
     providerGroup: ProviderGroupId,
     modelId: string
-  ): Promise<RuntimeMutationResult> {
-    const exists = await this.ensureSession(sessionId)
-
-    if (!exists) {
-      return {
-        error: "missing-session",
-        ok: false,
-      }
-    }
-
-    const host = this.sessionHosts.get(sessionId)
-
-    if (!host) {
-      return {
-        error: "missing-session",
-        ok: false,
-      }
-    }
-
-    if (host.isBusy()) {
-      return {
-        error: "busy",
-        ok: false,
-      }
-    }
-
+  ): Promise<void> {
+    const host = await this.getHostForCommand(sessionId, { requireIdle: true })
     await host.setModelSelection(providerGroup, modelId)
-
-    return {
-      ok: true,
-    }
-  }
-
-  async setRepoSource(
-    sessionId: string,
-    repoSource?: RepoSource
-  ): Promise<RuntimeMutationResult> {
-    const exists = await this.ensureSession(sessionId)
-
-    if (!exists) {
-      return {
-        error: "missing-session",
-        ok: false,
-      }
-    }
-
-    const host = this.sessionHosts.get(sessionId)
-
-    if (!host) {
-      return {
-        error: "missing-session",
-        ok: false,
-      }
-    }
-
-    if (host.isBusy()) {
-      return {
-        error: "busy",
-        ok: false,
-      }
-    }
-
-    await host.setRepoSource(repoSource)
-
-    return {
-      ok: true,
-    }
   }
 
   async refreshGithubToken(
     sessionId: string
-  ): Promise<RuntimeMutationResult> {
-    const exists = await this.ensureSession(sessionId)
-
-    if (!exists) {
-      return {
-        error: "missing-session",
-        ok: false,
-      }
-    }
-
-    const host = this.sessionHosts.get(sessionId)
-
-    if (!host) {
-      return {
-        error: "missing-session",
-        ok: false,
-      }
-    }
-
-    if (host.isBusy()) {
-      return {
-        error: "busy",
-        ok: false,
-      }
-    }
-
+  ): Promise<void> {
+    const host = await this.getHostForCommand(sessionId, { requireIdle: true })
     await host.refreshGithubToken()
-
-    return {
-      ok: true,
-    }
   }
 
   async setThinkingLevel(
     sessionId: string,
     thinkingLevel: ThinkingLevel
-  ): Promise<RuntimeMutationResult> {
-    const exists = await this.ensureSession(sessionId)
-
-    if (!exists) {
-      return {
-        error: "missing-session",
-        ok: false,
-      }
-    }
-
-    const host = this.sessionHosts.get(sessionId)
-
-    if (!host) {
-      return {
-        error: "missing-session",
-        ok: false,
-      }
-    }
-
-    if (host.isBusy()) {
-      return {
-        error: "busy",
-        ok: false,
-      }
-    }
-
+  ): Promise<void> {
+    const host = await this.getHostForCommand(sessionId, { requireIdle: true })
     await host.setThinkingLevel(thinkingLevel)
-
-    return {
-      ok: true,
-    }
   }
 
   dispose(): void {

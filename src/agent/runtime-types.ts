@@ -31,7 +31,3 @@ export interface StreamChatParams {
 export interface StreamChatResult {
   assistantMessage: AssistantMessage
 }
-
-export interface RuntimeConfig {
-  tools: ToolDefinition[]
-}

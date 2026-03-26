@@ -1,28 +1,14 @@
+import * as PiAi from "@mariozechner/pi-ai"
 import type { StreamFn } from "@mariozechner/pi-agent-core"
-import {
-  createAssistantMessageEventStream,
-  streamSimple,
-  type Api,
-  type AssistantMessage as PiAssistantMessage,
-  type AssistantMessageEvent,
-  type Context,
-  type Message,
-  type Model,
-  type SimpleStreamOptions,
-} from "@mariozechner/pi-ai"
+import type { StreamChatParams, StreamChatResult } from "@/agent/runtime-types"
+import type { AssistantMessage, StopReason, ToolCall } from "@/types/chat"
+import type { ModelDefinition } from "@/types/models"
 import { SYSTEM_PROMPT } from "@/agent/system-prompt"
+import { createProxyAwareStreamFn } from "@/agent/provider-proxy"
 import { resolveProviderAuthForProvider } from "@/auth/resolve-api-key"
-import { isOpencodeFreeMarker } from "@/auth/public-provider-fallbacks"
 import { createId } from "@/lib/ids"
 import { getModel } from "@/models/catalog"
-import { getProxyConfig } from "@/proxy/settings"
-import { buildProxiedUrl } from "@/proxy/url"
-import { createEmptyUsage, type ModelDefinition } from "@/types/models"
-import type { AssistantMessage, StopReason, ToolCall } from "@/types/chat"
-import type {
-  StreamChatParams,
-  StreamChatResult,
-} from "@/agent/runtime-types"
+import { createEmptyUsage } from "@/types/models"
 
 function createAssistantDraft(
   model: ModelDefinition,
@@ -49,7 +35,7 @@ function cloneToolCallArguments(
 }
 
 function cloneContentBlock(
-  block: PiAssistantMessage["content"][number]
+  block: PiAi.AssistantMessage["content"][number]
 ): AssistantMessage["content"][number] {
   switch (block.type) {
     case "text":
@@ -64,7 +50,7 @@ function cloneContentBlock(
   }
 }
 
-function cloneUsage(usage: PiAssistantMessage["usage"]): AssistantMessage["usage"] {
+function cloneUsage(usage: PiAi.AssistantMessage["usage"]): AssistantMessage["usage"] {
   return {
     ...usage,
     cost: {
@@ -75,9 +61,9 @@ function cloneUsage(usage: PiAssistantMessage["usage"]): AssistantMessage["usage
 
 function syncAssistantMessage(
   target: AssistantMessage,
-  source: PiAssistantMessage,
+  source: PiAi.AssistantMessage,
   id: string,
-  fallbackTimestamp: number
+  _fallbackTimestamp: number
 ): AssistantMessage {
   target.api = source.api
   target.content = source.content.map(cloneContentBlock)
@@ -90,10 +76,6 @@ function syncAssistantMessage(
   target.stopReason = source.stopReason
   target.timestamp = source.timestamp
   target.usage = cloneUsage(source.usage)
-
-  if (target.timestamp === undefined) {
-    target.timestamp = fallbackTimestamp
-  }
 
   if (target.errorMessage === undefined) {
     delete target.errorMessage
@@ -111,7 +93,7 @@ function extractErrorDetail(error: unknown): string {
     return "Request failed"
   }
 
-  const parts: string[] = [error.message]
+  const parts: Array<string> = [error.message]
   let current: unknown = (error as Error & { cause?: unknown }).cause
 
   while (current instanceof Error) {
@@ -128,7 +110,7 @@ function formatConnectionDiagnostic(
   model: ModelDefinition,
   detail: string
 ): string {
-  const target = model.baseUrl ?? "unknown endpoint"
+  const target = model.baseUrl
   return `${detail} [${model.provider}/${model.id} → ${target}]`
 }
 
@@ -164,12 +146,12 @@ function toSuccessStopReason(
 
 function normalizeReasoning(
   thinkingLevel: StreamChatParams["thinkingLevel"]
-): SimpleStreamOptions["reasoning"] {
+): PiAi.SimpleStreamOptions["reasoning"] {
   return thinkingLevel === "off" ? undefined : thinkingLevel
 }
 
 function ensureAssistantMessageId(
-  message: PiAssistantMessage | AssistantMessage
+  message: PiAi.AssistantMessage | AssistantMessage
 ): AssistantMessage {
   if ("id" in message && typeof message.id === "string") {
     return message
@@ -181,7 +163,7 @@ function ensureAssistantMessageId(
   }
 }
 
-function isEmptyAssistantPlaceholder(message: Message): boolean {
+function isEmptyAssistantPlaceholder(message: PiAi.Message): boolean {
   if (message.role !== "assistant") {
     return false
   }
@@ -202,10 +184,10 @@ function isEmptyAssistantPlaceholder(message: Message): boolean {
   )
 }
 
-function normalizeContext(context: Context): Context {
+function normalizeContext(context: PiAi.Context): PiAi.Context {
+  const trailingMessage = context.messages.at(-1)
   const messages =
-    context.messages.length > 0 &&
-    isEmptyAssistantPlaceholder(context.messages[context.messages.length - 1]!)
+    trailingMessage && isEmptyAssistantPlaceholder(trailingMessage)
       ? context.messages.slice(0, -1)
       : context.messages
 
@@ -216,84 +198,22 @@ function normalizeContext(context: Context): Context {
   }
 }
 
-function shouldUseProxyForProvider(provider: string, apiKey: string): boolean {
-  switch (provider.toLowerCase()) {
-    case "anthropic":
-      return apiKey.startsWith("sk-ant-oat") || apiKey.startsWith("{")
-    case "openai":
-    case "openai-codex":
-    case "opencode":
-    case "opencode-go":
-      return true
-    default:
-      return false
-  }
-}
-
-function applyProxyIfNeeded<TApi extends Api>(
-  model: Model<TApi>,
-  apiKey: string,
-  proxyUrl?: string
-): Model<TApi> {
-  if (!proxyUrl || !model.baseUrl) {
-    return model
-  }
-
-  if (!shouldUseProxyForProvider(model.provider, apiKey)) {
-    return model
-  }
-
-  return {
-    ...model,
-    baseUrl: buildProxiedUrl(proxyUrl, model.baseUrl),
-  }
-}
-
-export function createStreamFn(
-  getProxyUrl: (apiKey: string) => Promise<string | undefined>
-) {
-  return async <TApi extends Api>(
-    model: Model<TApi>,
-    context: Context,
-    options?: SimpleStreamOptions
-  ) => {
-    const apiKey = options?.apiKey
-
-    if (!apiKey) {
-      return streamSimple(model, context, options)
-    }
-
-    const proxyUrl = await getProxyUrl(apiKey)
-
-    if (!proxyUrl) {
-      return streamSimple(model, context, options)
-    }
-
-    const proxiedModel = applyProxyIfNeeded(model, apiKey, proxyUrl)
-    return streamSimple(proxiedModel, context, options)
-  }
-}
-
-const proxyAwareStreamSimple = createStreamFn(async (apiKey) => {
-  if (isOpencodeFreeMarker(apiKey)) {
-    return "/api/proxy"
-  }
-
-  const proxy = await getProxyConfig()
-  return proxy.enabled ? proxy.url : undefined
-})
+const proxyAwareStreamSimple = createProxyAwareStreamFn()
+type ProxyAwareStream = Awaited<
+  ReturnType<ReturnType<typeof createProxyAwareStreamFn>>
+>
 
 function wrapAssistantMessageEventStream(
   model: ModelDefinition,
-  upstream: ReturnType<typeof streamSimple>,
+  upstream: ProxyAwareStream,
   assistantId: string,
   timestamp: number
 ) {
-  const stream = createAssistantMessageEventStream()
+  const stream = PiAi.createAssistantMessageEventStream()
   const partials = new WeakMap<object, AssistantMessage>()
 
-  const decorateAssistant = (message: PiAssistantMessage): AssistantMessage => {
-    const key = message as object
+  const decorateAssistant = (message: PiAi.AssistantMessage): AssistantMessage => {
+    const key: object = message
     const existing = partials.get(key)
 
     if (existing) {
@@ -310,7 +230,7 @@ function wrapAssistantMessageEventStream(
     return created
   }
 
-  const pushEvent = (event: AssistantMessageEvent): boolean => {
+  const pushEvent = (event: PiAi.AssistantMessageEvent): boolean => {
     switch (event.type) {
       case "start":
         stream.push({
@@ -357,7 +277,7 @@ function wrapAssistantMessageEventStream(
           error.errorMessage = formatConnectionDiagnostic(model, error.errorMessage)
         }
         console.error(
-          `[provider-stream] Error from ${model.provider}/${model.id} (${model.baseUrl ?? "?"}):`,
+          `[provider-stream] Error from ${model.provider}/${model.id} (${model.baseUrl}):`,
           error.errorMessage
         )
         stream.push({
@@ -388,7 +308,7 @@ function wrapAssistantMessageEventStream(
       stream.end(message)
     } catch (error) {
       console.error(
-        `[provider-stream] Stream threw for ${model.provider}/${model.id} (${model.baseUrl ?? "?"}):`,
+        `[provider-stream] Stream threw for ${model.provider}/${model.id} (${model.baseUrl}):`,
         error
       )
       const failure = createStreamErrorMessage(
@@ -412,8 +332,8 @@ function wrapAssistantMessageEventStream(
 
 async function createAppStream(
   model: ModelDefinition,
-  context: Context,
-  options?: SimpleStreamOptions,
+  context: PiAi.Context,
+  options?: PiAi.SimpleStreamOptions,
   assistantId = createId(),
   timestamp = Date.now()
 ) {
@@ -504,16 +424,16 @@ export const streamChatWithPiAgent: StreamFn = async (
     return await createAppStream(modelDefinition, context, options)
   } catch (error) {
     console.error(
-      `[provider-stream] createAppStream failed for ${modelDefinition.provider}/${modelDefinition.id} (${modelDefinition.baseUrl ?? "?"}):`,
+      `[provider-stream] createAppStream failed for ${modelDefinition.provider}/${modelDefinition.id} (${modelDefinition.baseUrl}):`,
       error
     )
-    const stream = createAssistantMessageEventStream()
+    const stream = PiAi.createAssistantMessageEventStream()
     const failure = createStreamErrorMessage(
       modelDefinition,
       createId(),
       Date.now(),
       error,
-      options?.signal?.aborted ?? false
+      options?.signal?.aborted || false
     )
 
     queueMicrotask(() => {

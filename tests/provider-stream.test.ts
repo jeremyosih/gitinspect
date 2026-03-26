@@ -1,16 +1,21 @@
 import { Type } from "@sinclair/typebox"
-import {
-  createAssistantMessageEventStream,
-  type AssistantMessage as PiAssistantMessage,
-} from "@mariozechner/pi-ai"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { createAssistantMessageEventStream } from "@mariozechner/pi-ai"
+import type * as PiAi from "@mariozechner/pi-ai"
+import type { AssistantMessage as PiAssistantMessage } from "@mariozechner/pi-ai"
 import { getModel } from "@/models/catalog"
 import { createEmptyUsage } from "@/types/models"
 import { buildProxiedUrl } from "@/proxy/url"
 
-const resolveProviderAuthForProvider = vi.fn()
-const getProxyConfig = vi.fn()
-const streamSimple = vi.fn()
+const {
+  getProxyConfig,
+  resolveProviderAuthForProvider,
+  streamSimple,
+} = vi.hoisted(() => ({
+  getProxyConfig: vi.fn(),
+  resolveProviderAuthForProvider: vi.fn(),
+  streamSimple: vi.fn(),
+}))
 
 vi.mock("@/auth/resolve-api-key", () => ({
   resolveProviderAuthForProvider,
@@ -21,9 +26,7 @@ vi.mock("@/proxy/settings", () => ({
 }))
 
 vi.mock("@mariozechner/pi-ai", async () => {
-  const actual = await vi.importActual<typeof import("@mariozechner/pi-ai")>(
-    "@mariozechner/pi-ai"
-  )
+  const actual = await vi.importActual<typeof PiAi>("@mariozechner/pi-ai")
 
   return {
     ...actual,
@@ -256,7 +259,7 @@ describe("provider stream", () => {
     )
 
     const { streamChat } = await import("@/agent/provider-stream")
-    const deltas: string[] = []
+    const deltas: Array<string> = []
 
     await expect(
       streamChat({
@@ -362,7 +365,7 @@ describe("provider stream", () => {
         sessionId: "session-tools",
       }
     )
-    const events: string[] = []
+    const events: Array<string> = []
     let startId: string | undefined
     let finalId: string | undefined
 
@@ -407,5 +410,60 @@ describe("provider stream", () => {
     )
     expect(startId).toBeTruthy()
     expect(finalId).toBe(startId)
+  })
+
+  it("drops an empty trailing assistant placeholder before delegating to pi-ai", async () => {
+    getProxyConfig.mockResolvedValue({
+      enabled: false,
+      url: "https://proxy.example/proxy",
+    })
+    streamSimple.mockImplementation((_model, context) =>
+      createMockStream((stream) => {
+        expect(context.messages).toEqual([
+          {
+            content: "hello",
+            role: "user",
+            timestamp: 1,
+          },
+        ])
+        const message = createAssistant(_model, {
+          content: [{ text: "Done", type: "text" }],
+        })
+        stream.push({ partial: message, type: "start" })
+        stream.push({
+          message,
+          reason: "stop",
+          type: "done",
+        })
+        stream.end(message)
+      })
+    )
+
+    const { streamChatWithPiAgent } = await import("@/agent/provider-stream")
+    const model = getModel("opencode", "gpt-5-nano")
+    const eventStream = await streamChatWithPiAgent(
+      model,
+      {
+        messages: [
+          {
+            content: "hello",
+            role: "user",
+            timestamp: 1,
+          },
+          createAssistant(model, {
+            content: [{ text: "", type: "text" }],
+          }),
+        ],
+        systemPrompt: "system",
+        tools: [],
+      },
+      {
+        apiKey: "sk-public-free-key",
+        sessionId: "session-placeholder",
+      }
+    )
+
+    await eventStream.result()
+    expect(streamSimple).toHaveBeenCalledTimes(1)
   })
 })

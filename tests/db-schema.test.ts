@@ -3,8 +3,6 @@ import { createEmptyUsage } from "@/types/models"
 import {
   getCostsByModelFromAggregates,
   getCostsByProviderFromAggregates,
-  getDailyCost,
-  getLatestSessionId,
   getTotalCostFromAggregates,
   mergeDailyCostAggregate,
 } from "@/db/schema"
@@ -52,10 +50,5 @@ describe("db schema helpers", () => {
       "claude-sonnet-4-6": 2,
       "gpt-5.1": 3,
     })
-  })
-
-  it("keeps latest session and daily cost helpers callable", () => {
-    expect(typeof getLatestSessionId).toBe("function")
-    expect(typeof getDailyCost).toBe("function")
   })
 })

@@ -20,4 +20,26 @@ describe("classifyRuntimeError", () => {
     expect(c.kind).toBe("provider_connection")
     expect(c.source).toBe("provider")
   })
+
+  it("detects GitHub auth failures", () => {
+    const err = new GitHubFsError("EACCES", "Authentication required", "/")
+    const c = classifyRuntimeError(err)
+    expect(c.kind).toBe("github_auth")
+    expect(c.action).toBe("open-github-settings")
+    expect(c.source).toBe("github")
+  })
+
+  it("detects GitHub not found failures", () => {
+    const err = new GitHubFsError("ENOENT", "README.md not found", "/README.md")
+    const c = classifyRuntimeError(err)
+    expect(c.kind).toBe("github_not_found")
+    expect(c.severity).toBe("warning")
+    expect(c.source).toBe("github")
+  })
+
+  it("distinguishes repository network failures from provider failures", () => {
+    const c = classifyRuntimeError(new Error("Failed to fetch repository tree"))
+    expect(c.kind).toBe("repo_network")
+    expect(c.source).toBe("github")
+  })
 })
