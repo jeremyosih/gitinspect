@@ -1,6 +1,10 @@
-import { deleteSession } from "@/db/schema"
+import type { ProviderGroupId, ProviderId } from "@/types/models"
+import type { RepoSource, SessionData } from "@/types/storage"
+import { deleteSession,
+  getSetting,
+  listProviderKeys,
+  setSetting } from "@/db/schema"
 import { runtimeClient } from "@/agent/runtime-client"
-import type { SettingsSection } from "@/components/settings-dialog"
 import {
   getCanonicalProvider,
   getConnectedProviders,
@@ -12,13 +16,6 @@ import {
   hasModelForGroup,
   isProviderGroupId,
 } from "@/models/catalog"
-import {
-  getSetting,
-  listProviderKeys,
-  setSetting,
-} from "@/db/schema"
-import type { ProviderGroupId, ProviderId } from "@/types/models"
-import type { RepoSource, SessionData } from "@/types/storage"
 import {
   createSession,
   persistSessionSnapshot,
@@ -33,7 +30,7 @@ function isProviderId(value: string): value is ProviderId {
 
 function normalizeVisibleSession(
   session: SessionData,
-  visibleProviderGroups: ProviderGroupId[]
+  visibleProviderGroups: Array<ProviderGroupId>
 ): SessionData {
   const fallbackProviderGroup = visibleProviderGroups[0] ?? "opencode-free"
   const currentProviderGroup = session.providerGroup ?? session.provider
@@ -58,7 +55,7 @@ function normalizeVisibleSession(
 
 export async function persistVisibleSessionSelection(
   session: SessionData,
-  visibleProviderGroups: ProviderGroupId[]
+  visibleProviderGroups: Array<ProviderGroupId>
 ): Promise<SessionData> {
   const normalized = normalizeVisibleSession(session, visibleProviderGroups)
 
@@ -76,7 +73,7 @@ export async function persistVisibleSessionSelection(
 export async function resolveProviderDefaults(): Promise<{
   model: string
   providerGroup: ProviderGroupId
-  visibleProviderGroups: ProviderGroupId[]
+  visibleProviderGroups: Array<ProviderGroupId>
 }> {
   const providerKeys = await listProviderKeys()
   const connectedProviders = getConnectedProviders(providerKeys)
@@ -125,21 +122,11 @@ export type SessionCreationBase = Pick<
 >
 
 export type SessionRouteTarget = Pick<SessionData, "id" | "repoSource">
-export type SessionNavigationState = {
-  settings?: SettingsSection
-  sidebar?: "open"
-}
 
-export function navigateToSession(
-  target: SessionRouteTarget,
-  options?: SessionNavigationState
+export function sessionDestination(
+  target: SessionRouteTarget
 ):
   | {
-      search: {
-        settings: SettingsSection | undefined
-        sidebar: "open" | undefined
-        session: string
-      }
       to: "/chat"
     }
   | {
@@ -147,11 +134,6 @@ export function navigateToSession(
         _splat: string
         owner: string
         repo: string
-      }
-      search: {
-        settings: SettingsSection | undefined
-        sidebar: "open" | undefined
-        session: string
       }
       to: "/$owner/$repo/$"
     } {
@@ -162,21 +144,11 @@ export function navigateToSession(
         owner: target.repoSource.owner,
         repo: target.repoSource.repo,
       },
-      search: {
-        settings: options?.settings,
-        sidebar: options?.sidebar,
-        session: target.id,
-      },
       to: "/$owner/$repo/$",
     }
   }
 
   return {
-    search: {
-      settings: options?.settings,
-      sidebar: options?.sidebar,
-      session: target.id,
-    },
     to: "/chat",
   }
 }
@@ -267,7 +239,7 @@ export async function createSessionAndSend(params: {
 
 export async function deleteSessionAndResolveNext(params: {
   sessionId: string
-  siblingSessions: SessionData[]
+  siblingSessions: Array<SessionData>
 }): Promise<{ nextSession?: SessionRouteTarget }> {
   try {
     await runtimeClient.releaseSession(params.sessionId)

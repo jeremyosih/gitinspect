@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { createEmptyUsage } from "@/types/models"
 import type { SessionData } from "@/types/storage"
+import { createEmptyUsage } from "@/types/models"
 
 const deleteSession = vi.fn(async () => {})
 const getSetting = vi.fn()
@@ -82,57 +82,35 @@ describe("session-actions", () => {
   })
 
   it("builds chat navigation for non-repo sessions", async () => {
-    const { navigateToSession } = await import("@/sessions/session-actions")
+    const { sessionDestination } = await import("@/sessions/session-actions")
 
     expect(
-      navigateToSession(
-        {
-          id: "session-1",
-          repoSource: undefined,
-        },
-        {
-          settings: "proxy",
-          sidebar: "open",
-        }
-      )
+      sessionDestination({
+        id: "session-1",
+        repoSource: undefined,
+      })
     ).toEqual({
-      search: {
-        settings: "proxy",
-        sidebar: "open",
-        session: "session-1",
-      },
       to: "/chat",
     })
   })
 
   it("builds repo navigation for repo-backed sessions", async () => {
-    const { navigateToSession } = await import("@/sessions/session-actions")
+    const { sessionDestination } = await import("@/sessions/session-actions")
 
     expect(
-      navigateToSession(
-        {
-          id: "session-2",
-          repoSource: {
-            owner: "acme",
-            ref: "main",
-            repo: "demo",
-          },
+      sessionDestination({
+        id: "session-2",
+        repoSource: {
+          owner: "acme",
+          ref: "main",
+          repo: "demo",
         },
-        {
-          settings: undefined,
-          sidebar: "open",
-        }
-      )
+      })
     ).toEqual({
       params: {
         _splat: "main",
         owner: "acme",
         repo: "demo",
-      },
-      search: {
-        settings: undefined,
-        sidebar: "open",
-        session: "session-2",
       },
       to: "/$owner/$repo/$",
     })
