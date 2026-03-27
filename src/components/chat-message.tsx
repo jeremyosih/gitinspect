@@ -75,10 +75,10 @@ export function ChatMessage(props: {
     const severity = message.severity
     const tone =
       severity === "error"
-        ? "border-red-600/40 bg-red-100 text-red-900 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200"
+        ? "bg-red-100 text-red-900 dark:bg-red-950/30 dark:text-red-200"
         : severity === "warning"
-          ? "border-amber-600/40 bg-amber-100 text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/25 dark:text-amber-100"
-          : "border-foreground/15 bg-muted/40 text-foreground"
+          ? "bg-amber-100 text-amber-950 dark:bg-amber-950/25 dark:text-amber-100"
+          : "bg-muted/40 text-foreground"
 
     const icon =
       severity === "error" ? (
@@ -94,7 +94,7 @@ export function ChatMessage(props: {
     return (
       <div className="flex w-full justify-start py-1">
         <Item
-          className={`max-w-full flex-1 flex-wrap items-start gap-2 rounded-md border text-sm ${tone}`}
+          className={`max-w-full flex-1 flex-wrap items-start gap-2 rounded-lg border border-border text-sm ${tone}`}
           variant="outline"
         >
           <ItemMedia variant="icon">{icon}</ItemMedia>
