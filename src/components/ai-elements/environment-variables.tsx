@@ -65,7 +65,7 @@ export const EnvironmentVariables = ({
   return (
     <EnvironmentVariablesContext.Provider value={contextValue}>
       <div
-        className={cn("rounded-lg border bg-background", className)}
+        className={cn("rounded-lg border border-border bg-background", className)}
         {...props}
       >
         {children}
@@ -83,7 +83,7 @@ export const EnvironmentVariablesHeader = ({
 }: EnvironmentVariablesHeaderProps) => (
   <div
     className={cn(
-      "flex items-center justify-between border-b px-4 py-3",
+      "flex items-center justify-between border-b border-border px-4 py-3",
       className
     )}
     {...props}

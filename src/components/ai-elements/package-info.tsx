@@ -157,7 +157,7 @@ export const PackageInfo = ({
   return (
     <PackageInfoContext.Provider value={contextValue}>
       <div
-        className={cn("rounded-lg border bg-background p-4", className)}
+        className={cn("rounded-lg border border-border bg-background p-4", className)}
         {...props}
       >
         {children ?? (
@@ -193,7 +193,7 @@ export const PackageInfoContent = ({
   children,
   ...props
 }: PackageInfoContentProps) => (
-  <div className={cn("mt-3 border-t pt-3", className)} {...props}>
+  <div className={cn("mt-3 border-t border-border pt-3", className)} {...props}>
     {children}
   </div>
 );

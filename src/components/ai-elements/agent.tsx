@@ -19,7 +19,7 @@ export type AgentProps = ComponentProps<"div">;
 
 export const Agent = memo(({ className, ...props }: AgentProps) => (
   <div
-    className={cn("not-prose w-full rounded-md border", className)}
+    className={cn("not-prose w-full rounded-md border border-border", className)}
     {...props}
   />
 ));
@@ -81,7 +81,7 @@ export type AgentToolsProps = ComponentProps<typeof Accordion>;
 export const AgentTools = memo(({ className, ...props }: AgentToolsProps) => (
   <div className={cn("space-y-2", className)}>
     <span className="font-medium text-muted-foreground text-sm">Tools</span>
-    <Accordion className="rounded-md border" {...props} />
+    <Accordion className="rounded-md border border-border" {...props} />
   </div>
 ));
 
@@ -98,7 +98,7 @@ export const AgentTool = memo(
 
     return (
       <AccordionItem
-        className={cn("border-b last:border-b-0", className)}
+        className={cn("border-b border-border last:border-b-0", className)}
         value={value}
         {...props}
       >

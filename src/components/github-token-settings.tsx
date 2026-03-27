@@ -46,6 +46,11 @@ export function GithubTokenSettings(props: {
     <div className="space-y-4">
       <div className="rounded-none border border-foreground/10 p-4">
         <p className="text-xs text-muted-foreground">
+          Unauthenticated requests are limited to 60/hour. Adding a token bumps
+          the limit to 5,000/hour.
+        </p>
+
+        <p className="mt-2 text-xs text-muted-foreground">
           Fine-grained token, read-only repository access. We verify it with
           GitHub before saving. Repo scope follows URLs like{" "}
           <span className="font-mono text-[11px]">/owner/repo</span>.

@@ -5,6 +5,7 @@ import { ArrowRightIcon, StarIcon } from "@phosphor-icons/react"
 import { Icons } from "@/components/icons"
 import { formatGitHubStarCount } from "@/lib/format-github-stars"
 import { cn } from "@/lib/utils"
+import { githubApiFetch, isRateLimitError, showRateLimitToast } from "@/repo/github-fetch"
 import { githubOwnerAvatarUrl } from "@/repo/url"
 
 export type GithubRepoProps = {
@@ -57,12 +58,9 @@ function usePublicRepoMeta(owner: string, repo: string) {
 
     void (async () => {
       try {
-        const res = await fetch(
-          `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`,
-          {
-            headers: { Accept: "application/vnd.github+json" },
-            signal: ac.signal,
-          }
+        const res = await githubApiFetch(
+          `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`,
+          { signal: ac.signal }
         )
         if (!res.ok) {
           setState({ status: "error" })
@@ -74,8 +72,11 @@ function usePublicRepoMeta(owner: string, repo: string) {
           language: data.language,
           stargazers: data.stargazers_count,
         })
-      } catch {
-        if (!ac.signal.aborted) {
+      } catch (err) {
+        if (isRateLimitError(err)) {
+          showRateLimitToast()
+          setState({ status: "error" })
+        } else if (!ac.signal.aborted) {
           setState({ status: "error" })
         }
       }
@@ -135,7 +136,7 @@ export function GithubRepo({ owner, repo, ref: refName, to, className, isLink = 
         <div className="font-geist-pixel-square truncate text-[11px] leading-tight tracking-tight sm:text-xs">
           <span className="text-foreground">{owner}</span>
           <span className="font-normal text-muted-foreground">/</span>
-          <span className="text-foreground">{repo}</span>
+          <span className="font-bold text-foreground">{repo}</span>
           {refSuffix ? (
             <span className="ml-1 font-normal text-muted-foreground">
               {refSuffix}
@@ -166,10 +167,16 @@ export function GithubRepo({ owner, repo, ref: refName, to, className, isLink = 
       </div>
 
       <div className="flex shrink-0 items-center gap-1 tabular-nums">
-        <StarIcon
-          className="size-3.5 text-muted-foreground/80"
-          weight="regular"
-        />
+        <span className="relative size-3.5">
+          <StarIcon
+            className="absolute inset-0 size-3.5 text-muted-foreground/80 transition-opacity group-hover:opacity-0"
+            weight="regular"
+          />
+          <StarIcon
+            className="absolute inset-0 size-3.5 text-yellow-500 opacity-0 transition-opacity group-hover:opacity-100"
+            weight="fill"
+          />
+        </span>
         {meta.status === "loading" ? (
           <span className="h-3 w-8 animate-pulse rounded bg-muted-foreground/15" />
         ) : stars != null ? (

@@ -126,7 +126,7 @@ export const QueueItemAction = ({
 }: QueueItemActionProps) => (
   <Button
     className={cn(
-      "size-auto rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-muted-foreground/10 hover:text-foreground group-hover:opacity-100",
+      "size-auto rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-muted-foreground/10 hover:text-foreground group-hover:opacity-100",
       className
     )}
     size="icon"
@@ -153,7 +153,7 @@ export const QueueItemImage = ({
 }: QueueItemImageProps) => (
   <img
     alt=""
-    className={cn("h-8 w-8 rounded border object-cover", className)}
+    className={cn("h-8 w-8 rounded-md border border-border object-cover", className)}
     height={32}
     width={32}
     {...props}
@@ -167,9 +167,9 @@ export const QueueItemFile = ({
   className,
   ...props
 }: QueueItemFileProps) => (
-  <span
-    className={cn(
-      "flex items-center gap-1 rounded border bg-muted px-2 py-1 text-xs",
+    <span
+      className={cn(
+      "flex items-center gap-1 rounded-md border border-border bg-muted px-2 py-1 text-xs",
       className
     )}
     {...props}

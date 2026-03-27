@@ -101,7 +101,7 @@ const renderAttachmentImage = (
   ) : (
     <img
       alt={filename || "Image"}
-      className="size-full rounded object-cover"
+      className="size-full rounded-md object-cover"
       height={20}
       src={url}
       width={20}
@@ -209,10 +209,10 @@ export const Attachment = ({
             "flex h-8 cursor-pointer select-none items-center gap-1.5",
             "rounded-md border border-border px-1.5",
             "font-medium text-sm transition-all",
-            "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
+          "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
           ],
           variant === "list" && [
-            "flex w-full items-center gap-3 rounded-lg border p-3",
+            "flex w-full items-center gap-3 rounded-lg border border-border p-3",
             "hover:bg-accent/50",
           ],
           className
@@ -264,8 +264,8 @@ export const AttachmentPreview = ({
       className={cn(
         "flex shrink-0 items-center justify-center overflow-hidden",
         variant === "grid" && "size-full bg-muted",
-        variant === "inline" && "size-5 rounded bg-background",
-        variant === "list" && "size-12 rounded bg-muted",
+        variant === "inline" && "size-5 rounded-md bg-background",
+        variant === "list" && "size-12 rounded-md bg-muted",
         className
       )}
       {...props}
@@ -347,11 +347,14 @@ export const AttachmentRemove = ({
           "[&>svg]:size-3",
         ],
         variant === "inline" && [
-          "size-5 rounded p-0",
+          "size-5 rounded-md p-0",
           "opacity-0 transition-opacity group-hover:opacity-100",
           "[&>svg]:size-2.5",
         ],
-        variant === "list" && ["size-8 shrink-0 rounded p-0", "[&>svg]:size-4"],
+        variant === "list" && [
+          "size-8 shrink-0 rounded-md p-0",
+          "[&>svg]:size-4",
+        ],
         className
       )}
       onClick={handleClick}

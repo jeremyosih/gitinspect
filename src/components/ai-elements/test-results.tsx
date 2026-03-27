@@ -49,7 +49,7 @@ export const TestResultsHeader = ({
 }: TestResultsHeaderProps) => (
   <div
     className={cn(
-      "flex items-center justify-between border-b px-4 py-3",
+      "flex items-center justify-between border-b border-border px-4 py-3",
       className
     )}
     {...props}
@@ -141,7 +141,7 @@ export const TestResults = ({
   return (
     <TestResultsContext.Provider value={contextValue}>
       <div
-        className={cn("rounded-lg border bg-background", className)}
+        className={cn("rounded-lg border border-border bg-background", className)}
         {...props}
       >
         {children ??
@@ -256,7 +256,10 @@ export const TestSuite = ({
 
   return (
     <TestSuiteContext.Provider value={contextValue}>
-      <Collapsible className={cn("rounded-lg border", className)} {...props}>
+      <Collapsible
+        className={cn("rounded-lg border border-border", className)}
+        {...props}
+      >
         {children}
       </Collapsible>
     </TestSuiteContext.Provider>
@@ -334,7 +337,7 @@ export const TestSuiteContent = ({
   children,
   ...props
 }: TestSuiteContentProps) => (
-  <CollapsibleContent className={cn("border-t", className)} {...props}>
+  <CollapsibleContent className={cn("border-t border-border", className)} {...props}>
     <div className="divide-y">{children}</div>
   </CollapsibleContent>
 );

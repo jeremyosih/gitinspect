@@ -4,6 +4,7 @@ import { useLiveQuery } from "dexie-react-hooks"
 import { toast } from "sonner"
 import { Icons } from "@/components/icons"
 import { listRepositories } from "@/db/schema"
+import { githubApiFetch, isRateLimitError, showRateLimitToast } from "@/repo/github-fetch"
 import { parseRepoQuery } from "@/repo/parse"
 import { buildRepoPathname, githubOwnerAvatarUrl } from "@/repo/url"
 import { cn } from "@/lib/utils"
@@ -103,9 +104,8 @@ export const RepoCombobox = React.forwardRef<
 
     setIsValidating(true)
     try {
-      const res = await fetch(
-        `https://api.github.com/repos/${encodeURIComponent(parsed.owner)}/${encodeURIComponent(parsed.repo)}`,
-        { headers: { Accept: "application/vnd.github+json" } }
+      const res = await githubApiFetch(
+        `/repos/${encodeURIComponent(parsed.owner)}/${encodeURIComponent(parsed.repo)}`
       )
       if (!res.ok) {
         toast.error(`Repository ${parsed.owner}/${parsed.repo} not found`)
@@ -118,8 +118,12 @@ export const RepoCombobox = React.forwardRef<
         parsed.repo,
         parsed.ref && parsed.ref !== "main" ? parsed.ref : undefined
       )
-    } catch {
-      toast.error("Failed to validate repository")
+    } catch (err) {
+      if (isRateLimitError(err)) {
+        showRateLimitToast()
+      } else {
+        toast.error("Failed to validate repository")
+      }
     } finally {
       setIsValidating(false)
     }

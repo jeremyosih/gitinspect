@@ -61,7 +61,10 @@ export const SchemaDisplayHeader = ({
   ...props
 }: SchemaDisplayHeaderProps) => (
   <div
-    className={cn("flex items-center gap-3 border-b px-4 py-3", className)}
+    className={cn(
+      "flex items-center gap-3 border-b border-border px-4 py-3",
+      className
+    )}
     {...props}
   >
     {children}
@@ -126,7 +129,7 @@ export const SchemaDisplayDescription = ({
   return (
     <p
       className={cn(
-        "border-b px-4 py-3 text-muted-foreground text-sm",
+        "border-b border-border px-4 py-3 text-muted-foreground text-sm",
         className
       )}
       {...props}
@@ -205,7 +208,7 @@ export const SchemaDisplayParameters = ({
         </Badge>
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <div className="divide-y border-t">
+        <div className="divide-y border-t border-border">
           {children ??
             parameters?.map((param) => (
               <SchemaDisplayParameter key={param.name} {...param} />
@@ -268,7 +271,7 @@ export const SchemaDisplayProperty = ({
           </p>
         )}
         <CollapsibleContent>
-          <div className="divide-y border-t">
+          <div className="divide-y border-t border-border">
             {properties?.map((prop) => (
               <SchemaDisplayProperty
                 key={prop.name}
@@ -334,7 +337,7 @@ export const SchemaDisplayRequest = ({
         <span className="font-medium text-sm">Request Body</span>
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <div className="border-t">
+        <div className="border-t border-border">
           {children ??
             requestBody?.map((prop) => (
               <SchemaDisplayProperty key={prop.name} {...prop} depth={0} />
@@ -361,7 +364,7 @@ export const SchemaDisplayResponse = ({
         <span className="font-medium text-sm">Response</span>
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <div className="border-t">
+        <div className="border-t border-border">
           {children ??
             responseBody?.map((prop) => (
               <SchemaDisplayProperty key={prop.name} {...prop} depth={0} />
@@ -408,7 +411,7 @@ export const SchemaDisplay = ({
     <SchemaDisplayContext.Provider value={contextValue}>
       <div
         className={cn(
-          "overflow-hidden rounded-lg border bg-background",
+          "overflow-hidden rounded-lg border border-border bg-background",
           className
         )}
         {...props}
