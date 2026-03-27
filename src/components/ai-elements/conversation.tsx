@@ -97,7 +97,7 @@ export const ConversationScrollButton = ({
         onClick={handleScrollToBottom}
         size="icon"
         style={{
-          bottom: "calc(var(--chat-input-height, 0px) + 16px)",
+          bottom: "calc(var(--chat-input-height, 0px) + 16px + 0.5rem)",
           ...style,
         }}
         type="button"

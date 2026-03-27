@@ -120,13 +120,15 @@ export type ToolInputProps = ComponentProps<"div"> & {
 };
 
 export const ToolInput = ({ className, input, ...props }: ToolInputProps) => (
-  <div className={cn("space-y-2 overflow-hidden", className)} {...props}>
+  <div className={cn("space-y-2", className)} {...props}>
     <h4 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
       Parameters
     </h4>
-    <div className="rounded-md bg-muted/50">
-      <CodeBlock code={JSON.stringify(input, null, 2)} language="json" />
-    </div>
+    <CodeBlock
+      code={JSON.stringify(input, null, 2)}
+      language="json"
+      style={{ contentVisibility: "visible" }}
+    />
   </div>
 );
 
@@ -164,7 +166,7 @@ export const ToolOutput = ({
       </h4>
       <div
         className={cn(
-          "overflow-x-auto rounded-md text-xs [&_table]:w-full",
+          "overflow-x-auto rounded-md p-1 text-xs [&_table]:w-full",
           isError
             ? "bg-destructive/10 text-destructive"
             : "bg-muted/50 text-foreground"

@@ -16,10 +16,10 @@ export function ChatEmptyState({
   repoSource,
 }: ChatEmptyStateProps) {
   return (
-    <div className="flex h-full flex-col items-center justify-center px-6 pb-[var(--chat-input-height)]">
+    <div className="flex flex-1 flex-col items-center justify-center px-6">
       <div className="flex w-full max-w-sm flex-col items-center gap-4">
-        <h2 className="text-2xl font-semibold tracking-tight text-foreground">
-          Let&apos;s explore
+        <h2 className="font-geist-pixel-square text-2xl font-semibold tracking-tight text-foreground">
+          Let&apos;s inspect
         </h2>
 
         {repoSource ? (

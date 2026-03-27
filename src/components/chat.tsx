@@ -18,11 +18,15 @@ import {
   ConversationScrollButton,
 } from "@/components/ai-elements/conversation"
 import type { RepoComboboxHandle } from "./repo-combobox"
+import { toast } from "sonner"
+import { Icons } from "@/components/icons"
+import { copySessionToClipboard } from "@/lib/copy-session-markdown"
 import { getRuntimeCommandErrorMessage } from "@/agent/runtime-command-errors"
 import { runtimeClient } from "@/agent/runtime-client"
 import { touchRepository } from "@/db/schema"
 import { useRuntimeSession } from "@/hooks/use-runtime-session"
 import { getIsoNow } from "@/lib/dates"
+import { logRuntimeDebug } from "@/lib/runtime-debug"
 import { getCanonicalProvider, getDefaultProviderGroup } from "@/models/catalog"
 import {
   createSessionForChat,
@@ -152,9 +156,29 @@ export function Chat(props: ChatProps) {
   const [draftError, setDraftError] = React.useState<string | undefined>(undefined)
   const [isStartingSession, setIsStartingSession] = React.useState(false)
   const runtime = useRuntimeSession(sessionId)
-  const promptRef = React.useRef<HTMLDivElement | null>(null)
+  const observerRef = React.useRef<ResizeObserver | null>(null)
   const repoComboboxRef = React.useRef<RepoComboboxHandle>(null)
   const [promptHeight, setPromptHeight] = React.useState(0)
+
+  const promptRef = React.useCallback((node: HTMLDivElement | null) => {
+    if (observerRef.current) {
+      observerRef.current.disconnect()
+      observerRef.current = null
+    }
+
+    if (!node || typeof ResizeObserver === "undefined") {
+      return
+    }
+
+    const updateHeight = () => {
+      setPromptHeight(node.offsetHeight)
+    }
+
+    updateHeight()
+
+    observerRef.current = new ResizeObserver(updateHeight)
+    observerRef.current.observe(node)
+  }, [])
 
   React.useEffect(() => {
     if (!props.repoSource) {
@@ -171,26 +195,6 @@ export function Chat(props: ChatProps) {
 
     setDraft((currentDraft) => currentDraft ?? defaults)
   }, [defaults])
-
-  React.useEffect(() => {
-    const node = promptRef.current
-    if (!node || typeof ResizeObserver === "undefined") {
-      return
-    }
-
-    const updateHeight = () => {
-      setPromptHeight(node.offsetHeight)
-    }
-
-    updateHeight()
-
-    const observer = new ResizeObserver(updateHeight)
-    observer.observe(node)
-
-    return () => {
-      observer.disconnect()
-    }
-  }, [])
 
   const activeSession =
     loadedSessionState?.kind === "active" ? loadedSessionState.session : undefined
@@ -282,6 +286,12 @@ export function Chat(props: ChatProps) {
             })
           : await createSessionForChat(base)
 
+        logRuntimeDebug("session_created", {
+          hasInitialQuery: Boolean(initialQuery),
+          repoSource: session.repoSource,
+          sessionId: session.id,
+        })
+
         await persistLastUsedSessionSettings(session)
 
         await navigate({
@@ -367,15 +377,19 @@ export function Chat(props: ChatProps) {
       style={{ "--chat-input-height": `${promptHeight}px` } as CSSProperties}
     >
       <Conversation className="min-h-0 flex-1">
-        {messages.length === 0 ? (
-          <ChatEmptyState
-            onSuggestionClick={(text) => void handleSend(text)}
-            onSwitchRepo={() => repoComboboxRef.current?.focusAndClear()}
-            repoSource={props.repoSource}
-          />
-        ) : (
-          <ConversationContent className="mx-auto w-full max-w-4xl px-4 py-6">
-            {messages.map((message, index) => {
+        <ConversationContent
+          className={`mx-auto w-full max-w-4xl px-4 py-6 ${
+            messages.length === 0 ? "min-h-full" : ""
+          }`}
+        >
+          {messages.length === 0 ? (
+            <ChatEmptyState
+              onSuggestionClick={(text) => void handleSend(text)}
+              onSwitchRepo={() => repoComboboxRef.current?.focusAndClear()}
+              repoSource={props.repoSource}
+            />
+          ) : (
+            messages.map((message, index) => {
               if (
                 message.role === "toolResult" &&
                 foldedToolResultIds.has(message.id)
@@ -395,22 +409,41 @@ export function Chat(props: ChatProps) {
                   message={message}
                 />
               )
-            })}
-          </ConversationContent>
-        )}
+            })
+          )}
+        </ConversationContent>
         <ConversationScrollButton />
       </Conversation>
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10">
+        <div className="mx-auto w-full max-w-4xl px-4">
+          <div className="pointer-events-auto flex items-center justify-between pb-2">
+            <RepoCombobox
+              ref={repoComboboxRef}
+              autoFocus={!sessionId && !props.repoSource}
+              repoSource={props.repoSource}
+            />
+            {messages.length > 0 ? (
+              <button
+                className="flex items-center gap-1.5 rounded-sm border border-border/50 bg-muted px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                onClick={() => {
+                  copySessionToClipboard(messages).then(
+                    () => toast.success("Copied session as Markdown"),
+                    () => toast.error("Failed to copy to clipboard")
+                  )
+                }}
+                type="button"
+              >
+                <Icons.copy className="size-3.5" />
+                <span>Copy as Markdown</span>
+              </button>
+            ) : null}
+          </div>
+        </div>
+
         <div className="pointer-events-auto bg-background">
           <div className="mx-auto w-full max-w-4xl px-4 pb-4">
-            <div ref={promptRef} className="grid gap-3 pt-4">
-              <RepoCombobox
-                ref={repoComboboxRef}
-                autoFocus={!sessionId && !props.repoSource}
-                repoSource={props.repoSource}
-              />
-
+            <div ref={promptRef}>
               <ChatComposer
                 error={currentError}
                 initialInput={messages.length === 0 ? initialQuery : undefined}

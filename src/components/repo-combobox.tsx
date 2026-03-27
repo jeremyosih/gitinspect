@@ -185,14 +185,14 @@ export const RepoCombobox = React.forwardRef<
     return (
       <button
         className={cn(
-          "flex w-fit items-center gap-1.5 rounded-sm border border-border/50 bg-muted/50 px-2 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted",
+          "flex w-fit items-center gap-1.5 rounded-sm border border-border/50 bg-muted px-2 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted",
           className
         )}
         onClick={() => setMode("edit")}
         type="button"
       >
         <OwnerAvatar owner={repoSource.owner} size="sm" />
-        <span className="whitespace-nowrap font-mono text-[11px]">
+        <span className="whitespace-nowrap font-mono text-xs">
           {repoSource.owner}/{repoSource.repo}
         </span>
       </button>
@@ -201,13 +201,13 @@ export const RepoCombobox = React.forwardRef<
 
   return (
     <div ref={containerRef} className={cn("relative w-fit", className)}>
-      <div className="flex w-fit items-center gap-1.5 rounded-sm border border-border/50 bg-muted/50 px-2 py-1">
+      <div className="flex w-fit items-center gap-1.5 rounded-sm border border-border/50 bg-muted px-2 py-1">
         <Icons.gitHub className="size-3 shrink-0 text-muted-foreground" />
         <input
           ref={inputRef}
           aria-label="Repository (owner/repo)"
           autoComplete="off"
-          className="w-[140px] bg-transparent font-mono text-[11px] text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
+          className="w-[140px] bg-transparent font-mono text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
           disabled={isValidating}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -238,7 +238,7 @@ export const RepoCombobox = React.forwardRef<
               type="button"
             >
               <OwnerAvatar owner={repo.owner} size="sm" />
-              <span className="truncate font-mono text-[11px]">
+              <span className="truncate font-mono text-xs">
                 {repo.owner}/{repo.repo}
                 {repo.ref !== "main" ? (
                   <span className="text-muted-foreground">@{repo.ref}</span>
