@@ -1,5 +1,7 @@
 const BUSY_RUNTIME_ERROR_NAME = "BusyRuntimeError"
 const MISSING_SESSION_RUNTIME_ERROR_NAME = "MissingSessionRuntimeError"
+const BOOTSTRAP_FAILED_RUNTIME_ERROR_NAME = "BootstrapFailedRuntimeError"
+const STREAM_INTERRUPTED_RUNTIME_ERROR_NAME = "StreamInterruptedRuntimeError"
 
 export abstract class RuntimeCommandError extends Error {
   abstract readonly code: "busy" | "missing-session"
@@ -33,6 +35,20 @@ export class BusyRuntimeError extends RuntimeCommandError {
       `Runtime session is busy: ${sessionId}`,
       sessionId
     )
+  }
+}
+
+export class BootstrapFailedRuntimeError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = BOOTSTRAP_FAILED_RUNTIME_ERROR_NAME
+  }
+}
+
+export class StreamInterruptedRuntimeError extends Error {
+  constructor(message = "Stream interrupted. The runtime stopped before completion.") {
+    super(message)
+    this.name = STREAM_INTERRUPTED_RUNTIME_ERROR_NAME
   }
 }
 

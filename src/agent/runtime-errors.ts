@@ -1,14 +1,24 @@
 import { GitHubFsError } from "@/repo/github-fs"
 import type { SystemMessage } from "@/types/chat"
+import {
+  BootstrapFailedRuntimeError,
+  BusyRuntimeError,
+  MissingSessionRuntimeError,
+  StreamInterruptedRuntimeError,
+} from "@/agent/runtime-command-errors"
 
 export type RuntimeErrorKind =
+  | "bootstrap_failed"
+  | "missing_session"
   | "github_rate_limit"
   | "github_auth"
   | "github_not_found"
   | "github_permission"
   | "github_api"
+  | "runtime_busy"
   | "repo_network"
   | "provider_connection"
+  | "stream_interrupted"
   | "unknown"
 
 export interface ClassifiedRuntimeError {
@@ -45,6 +55,46 @@ function fingerprintFor(
 export function classifyRuntimeError(error: unknown): ClassifiedRuntimeError {
   const message = normalizeMessage(error)
   const lower = message.toLowerCase()
+
+  if (error instanceof BootstrapFailedRuntimeError) {
+    return {
+      fingerprint: fingerprintFor("bootstrap_failed", message),
+      kind: "bootstrap_failed",
+      message,
+      severity: "error",
+      source: "runtime",
+    }
+  }
+
+  if (error instanceof StreamInterruptedRuntimeError) {
+    return {
+      fingerprint: fingerprintFor("stream_interrupted", message),
+      kind: "stream_interrupted",
+      message,
+      severity: "error",
+      source: "runtime",
+    }
+  }
+
+  if (error instanceof BusyRuntimeError) {
+    return {
+      fingerprint: fingerprintFor("runtime_busy", message),
+      kind: "runtime_busy",
+      message,
+      severity: "warning",
+      source: "runtime",
+    }
+  }
+
+  if (error instanceof MissingSessionRuntimeError) {
+    return {
+      fingerprint: fingerprintFor("missing_session", message),
+      kind: "missing_session",
+      message,
+      severity: "error",
+      source: "runtime",
+    }
+  }
 
   if (error instanceof GitHubFsError) {
     const path = error.path ?? ""
@@ -167,6 +217,7 @@ export function buildSystemMessage(
 ): SystemMessage {
   return {
     action: classified.action,
+    fingerprint: classified.fingerprint,
     id,
     kind: classified.kind,
     message: classified.message,

@@ -6,6 +6,7 @@ import {
   MissingSessionRuntimeError,
   reviveRuntimeCommandError,
 } from "@/agent/runtime-command-errors"
+import { logRuntimeDebug } from "@/lib/runtime-debug"
 
 const sharedWorkerSupported =
   typeof window !== "undefined" && "SharedWorker" in window
@@ -13,6 +14,22 @@ const sharedWorkerSupported =
 interface WorkerHandle {
   worker: SharedWorker | Worker
   api: Remote<SessionWorkerApi>
+  workerType: "dedicated" | "shared"
+}
+
+function isWorkerTransportError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false
+  }
+
+  const message = error.message.toLowerCase()
+
+  return (
+    message.includes("disposed") ||
+    message.includes("closed") ||
+    message.includes("port") ||
+    message.includes("worker")
+  )
 }
 
 export class RuntimeClient {
@@ -34,12 +51,27 @@ export class RuntimeClient {
     }
 
     if (sharedWorkerSupported) {
-      const worker = new SharedWorker(url, opts)
-      return { worker, api: wrap<SessionWorkerApi>(worker.port) }
+      try {
+        const worker = new SharedWorker(url, opts)
+        return {
+          worker,
+          api: wrap<SessionWorkerApi>(worker.port),
+          workerType: "shared",
+        }
+      } catch (error) {
+        console.warn("[gitinspect:first-send] shared_worker_unavailable", {
+          error,
+          sessionId,
+        })
+      }
     }
 
     const worker = new Worker(url, opts)
-    return { worker, api: wrap<SessionWorkerApi>(worker) }
+    return {
+      worker,
+      api: wrap<SessionWorkerApi>(worker),
+      workerType: "dedicated",
+    }
   }
 
   private terminateHandle(handle: WorkerHandle): void {
@@ -68,6 +100,10 @@ export class RuntimeClient {
     pending = (async () => {
       try {
         const handle = this.createWorker(sessionId)
+        logRuntimeDebug("worker_init_started", {
+          sessionId,
+          workerType: handle.workerType,
+        })
         const exists = await handle.api.init(sessionId)
 
         if (!exists) {
@@ -75,6 +111,10 @@ export class RuntimeClient {
           return undefined
         }
 
+        logRuntimeDebug("worker_init_completed", {
+          sessionId,
+          workerType: handle.workerType,
+        })
         this.workers.set(sessionId, handle)
         return handle
       } finally {
@@ -99,6 +139,11 @@ export class RuntimeClient {
     try {
       return await invoke(handle.api)
     } catch (error) {
+      if (isWorkerTransportError(error)) {
+        this.terminateHandle(handle)
+        this.workers.delete(sessionId)
+      }
+
       if (error instanceof Error) {
         throw reviveRuntimeCommandError(error, sessionId)
       }
@@ -113,7 +158,20 @@ export class RuntimeClient {
   }
 
   async send(sessionId: string, content: string): Promise<void> {
-    await this.call(sessionId, async (api) => await api.send(content))
+    logRuntimeDebug("runtime_send_started", {
+      contentLength: content.trim().length,
+      sessionId,
+    })
+    try {
+      await this.call(sessionId, async (api) => await api.send(content))
+      logRuntimeDebug("runtime_send_completed", { sessionId })
+    } catch (error) {
+      logRuntimeDebug("runtime_send_failed", {
+        message: error instanceof Error ? error.message : String(error),
+        sessionId,
+      })
+      throw error
+    }
   }
 
   async abort(sessionId: string): Promise<void> {
@@ -126,6 +184,11 @@ export class RuntimeClient {
     try {
       await handle.api.abort()
     } catch (error) {
+      if (isWorkerTransportError(error)) {
+        this.terminateHandle(handle)
+        this.workers.delete(sessionId)
+      }
+
       if (error instanceof Error) {
         throw reviveRuntimeCommandError(error, sessionId)
       }

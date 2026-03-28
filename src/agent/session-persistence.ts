@@ -37,8 +37,10 @@ function sortByTimestamp(left: MessageRow, right: MessageRow): number {
 }
 
 export class SessionPersistence {
+  private readonly assignedAssistantIds = new Map<string, string>()
   private readonly persistedMessageIds = new Set<string>()
   private readonly recordedAssistantMessageIds = new Set<string>()
+  private disposed = false
   private persistQueue = Promise.resolve()
 
   constructor(
@@ -46,6 +48,7 @@ export class SessionPersistence {
     private readonly runtimeState: RuntimeStateSnapshot,
     messages: Array<MessageRow>
   ) {
+    this.seedAssignedAssistantIds(messages)
     this.seedRecordedCosts(messages)
   }
 
@@ -57,6 +60,14 @@ export class SessionPersistence {
     this.session = session
   }
 
+  private isDisposed(): boolean {
+    return this.disposed
+  }
+
+  dispose(): void {
+    this.disposed = true
+  }
+
   async flush(): Promise<void> {
     await this.persistQueue
   }
@@ -65,6 +76,10 @@ export class SessionPersistence {
     message: PiAssistantMessage,
     messageId: string
   ): Promise<void> {
+    if (this.isDisposed()) {
+      return
+    }
+
     if (
       message.usage.cost.total <= 0 ||
       this.recordedAssistantMessageIds.has(messageId)
@@ -83,30 +98,43 @@ export class SessionPersistence {
 
   buildCompletedRows(): Array<MessageRow> {
     const normalizedMessages = normalizeMessages(this.runtimeState.getMessages())
-    let lastAssistantIndex = -1
+    const currentAssistantId = this.runtimeState.getCurrentAssistantId()
 
-    for (let index = normalizedMessages.length - 1; index >= 0; index -= 1) {
-      if (normalizedMessages[index]?.role === "assistant") {
-        lastAssistantIndex = index
-        break
+    if (currentAssistantId) {
+      for (let i = normalizedMessages.length - 1; i >= 0; i -= 1) {
+        const msg = normalizedMessages[i]
+        if (
+          msg?.role === "assistant" &&
+          !this.assignedAssistantIds.has(msg.id)
+        ) {
+          this.assignedAssistantIds.set(msg.id, currentAssistantId)
+          break
+        }
       }
     }
 
-    return normalizedMessages.map((message, index) => {
-      const currentAssistantId = this.runtimeState.getCurrentAssistantId()
-      const id =
-        message.role === "assistant" &&
-        currentAssistantId &&
-        index === lastAssistantIndex
-          ? currentAssistantId
-          : message.id
+    let activeAssistantId: string | undefined
 
-      return toMessageRow(
+    return normalizedMessages.map((message) => {
+      let id = message.id
+
+      if (message.role === "assistant") {
+        id = this.assignedAssistantIds.get(message.id) ?? message.id
+        activeAssistantId = id
+      }
+
+      const row = toMessageRow(
         this.session.id,
         message,
         inferMessageStatus(message),
         id
       )
+
+      if (row.role === "toolResult" && activeAssistantId) {
+        row.parentAssistantId = activeAssistantId
+      }
+
+      return row
     })
   }
 
@@ -184,6 +212,7 @@ export class SessionPersistence {
   ): Promise<void> {
     await this.persistSessionBoundary(
       {
+        bootstrapStatus: "ready",
         error: undefined,
         isStreaming: true,
       },
@@ -196,7 +225,15 @@ export class SessionPersistence {
     currentAssistantRow: MessageRow | undefined,
     newlyCompletedRows: Array<MessageRow>
   ): Promise<void> {
+    if (this.isDisposed()) {
+      return
+    }
+
     this.persistQueue = this.persistQueue.then(async () => {
+      if (this.isDisposed()) {
+        return
+      }
+
       if (newlyCompletedRows.length > 0) {
         await putMessages(newlyCompletedRows)
 
@@ -215,12 +252,17 @@ export class SessionPersistence {
   }
 
   async persistSessionBoundary(
-    overrides: Pick<SessionData, "error" | "isStreaming">,
+    overrides: Pick<SessionData, "bootstrapStatus" | "error" | "isStreaming">,
     changedMessages: Array<MessageRow>,
     rowsForDerivation?: Array<MessageRow>
   ): Promise<void> {
+    if (this.isDisposed()) {
+      return
+    }
+
     const nextSessionBase = {
       ...this.session,
+      bootstrapStatus: overrides.bootstrapStatus,
       error: overrides.error,
       isStreaming: overrides.isStreaming,
       updatedAt: getIsoNow(),
@@ -235,9 +277,17 @@ export class SessionPersistence {
         return changedMessage ?? message
       })
 
+    if (this.isDisposed()) {
+      return
+    }
+
     this.session = buildPersistedSession(nextSessionBase, allRows)
 
     this.persistQueue = this.persistQueue.then(async () => {
+      if (this.isDisposed()) {
+        return
+      }
+
       if (changedMessages.length > 0) {
         await putSessionAndMessages(this.session, changedMessages)
 
@@ -254,7 +304,15 @@ export class SessionPersistence {
   }
 
   async appendSystemRow(row: MessageRow): Promise<void> {
+    if (this.isDisposed()) {
+      return
+    }
+
     this.persistQueue = this.persistQueue.then(async () => {
+      if (this.isDisposed()) {
+        return
+      }
+
       const existing = await getSessionMessages(this.session.id)
       const merged = [...existing, row].sort(sortByTimestamp)
       this.session = buildPersistedSession(
@@ -290,6 +348,16 @@ export class SessionPersistence {
       }
 
       this.recordedAssistantMessageIds.add(message.id)
+    }
+  }
+
+  private seedAssignedAssistantIds(messages: Array<MessageRow>): void {
+    for (const message of messages) {
+      if (message.role !== "assistant") {
+        continue
+      }
+
+      this.assignedAssistantIds.set(message.id, message.id)
     }
   }
 }

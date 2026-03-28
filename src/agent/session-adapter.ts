@@ -48,6 +48,7 @@ export function normalizeMessage(message: Message, index: number): ChatMessage {
       return {
         ...message,
         id,
+        parentAssistantId: "",
       } satisfies ToolResultMessage
     case "user":
       return {

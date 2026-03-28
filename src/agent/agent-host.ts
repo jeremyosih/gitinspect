@@ -10,13 +10,14 @@ import { webMessageTransformer } from "@/agent/message-transformer"
 import { streamChatWithPiAgent } from "@/agent/provider-stream"
 import { SessionPersistence } from "@/agent/session-persistence"
 import { buildInitialAgentState, toMessageRow } from "@/agent/session-adapter"
-import { RuntimeNoticeService } from "@/agent/runtime-notice-service"
 import { resolveApiKeyForProvider } from "@/auth/resolve-api-key"
 import { getIsoNow } from "@/lib/dates"
 import { createId } from "@/lib/ids"
+import { logRuntimeDebug } from "@/lib/runtime-debug"
 import { getCanonicalProvider, getModel } from "@/models/catalog"
 import { createRepoRuntime } from "@/repo/repo-runtime"
 import { normalizeRepoSource } from "@/repo/settings"
+import { appendSessionNotice } from "@/sessions/session-notices"
 import { createRepoTools } from "@/tools"
 
 export class AgentHost {
@@ -29,7 +30,6 @@ export class AgentHost {
   private promptPending = false
   private githubRuntimeTokenSnapshot?: string
   private getGithubToken?: () => Promise<string | undefined>
-  private readonly notices = new RuntimeNoticeService()
   private readonly persistence: SessionPersistence
   private repoRuntime
   private unsubscribe?: () => void
@@ -154,6 +154,11 @@ export class AgentHost {
       this.currentAssistantMessageId
     )
     await this.persistence.persistPromptStart(userRow, assistantRow)
+    logRuntimeDebug("prompt_persisted", {
+      assistantMessageId: assistantRow.id,
+      sessionId: this.session.id,
+      userMessageId: userRow.id,
+    })
 
     try {
       await this.agent.prompt(userMessage)
@@ -166,7 +171,9 @@ export class AgentHost {
       this.lastTerminalStatus = "error"
       this.session = {
         ...this.session,
-        error: error instanceof Error ? error.message : "Request failed",
+        error: undefined,
+        isStreaming: false,
+        updatedAt: getIsoNow(),
       }
 
       const currentAssistantRow = this.persistence.buildCurrentAssistantRow()
@@ -174,7 +181,8 @@ export class AgentHost {
 
       await this.persistence.persistSessionBoundary(
         {
-          error: this.session.error,
+          bootstrapStatus: this.session.bootstrapStatus,
+          error: undefined,
           isStreaming: false,
         },
         currentAssistantRow ? [currentAssistantRow] : [],
@@ -192,6 +200,7 @@ export class AgentHost {
         )
         this.session = {
           ...this.session,
+          error: undefined,
           isStreaming: false,
           updatedAt: getIsoNow(),
         }
@@ -324,7 +333,8 @@ export class AgentHost {
 
     await this.persistence.persistSessionBoundary(
       {
-        error: this.agent.state.error,
+        bootstrapStatus: this.session.bootstrapStatus,
+        error: undefined,
         isStreaming: false,
       },
       changedMessages,
@@ -371,12 +381,6 @@ export class AgentHost {
       return
     }
 
-    const row = this.notices.toSystemRow(this.session.id, error)
-
-    if (!row) {
-      return
-    }
-
-    await this.persistence.appendSystemRow(row)
+    await appendSessionNotice(this.session.id, error)
   }
 }
