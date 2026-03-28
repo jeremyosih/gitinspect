@@ -1,8 +1,12 @@
 # gitinspect
 
-*Ask questions to any GitHub repo — from your browser, without cloning.*
+![Screenshot 2026-03-28 at 01 36 31](https://github.com/user-attachments/assets/a39a420d-a538-4e8e-82a3-16794b3e0e6f)
 
----
+
+Ask questions to any GitHub repo — from your browser, without cloning.
+You can also replace hub with inspect in any GitHub URL to access the corresponding digest.
+
+[try it here](https://gitinspect.com/)
 
 **gitinspect** is a research agent for source code. Pick a repository, chat in natural language, and get answers grounded on the code. The agent is built on [pi-mono](https://github.com/badlogic/pi-mono) and explores the codebase through a **read-only virtual shell** ([just-bash](https://github.com/vercel-labs/just-bash)) mounted on a **virtual filesystem** backed by the **GitHub API** ([just-github](https://github.com/ThallesP/just-github) in this repo) — not your laptop, not a real checkout.
 
