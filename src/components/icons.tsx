@@ -88,6 +88,17 @@ export const Icons = {
       <path d="m16,14h1v-4h-1v-2h-2v-1h-4v1h-2v2h-1v4h1v2h2v1h4v-1h2v-2Zm-1,0h-1v1h-4v-1h-1v-4h1v-1h4v1h1v4Z" />
     </IconBase>
   ),
+  bank: (props: IconProps) => (
+    <IconBase
+      aria-label="Data"
+      id="bank-solid"
+      viewBox="0 0 24 24"
+      {...props}
+    >
+      <polygon points="23 20 23 22 22 22 22 23 2 23 2 22 1 22 1 20 3 20 3 19 4 19 4 10 6 10 6 19 8 19 8 10 10 10 10 19 14 19 14 10 16 10 16 19 18 19 18 10 20 10 20 19 21 19 21 20 23 20" />
+      <path d="m20,5v-1h-2v-1h-2v-1h-2v-1h-4v1h-2v1h-2v1h-2v1H1v2h1v1h1v1h18v-1h1v-1h1v-2h-3Zm-9,2v-1h-1v-2h1v-1h2v1h1v2h-1v1h-2Z" />
+    </IconBase>
+  ),
   cost: (props: IconProps) => (
     <IconBase
       aria-label="Costs"

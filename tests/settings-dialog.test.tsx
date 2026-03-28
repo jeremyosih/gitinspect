@@ -62,6 +62,7 @@ vi.mock("@/components/icons", () => {
   return {
     Icons: {
       badgeCheck: Icon,
+      bank: Icon,
       cost: Icon,
       faceThinking: Icon,
       gitHub: Icon,

@@ -4,6 +4,7 @@ import { ArrowUpRight, BadgeCheck } from "lucide-react"
 import { runtimeClient } from "@/agent/runtime-client"
 import { Icons } from "@/components/icons"
 import { CostsPanel } from "@/components/costs-panel"
+import { DataSettings } from "@/components/data-settings"
 import { GithubTokenSettings } from "@/components/github-token-settings"
 import { ProviderSettings } from "@/components/provider-settings"
 import { ProxySettings } from "@/components/proxy-settings"
@@ -48,6 +49,7 @@ export type SettingsSection =
   | "github"
   | "costs"
   | "proxy"
+  | "data"
   | "about"
 type AboutDemoState = "update" | "latest"
 
@@ -80,6 +82,12 @@ const SETTINGS_SECTIONS: Array<{
     icon: Icons.globe,
     id: "proxy",
     label: "Proxy",
+  },
+  {
+    description: "Export chat or wipe all local app data",
+    icon: Icons.bank,
+    id: "data",
+    label: "Data",
   },
   {
     description: "What gitinspect.com is and how it works",
@@ -141,10 +149,13 @@ export function AppSettingsDialog() {
       }}
       open={open}
     >
-      <DialogContent className="overflow-hidden p-0 md:max-h-[620px] md:max-w-5xl">
+      <DialogContent className="flex min-h-0 w-full max-w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden p-0 max-h-[90dvh] sm:max-w-[min(100%-2rem,36rem)] md:h-[620px] md:max-h-[620px] md:min-h-[620px] md:max-w-5xl">
         <DialogTitle className="sr-only">Settings</DialogTitle>
-        <SidebarProvider className="items-start">
-          <Sidebar className="hidden border-r border-foreground/10 md:flex" collapsible="none">
+        <SidebarProvider className="flex min-h-0 min-w-0 flex-1 flex-row items-stretch overflow-hidden md:h-full md:min-h-0">
+          <Sidebar
+            className="hidden border-r border-foreground/10 md:flex md:h-full md:min-h-0 md:self-stretch"
+            collapsible="none"
+          >
             <SidebarContent>
               <SidebarGroup>
                 <SidebarGroupContent>
@@ -167,7 +178,7 @@ export function AppSettingsDialog() {
               </SidebarGroup>
             </SidebarContent>
           </Sidebar>
-          <main className="flex h-[620px] min-w-0 flex-1 flex-col overflow-hidden">
+          <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden md:min-h-0">
             <header className="shrink-0 border-b border-foreground/10 px-5 pt-4 md:h-16 md:pt-0">
               <div className="flex min-h-11 items-center">
                 <Breadcrumb>
@@ -191,21 +202,23 @@ export function AppSettingsDialog() {
                 }}
                 value={section}
               >
-                <TabsList
-                  className="-mx-1 h-auto w-[calc(100%+0.5rem)] justify-start overflow-x-auto px-1"
-                  variant="line"
-                >
-                  {SETTINGS_SECTIONS.map((item) => (
-                    <TabsTrigger
-                      className="shrink-0 gap-1.5 px-0 pb-2"
-                      key={item.id}
-                      value={item.id}
-                    >
-                      <item.icon className="size-4 shrink-0" />
-                      {item.label}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
+                <div className="min-w-0 w-full touch-pan-x overflow-x-auto overflow-y-hidden overscroll-x-contain [-webkit-overflow-scrolling:touch] pb-0.5 [scrollbar-width:thin]">
+                  <TabsList
+                    className="inline-flex h-auto w-max flex-nowrap justify-start gap-4 bg-transparent p-0 px-1 data-[variant=line]:gap-4"
+                    variant="line"
+                  >
+                    {SETTINGS_SECTIONS.map((item) => (
+                      <TabsTrigger
+                        className="flex-none gap-1.5 px-1.5 pb-2"
+                        key={item.id}
+                        value={item.id}
+                      >
+                        <item.icon className="size-4 shrink-0" />
+                        {item.label}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </div>
               </Tabs>
             </header>
             <div className="min-h-0 flex-1 overflow-y-auto p-5">
@@ -238,6 +251,7 @@ export function AppSettingsDialog() {
                 {section === "costs" ? (
                   <CostsPanel session={session} />
                 ) : null}
+                {section === "data" ? <DataSettings /> : null}
                 {section === "about" ? <AboutPanel /> : null}
               </div>
             </div>
