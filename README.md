@@ -1,6 +1,6 @@
 # gitinspect
 
-*Ask questions about any GitHub repo — from your browser, without cloning.*
+*Ask questions to any GitHub repo — from your browser, without cloning.*
 
 ---
 
@@ -8,20 +8,20 @@
 
 **Private by design.** Sessions, settings, provider keys, and usage stay on your device ([Dexie](https://github.com/dexie/Dexie.js) / IndexedDB). Chat runs client-side; we don’t run a backend for your data.
 
-Shaped by the same product instincts as [Sitegeist](https://sitegeist.ai) (browser-first, you stay in control).
+Inspired by [Sitegeist](https://sitegeist.ai) (browser-first, you stay in control) & [just-github](https://github.com/ThallesP/just-github).
 
-### Develop
+## How it works
 
-```bash
-bun install
-bun run dev
-```
+- **Local first** - the agent lives in a shared worker, and the data on a local Index DB.
+- **Lazy loading** — nothing is fetched on construction, everything on demand
+- **Tree cache** — the full repo tree is fetched once via Git Trees API, then all `stat`/`exists`/`readdir` calls are served from cache
+- **Content cache** — file contents are cached by blob SHA (content-addressable, never stale)
+- **Smart API selection** — Contents API for small files, raw endpoint for large ones (>1MB)
 
-```bash
-bun test
-bun run build
-```
+## Rate limits
 
-### License
+Unauthenticated: 60 requests/hour. Authenticated: 5,000 requests/hour. Set `GITHUB_TOKEN` to avoid limits. The tree cache keeps actual API usage low — after the initial load, only `readFile` for new files costs an API call.
+
+## License
 
 [AGPL-3.0](LICENSE)
