@@ -2,25 +2,24 @@
 
 ![Screenshot 2026-03-28 at 01 36 31](https://github.com/user-attachments/assets/a39a420d-a538-4e8e-82a3-16794b3e0e6f)
 
-
 Ask questions to any GitHub repo — from your browser, without cloning.
+
 You can also replace hub with inspect in any GitHub URL to access the corresponding digest.
 
-[try it here](https://gitinspect.com/)
-
-**gitinspect** is a research agent for source code. Pick a repository, chat in natural language, and get answers grounded on the code. The agent is built on [pi-mono](https://github.com/badlogic/pi-mono) and explores the codebase through a **read-only virtual shell** ([just-bash](https://github.com/vercel-labs/just-bash)) mounted on a **virtual filesystem** backed by the **GitHub API** ([just-github](https://github.com/ThallesP/just-github) in this repo) — not your laptop, not a real checkout.
-
-**Private by design.** Sessions, settings, provider keys, and usage stay on your device ([Dexie](https://github.com/dexie/Dexie.js) / IndexedDB). Chat runs client-side; we don’t run a backend for your data.
-
-Inspired by [Sitegeist](https://sitegeist.ai) (browser-first, you stay in control) & [just-github](https://github.com/ThallesP/just-github).
+[website](https://gitinspect.com/) 
 
 ## How it works
 
-- **Local first** - the agent lives in a shared worker, and the data on a local Index DB.
-- **Lazy loading** — nothing is fetched on construction, everything on demand
-- **Tree cache** — the full repo tree is fetched once via Git Trees API, then all `stat`/`exists`/`readdir` calls are served from cache
-- **Content cache** — file contents are cached by blob SHA (content-addressable, never stale)
-- **Smart API selection** — Contents API for small files, raw endpoint for large ones (>1MB)
+- **Research agent** — Pick a repository, chat in natural language; answers are grounded in the code.
+- **Stack** — [pi-mono](https://github.com/badlogic/pi-mono), read-only shell via [just-bash](https://github.com/vercel-labs/just-bash), virtual FS from the GitHub API ([just-github](https://github.com/jeremyosih/gitoverflow/tree/main/just-github) in this repo) — not your machine, not a checkout.
+- **Private by design** — Sessions, settings, provider keys, and usage stay on device ([Dexie](https://github.com/dexie/Dexie.js) / IndexedDB); chat is client-side, no backend for your data.
+- **Local first** — Agent in a SharedWorker; durable state in IndexedDB.
+- **Lazy loading** — Nothing fetched at construction; everything on demand.
+- **Tree cache** — Full repo tree once via Git Trees API; `stat`, `exists`, and `readdir` from cache.
+- **Content cache** — File contents by blob SHA (content-addressable, never stale).
+- **Smart API selection** — Contents API for small files; raw endpoint for large files (>1 MB).
+
+Inspired by [Sitegeist](https://sitegeist.ai) (browser-first, you stay in control) & [just-github](https://github.com/ThallesP/just-github).
 
 ## Rate limits
 
