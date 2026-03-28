@@ -44,6 +44,7 @@ const THINKING_LEVELS: Array<{ label: string; value: ThinkingLevel }> = [
 ]
 
 function ChatComposerInner(props: {
+  composerDisabled?: boolean
   isStreaming: boolean
   model: string
   onAbort: () => void
@@ -58,9 +59,14 @@ function ChatComposerInner(props: {
 }) {
   const { textInput } = usePromptInputController()
   const text = textInput.value
+  const locked = props.composerDisabled === true
 
   const handleSubmit = React.useCallback(
     (message: PromptInputMessage) => {
+      if (locked) {
+        return
+      }
+
       const next = message.text.trim()
 
       if (!next || props.isStreaming) {
@@ -69,13 +75,14 @@ function ChatComposerInner(props: {
 
       void props.onSend(next)
     },
-    [props.isStreaming, props.onSend]
+    [locked, props.isStreaming, props.onSend]
   )
 
   const submitStatus: ChatStatus = props.isStreaming ? "streaming" : "ready"
 
   const currentModel = getModelForGroup(props.providerGroup, props.model)
   const supportsThinking = currentModel.reasoning === true
+  const controlsDisabled = locked || props.isStreaming
 
   return (
     <div className="mx-auto grid w-full max-w-4xl gap-4">
@@ -87,7 +94,12 @@ function ChatComposerInner(props: {
         <PromptInputBody>
           <PromptInputTextarea
             className="min-h-[4.5rem] text-sm font-medium leading-6 text-foreground placeholder:text-muted-foreground md:text-base"
-            placeholder="What would you like to know?"
+            disabled={locked}
+            placeholder={
+              locked
+                ? "Select a repository to get started"
+                : "What would you like to know?"
+            }
           />
         </PromptInputBody>
 
@@ -96,6 +108,7 @@ function ChatComposerInner(props: {
             <PromptInputActionMenu>
               <PromptInputActionMenuTrigger
                 aria-label="Add attachments"
+                disabled={locked}
                 tooltip={{
                   content:
                     "Add files for local preview. Only message text is sent in this version.",
@@ -108,7 +121,7 @@ function ChatComposerInner(props: {
             </PromptInputActionMenu>
 
             <ChatModelSelector
-              disabled={props.isStreaming}
+              disabled={controlsDisabled}
               model={props.model}
               onSelect={props.onSelectModel}
               providerGroup={props.providerGroup}
@@ -116,7 +129,7 @@ function ChatComposerInner(props: {
 
             {supportsThinking ? (
               <Select
-                disabled={props.isStreaming}
+                disabled={controlsDisabled}
                 onValueChange={(value) => {
                   void props.onThinkingLevelChange(value as ThinkingLevel)
                 }}
@@ -141,7 +154,9 @@ function ChatComposerInner(props: {
           </PromptInputTools>
 
           <PromptInputSubmit
-            disabled={!text.trim() && !props.isStreaming}
+            disabled={
+              locked || (!text.trim() && !props.isStreaming)
+            }
             onStop={props.onAbort}
             status={submitStatus}
           />
@@ -175,6 +190,7 @@ function PromptInputAttachmentsRow() {
 }
 
 export function ChatComposer(props: {
+  composerDisabled?: boolean
   initialInput?: string
   isStreaming: boolean
   model: string

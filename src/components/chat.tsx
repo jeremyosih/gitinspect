@@ -31,6 +31,7 @@ import {
   resolveProviderDefaults,
   sessionDestination,
 } from "@/sessions/session-actions"
+import { getChatBootstrapPanelMode } from "@/sessions/chat-bootstrap-ui"
 import { bootstrapSessionAndSend } from "@/sessions/session-bootstrap"
 import { loadSessionWithMessages } from "@/sessions/session-service"
 
@@ -382,11 +383,12 @@ export function Chat(props: ChatProps) {
   const currentThinkingLevel =
     activeSession?.thinkingLevel ?? draft?.thinkingLevel ?? "medium"
   const isStreaming = activeSession?.isStreaming ?? isStartingSession
-  const currentBootstrapStatus = activeSession?.bootstrapStatus ?? "ready"
-  const showStreamingStatus =
-    (currentBootstrapStatus === "bootstrap" || isStreaming) &&
-    messages.length > 0 &&
-    !hasAssistantMessage
+  const chatPanelMode = getChatBootstrapPanelMode({
+    bootstrapStatus: activeSession?.bootstrapStatus,
+    effectiveStreaming: isStreaming,
+    hasAssistantMessage,
+    messageCount: messages.length,
+  })
 
   return (
     <div
@@ -399,23 +401,21 @@ export function Chat(props: ChatProps) {
             messages.length === 0 ? "min-h-full" : ""
           }`}
         >
-          {currentBootstrapStatus === "bootstrap" && messages.length === 0 ? (
+          {chatPanelMode === "bootstrap_spinner" ? (
             <div className="flex min-h-[30vh] items-center justify-center">
               <StatusShimmer>Starting session...</StatusShimmer>
             </div>
-          ) : showStreamingStatus ? (
+          ) : chatPanelMode === "streaming_pending" ? (
             <div className="mb-4 flex justify-start">
               <StatusShimmer>Assistant is streaming...</StatusShimmer>
             </div>
-          ) : messages.length === 0 ? (
-            currentBootstrapStatus === "ready" ? (
-              <ChatEmptyState
-                onSuggestionClick={(text) => void handleSend(text)}
-                onSwitchRepo={() => repoComboboxRef.current?.focusAndClear()}
-                repoSource={resolvedRepoSource}
-              />
-            ) : null
-          ) : (
+          ) : chatPanelMode === "empty_ready" ? (
+            <ChatEmptyState
+              onSuggestionClick={(text) => void handleSend(text)}
+              onSwitchRepo={() => repoComboboxRef.current?.focusAndClear()}
+              repoSource={resolvedRepoSource}
+            />
+          ) : chatPanelMode === "empty_other" ? null : (
             messages.map((message, index) => {
               if (
                 message.role === "toolResult" &&
@@ -482,6 +482,7 @@ export function Chat(props: ChatProps) {
           <div className="mx-auto w-full max-w-4xl px-4 pb-4">
             <div ref={promptRef}>
               <ChatComposer
+                composerDisabled={!resolvedRepoSource}
                 initialInput={messages.length === 0 ? initialQuery : undefined}
                 isStreaming={isStreaming}
                 model={currentModel}

@@ -21,6 +21,14 @@ export interface RepoTarget {
   token?: string
 }
 
+/**
+ * Session bootstrap lifecycle (worker runs `AgentHost` after Dexie has a row).
+ *
+ * - `bootstrap`: row exists; first prompt not yet durably started (`persistPromptStart` in
+ *   `session-persistence.ts` promotes to `ready`).
+ * - `ready`: normal chat; also the default when `bootstrapStatus` is missing in older rows.
+ * - `failed`: repo resolution or first-send failed; see `session-bootstrap.ts` + notices.
+ */
 export type BootstrapStatus = "bootstrap" | "failed" | "ready"
 
 export interface RepositoryRow {

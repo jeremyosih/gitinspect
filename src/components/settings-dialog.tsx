@@ -113,6 +113,7 @@ export function AppSettingsDialog() {
       void navigate({
         to: "/",
         search: {
+          ...search,
           settings: nextSection,
           sidebar,
         },

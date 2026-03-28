@@ -4,6 +4,25 @@ import { CHAT_SUGGESTIONS } from "@/components/chat-suggestions"
 import { buildRepoPathname } from "@/repo/url"
 import type { RepoSource } from "@/types/storage"
 
+function LetsInspectHeading() {
+  return (
+    <div className="flex flex-row items-center justify-center gap-2.5">
+      <h2 className="font-geist-pixel-square text-2xl font-semibold tracking-tight text-foreground">
+        Let&apos;s Inspect
+      </h2>
+      <img
+        alt=""
+        aria-hidden
+        className="size-5 shrink-0 object-contain"
+        decoding="async"
+        height={32}
+        src="/favicon.svg"
+        width={32}
+      />
+    </div>
+  )
+}
+
 type ChatEmptyStateProps = {
   onSuggestionClick: (text: string) => void
   onSwitchRepo?: () => void
@@ -15,26 +34,35 @@ export function ChatEmptyState({
   onSwitchRepo,
   repoSource,
 }: ChatEmptyStateProps) {
+  if (!repoSource) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center px-6">
+        <div className="flex w-full max-w-sm flex-col items-center gap-2 text-center">
+          <LetsInspectHeading />
+          <p className="text-sm text-muted-foreground">
+            Select or type in a repo to get started.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-1 flex-col items-center justify-center px-6">
       <div className="flex w-full max-w-sm flex-col items-center gap-4">
-        <h2 className="font-geist-pixel-square text-2xl font-semibold tracking-tight text-foreground">
-          Let&apos;s inspect
-        </h2>
+        <LetsInspectHeading />
 
-        {repoSource ? (
-          <GithubRepo
-            isLink={false}
-            owner={repoSource.owner}
-            ref={repoSource.ref}
-            repo={repoSource.repo}
-            to={buildRepoPathname(
-              repoSource.owner,
-              repoSource.repo,
-              repoSource.ref !== "main" ? repoSource.ref : undefined
-            )}
-          />
-        ) : null}
+        <GithubRepo
+          isLink={false}
+          owner={repoSource.owner}
+          ref={repoSource.ref}
+          repo={repoSource.repo}
+          to={buildRepoPathname(
+            repoSource.owner,
+            repoSource.repo,
+            repoSource.ref !== "main" ? repoSource.ref : undefined
+          )}
+        />
 
         <div className="flex w-full flex-col">
           {CHAT_SUGGESTIONS.map((suggestion) => (

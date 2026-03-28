@@ -31,6 +31,7 @@ export function SidebarMobileActions() {
       void navigate({
         to: "/",
         search: {
+          ...search,
           settings: "providers",
           sidebar,
         },

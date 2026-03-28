@@ -145,7 +145,7 @@ function RootLayout() {
           void navigate({
             to: "/",
             search: (prev) => ({
-              settings: prev.settings,
+              ...prev,
               sidebar: open ? "open" : undefined,
             }),
           })

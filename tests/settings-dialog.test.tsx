@@ -13,6 +13,7 @@ const {
       | undefined,
     search: {
       settings: "providers",
+      tab: "suggested",
     } as Record<string, unknown>,
     tabsOnValueChange: undefined as
       | ((value: string) => void)
@@ -184,7 +185,7 @@ describe("settings dialog", () => {
   beforeEach(() => {
     state.dialogOnOpenChange = undefined
     state.tabsOnValueChange = undefined
-    state.search = { settings: "providers" }
+    state.search = { settings: "providers", tab: "suggested" }
     navigate.mockReset()
   })
 
@@ -207,6 +208,7 @@ describe("settings dialog", () => {
       search: {
         settings: "github",
         sidebar: undefined,
+        tab: "suggested",
       },
       to: "/",
     })

@@ -11,11 +11,27 @@ import {
 import { persistSessionSnapshot } from "@/sessions/session-service"
 import type { RepoTarget, SessionData } from "@/types/storage"
 
-// Provisional sessions become ready only after prompt persistence; bootstrap failures stay chat-visible.
+/**
+ * First-send lifecycle (Dexie is source of truth; worker is command executor):
+ * 1. Create session row (`createSessionFor*`).
+ * 2. `bootstrapStatus: "bootstrap"` until `persistPromptStart` writes user+assistant rows → `ready`.
+ * 3. On failure before/during first send, `failed` + system notice (see `appendSessionNotice`).
+ */
 function toBootstrapFailure(error: unknown): BootstrapFailedRuntimeError {
   return new BootstrapFailedRuntimeError(
     error instanceof Error ? error.message : "Bootstrap failed"
   )
+}
+
+async function recordBootstrapFailure(
+  sessionId: string,
+  error: unknown
+): Promise<void> {
+  await appendSessionNotice(sessionId, toBootstrapFailure(error), {
+    bootstrapStatus: "failed",
+    clearStreaming: true,
+    rewriteStreamingAssistant: true,
+  })
 }
 
 export async function bootstrapSessionAndSend(params: {
@@ -53,11 +69,7 @@ export async function bootstrapSessionAndSend(params: {
       ...session,
       bootstrapStatus: "bootstrap",
     })
-    await appendSessionNotice(session.id, toBootstrapFailure(error), {
-      bootstrapStatus: "failed",
-      clearStreaming: true,
-      rewriteStreamingAssistant: true,
-    })
+    await recordBootstrapFailure(session.id, error)
     return {
       ...session,
       bootstrapStatus: "failed",
@@ -71,11 +83,7 @@ export async function bootstrapSessionAndSend(params: {
 
   void runtimeClient.send(session.id, params.content).catch(async (error) => {
     try {
-      await appendSessionNotice(session.id, toBootstrapFailure(error), {
-        bootstrapStatus: "failed",
-        clearStreaming: true,
-        rewriteStreamingAssistant: true,
-      })
+      await recordBootstrapFailure(session.id, error)
     } catch (noticeError) {
       console.error("[gitinspect:first-send] bootstrap_notice_failed", {
         error,

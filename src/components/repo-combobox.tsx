@@ -7,6 +7,7 @@ import { Icons } from "@/components/icons"
 import { listRepositories } from "@/db/schema"
 import { githubApiFetch, isRateLimitError, showRateLimitToast } from "@/repo/github-fetch"
 import { parseRepoQuery } from "@/repo/parse"
+import { SUGGESTED_REPOS } from "@/repo/suggested-repos"
 import { buildRepoPathname, githubOwnerAvatarUrl } from "@/repo/url"
 import { cn } from "@/lib/utils"
 
@@ -37,17 +38,37 @@ export const RepoCombobox = React.forwardRef<
   const inputRef = React.useRef<HTMLInputElement>(null)
   const containerRef = React.useRef<HTMLDivElement>(null)
 
-  const filteredRepos = React.useMemo(() => {
-    if (!repositories) return []
-    if (!query.trim()) return repositories.slice(0, 5)
-    const lower = query.toLowerCase()
-    return repositories
-      .filter((r) => `${r.owner}/${r.repo}`.toLowerCase().includes(lower))
-      .slice(0, 5)
-  }, [repositories, query])
+  const hasRecentRepos = (repositories?.length ?? 0) > 0
 
-  const showDropdown =
-    mode === "edit" && filteredRepos.length > 0
+  const listItems = React.useMemo(() => {
+    if (repositories === undefined) {
+      return []
+    }
+
+    if (hasRecentRepos) {
+      if (!query.trim()) {
+        return repositories.slice(0, 5)
+      }
+
+      const lower = query.toLowerCase()
+
+      return repositories
+        .filter((r) => `${r.owner}/${r.repo}`.toLowerCase().includes(lower))
+        .slice(0, 5)
+    }
+
+    if (!query.trim()) {
+      return SUGGESTED_REPOS.slice(0, 5)
+    }
+
+    const lower = query.toLowerCase()
+
+    return SUGGESTED_REPOS.filter((r) =>
+      `${r.owner}/${r.repo}`.toLowerCase().includes(lower)
+    ).slice(0, 5)
+  }, [repositories, hasRecentRepos, query])
+
+  const showDropdown = mode === "edit" && listItems.length > 0
 
   React.useImperativeHandle(ref, () => ({
     focusAndClear() {
@@ -90,8 +111,8 @@ export const RepoCombobox = React.forwardRef<
   )
 
   const handleSubmit = React.useCallback(async () => {
-    if (highlightedIndex >= 0 && highlightedIndex < filteredRepos.length) {
-      const item = filteredRepos[highlightedIndex]
+    if (highlightedIndex >= 0 && highlightedIndex < listItems.length) {
+      const item = listItems[highlightedIndex]
       handleSelect(item.owner, item.repo, item.ref)
       return
     }
@@ -131,7 +152,7 @@ export const RepoCombobox = React.forwardRef<
     } finally {
       setIsValidating(false)
     }
-  }, [query, highlightedIndex, filteredRepos, handleSelect, navigateToRepo])
+  }, [query, highlightedIndex, listItems, handleSelect, navigateToRepo])
 
   const handleKeyDown = React.useCallback(
     (e: React.KeyboardEvent) => {
@@ -151,19 +172,19 @@ export const RepoCombobox = React.forwardRef<
       if (e.key === "ArrowDown" && showDropdown) {
         e.preventDefault()
         setHighlightedIndex((i) =>
-          i < filteredRepos.length - 1 ? i + 1 : 0
+          i < listItems.length - 1 ? i + 1 : 0
         )
         return
       }
       if (e.key === "ArrowUp" && showDropdown) {
         e.preventDefault()
         setHighlightedIndex((i) =>
-          i > 0 ? i - 1 : filteredRepos.length - 1
+          i > 0 ? i - 1 : listItems.length - 1
         )
         return
       }
     },
-    [handleSubmit, repoSource, showDropdown, filteredRepos.length]
+    [handleSubmit, listItems.length, repoSource, showDropdown]
   )
 
   React.useEffect(() => {
@@ -228,10 +249,19 @@ export const RepoCombobox = React.forwardRef<
       {showDropdown ? (
         <div className="absolute bottom-full left-0 z-50 mb-1 min-w-[200px] overflow-hidden rounded-sm border border-border bg-popover shadow-md">
           <div className="flex items-center gap-1 px-2 py-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-            <Icons.clock className="size-2.5" />
-            Recent
+            {hasRecentRepos ? (
+              <>
+                <Icons.clock className="size-2.5" />
+                Recent
+              </>
+            ) : (
+              <>
+                <Icons.sparkles className="size-2.5" />
+                Suggested Repo
+              </>
+            )}
           </div>
-          {filteredRepos.map((repo, index) => (
+          {listItems.map((repo, index) => (
             <button
               className={cn(
                 "flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs transition-colors hover:bg-accent",

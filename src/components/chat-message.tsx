@@ -115,6 +115,7 @@ export function ChatMessage(props: {
                     void navigate({
                       to: "/",
                       search: {
+                        ...search,
                         settings: "github",
                         sidebar,
                       },

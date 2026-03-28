@@ -23,30 +23,7 @@ import { Icons } from "@/components/icons"
 import { ChatLogo } from "@/components/chat-logo"
 import { cn } from "@/lib/utils"
 import { githubApiFetch, isRateLimitError, showRateLimitToast } from "@/repo/github-fetch"
-import type { RepositoryRow } from "@/types/storage"
-
-const SUGGESTED_REPOS: ReadonlyArray<
-  Pick<RepositoryRow, "owner" | "repo" | "ref">
-> = [
-  { owner: "imputnet", repo: "helium", ref: "main" },
-  { owner: "pierrecomputer", repo: "pierre", ref: "main" },
-  { owner: "jeremyosih", repo: "gitinspect", ref: "main" },
-  { owner: "alibaba", repo: "OpenSandbox", ref: "main" },
-  { owner: "coderamp-labs", repo: "gitingest", ref: "main" },
-  { owner: "twentyhq", repo: "twenty", ref: "main" },
-  { owner: "badlogic", repo: "pi-mono", ref: "main" },
-  { owner: "openclaw", repo: "openclaw", ref: "main" },
-  { owner: "oven-sh", repo: "bun", ref: "main" },
-  { owner: "vercel-labs", repo: "just-bash", ref: "main" },
-  { owner: "Effect-TS", repo: "effect", ref: "main" },
-  { owner: "rocicorp", repo: "mono", ref: "main" },
-  { owner: "zml", repo: "zml", ref: "main" },
-  { owner: "anomalyco", repo: "opencode", ref: "dev" },
-  { owner: "durable-streams", repo: "durable-streams", ref: "main" },
-  { owner: "rivet-dev", repo: "rivet", ref: "main" },
-  { owner: "better-auth", repo: "better-auth", ref: "main" },
-  { owner: "RhysSullivan", repo: "executor", ref: "main" },
-]
+import { SUGGESTED_REPOS } from "@/repo/suggested-repos"
 
 function useSuggestedRepos(count: number) {
   return React.useMemo(() => {
@@ -105,7 +82,10 @@ export function LandingPage() {
                 <Icons.clock className="size-3" />
                 Recent
               </TabsTrigger>
-              <TabsTrigger value="suggested">Suggested</TabsTrigger>
+              <TabsTrigger value="suggested">
+                <Icons.sparkles className="size-3" />
+                Suggested
+              </TabsTrigger>
             </TabsList>
           </div>
 

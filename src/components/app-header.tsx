@@ -195,6 +195,7 @@ export function AppHeader() {
                 void navigate({
                   to: "/",
                   search: {
+                    ...search,
                     settings: "providers",
                     sidebar,
                   },

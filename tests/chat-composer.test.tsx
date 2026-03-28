@@ -36,6 +36,34 @@ describe("ChatComposer", () => {
     })
   })
 
+  it("disables input and submit when composerDisabled", () => {
+    const onSend = vi.fn()
+
+    renderWithProviders(
+      <ChatComposer
+        composerDisabled
+        isStreaming={false}
+        model="gpt-5.1-codex-mini"
+        onAbort={() => {}}
+        onSelectModel={() => {}}
+        onSend={onSend}
+        onThinkingLevelChange={() => {}}
+        providerGroup="openai-codex"
+        thinkingLevel="medium"
+      />
+    )
+
+    const input = screen.getByPlaceholderText(
+      "Select a repository to get started"
+    ) as HTMLTextAreaElement
+    expect(input.disabled).toBe(true)
+
+    fireEvent.input(input, { target: { value: "hello" } })
+    fireEvent.submit(input.closest("form") as HTMLFormElement)
+
+    expect(onSend).not.toHaveBeenCalled()
+  })
+
   it("does not send when empty", () => {
     const onSend = vi.fn()
 
