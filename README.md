@@ -11,7 +11,7 @@ You can also replace hub with inspect in any GitHub URL to access the correspond
 ## How it works
 
 - **Research agent** — Pick a repository, chat in natural language; answers are grounded in the code.
-- **Stack** — [pi-mono](https://github.com/badlogic/pi-mono), read-only shell via [just-bash](https://github.com/vercel-labs/just-bash), virtual FS from the GitHub API ([just-github](https://github.com/jeremyosih/gitoverflow/tree/main/just-github) in this repo) — not your machine, not a checkout.
+- **Stack** — [pi-mono](https://github.com/badlogic/pi-mono), read-only shell via [just-bash](https://github.com/vercel-labs/just-bash), virtual FS from the GitHub API ([just-github](https://github.com/ThallesP/just-github)).
 - **Private by design** — Sessions, settings, provider keys, and usage stay on device ([Dexie](https://github.com/dexie/Dexie.js) / IndexedDB); chat is client-side, no backend for your data.
 - **Local first** — Agent in a SharedWorker; durable state in IndexedDB.
 - **Lazy loading** — Nothing fetched at construction; everything on demand.
@@ -19,7 +19,7 @@ You can also replace hub with inspect in any GitHub URL to access the correspond
 - **Content cache** — File contents by blob SHA (content-addressable, never stale).
 - **Smart API selection** — Contents API for small files; raw endpoint for large files (>1 MB).
 
-Inspired by [Sitegeist](https://sitegeist.ai) (browser-first, you stay in control) & [just-github](https://github.com/ThallesP/just-github).
+Inspired by [Sitegeist](https://sitegeist.ai) (browser-first, you stay in control) & [btca](https://github.com/davis7dotsh/better-context). (Asking Question to codebases)
 
 ## Rate limits
 
