@@ -69,18 +69,18 @@ function buildRateLimitMessage(
   const retryLabel = formatRetryTime(retryAtMs)
 
   if (kind === "primary" && retryLabel) {
-    return `GitHub API rate limit exceeded until ${retryLabel}. Add a token to raise the limit.`
+    return `GitHub API rate limit exceeded until ${retryLabel}. Sign in with GitHub to raise the limit.`
   }
 
   if (kind === "secondary" && retryLabel) {
-    return `GitHub API secondary rate limit exceeded until ${retryLabel}. Add a token or wait before retrying.`
+    return `GitHub API secondary rate limit exceeded until ${retryLabel}. Wait before retrying.`
   }
 
   if (retryLabel) {
-    return `GitHub API rate limit exceeded until ${retryLabel}. Add a token or wait before retrying.`
+    return `GitHub API rate limit exceeded until ${retryLabel}. Wait before retrying.`
   }
 
-  return "GitHub API rate limit exceeded. Add a token or wait before retrying."
+  return "GitHub API rate limit exceeded. Wait before retrying."
 }
 
 function shouldSuppressToast(signature: string): boolean {
@@ -246,10 +246,10 @@ function showClassifiedGithubToast(
         : undefined
 
     showGithubActionToast({
-      actionLabel: "Add token",
+      actionLabel: "GitHub settings",
       message: retryAt
-        ? `GitHub requests are rate limited until ${retryAt}. Add a token to raise the limit.`
-        : "GitHub requests are rate limited right now. Add a token to raise the limit.",
+        ? `GitHub requests are rate limited until ${retryAt}.`
+        : "GitHub requests are rate limited right now.",
       signature,
     })
     return

@@ -63,7 +63,7 @@ export function createRepoRuntime(
       return cwd
     },
     getWarnings() {
-      return fs.warnings.map((warning) => warning.message)
+      return []
     },
     refresh() {
       fs.refresh()

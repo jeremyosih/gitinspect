@@ -1,39 +1,36 @@
 import * as React from "react"
-import { ArrowUpRight } from "lucide-react"
 import {
-  GITHUB_CREATE_PAT_URL,
+  getGithubLogin,
   getGithubPersonalAccessToken,
-  setGithubPersonalAccessToken,
-  validateGithubPersonalAccessToken,
+  loginWithGitHub,
+  logoutGitHub,
 } from "@/repo/github-token"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { cn } from "@/lib/utils"
 
 export function GithubTokenSettings(props: {
   disabled?: boolean
   onTokenSaved?: () => void | Promise<void>
 }) {
-  const [token, setToken] = React.useState("")
-  const [hasSavedToken, setHasSavedToken] = React.useState(false)
+  const [login, setLogin] = React.useState<string | undefined>()
+  const [isConnected, setIsConnected] = React.useState(false)
   const [isLoading, setIsLoading] = React.useState(true)
-  const [isSaving, setIsSaving] = React.useState(false)
+  const [isBusy, setIsBusy] = React.useState(false)
 
   React.useEffect(() => {
     let disposed = false
 
     void (async () => {
-      const stored = await getGithubPersonalAccessToken()
+      const [token, storedLogin] = await Promise.all([
+        getGithubPersonalAccessToken(),
+        getGithubLogin(),
+      ])
 
-      if (disposed) {
-        return
-      }
+      if (disposed) return
 
-      const present = Boolean(stored?.trim())
-      setToken(stored ?? "")
-      setHasSavedToken(present)
+      const connected = Boolean(token?.trim())
+      setIsConnected(connected)
+      setLogin(storedLogin)
       setIsLoading(false)
     })()
 
@@ -46,116 +43,60 @@ export function GithubTokenSettings(props: {
     <div className="space-y-4">
       <div className="rounded-none border border-foreground/10 p-4">
         <p className="text-xs text-muted-foreground">
-          Unauthenticated requests are limited to 60/hour. Adding a token bumps
-          the limit to 5,000/hour.
+          Authenticated requests get 5,000/hour. Sign in with GitHub to
+          continue.
         </p>
-
-        <p className="mt-2 text-xs text-muted-foreground">
-          Fine-grained token, read-only repository access. We verify it with
-          GitHub before saving. Repo scope follows URLs like{" "}
-          <span className="font-mono text-[11px]">/owner/repo</span>.
-        </p>
-
-        {!isLoading && !hasSavedToken ? (
-          <Button
-            className="mt-4 h-8 w-full gap-1 text-xs sm:w-auto"
-            disabled={props.disabled || isSaving}
-            onClick={() => {
-              window.open(
-                GITHUB_CREATE_PAT_URL,
-                "_blank",
-                "noopener,noreferrer"
-              )
-            }}
-            size="sm"
-            type="button"
-            variant="outline"
-          >
-            Generate GitHub Token
-            <ArrowUpRight className="size-3.5 opacity-70" />
-          </Button>
-        ) : null}
-
-        <div
-          className={cn(
-            "space-y-2",
-            !isLoading && !hasSavedToken ? "mt-3" : "mt-4"
-          )}
-        >
-          <Label htmlFor="github-pat">Access token</Label>
-          <Input
-            autoComplete="off"
-            disabled={props.disabled || isLoading || isSaving}
-            id="github-pat"
-            onChange={(event) => setToken(event.target.value)}
-            placeholder="github_pat_…"
-            type="password"
-            value={token}
-          />
-          <p className="text-xs text-muted-foreground">
-            Stored only in this browser.
-          </p>
-        </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          <Button
-            disabled={props.disabled || isLoading || isSaving}
-            onClick={async () => {
-              const next = token.trim()
-              setIsSaving(true)
-              try {
-                if (!next) {
-                  setToken("")
-                  await setGithubPersonalAccessToken(undefined)
-                  setHasSavedToken(false)
-                  toast.success("GitHub token cleared")
-                  await props.onTokenSaved?.()
-                  return
-                }
-
-                const result = await validateGithubPersonalAccessToken(next)
-                if (!result.ok) {
-                  toast.error(result.message)
-                  return
-                }
-
-                await setGithubPersonalAccessToken(next)
-                setHasSavedToken(true)
-                toast.success(`GitHub connected as @${result.login}`)
-                await props.onTokenSaved?.()
-              } catch {
-                toast.error("Could not save GitHub token")
-              } finally {
-                setIsSaving(false)
-              }
-            }}
-            size="sm"
-          >
-            Save token
-          </Button>
-          {!isLoading && hasSavedToken ? (
+          {isLoading ? null : isConnected ? (
+            <>
+              <p className="text-sm text-foreground">
+                Connected{login ? ` as @${login}` : ""}
+              </p>
+              <Button
+                disabled={props.disabled || isBusy}
+                onClick={async () => {
+                  setIsBusy(true)
+                  try {
+                    await logoutGitHub()
+                    setIsConnected(false)
+                    setLogin(undefined)
+                    toast.success("GitHub disconnected")
+                    await props.onTokenSaved?.()
+                  } catch {
+                    toast.error("Could not disconnect")
+                  } finally {
+                    setIsBusy(false)
+                  }
+                }}
+                size="sm"
+                variant="ghost"
+              >
+                Disconnect
+              </Button>
+            </>
+          ) : (
             <Button
-              disabled={props.disabled || isSaving}
+              disabled={props.disabled || isBusy}
               onClick={async () => {
-                setIsSaving(true)
+                setIsBusy(true)
                 try {
-                  setToken("")
-                  await setGithubPersonalAccessToken(undefined)
-                  setHasSavedToken(false)
-                  toast.success("GitHub token deleted")
+                  const name = await loginWithGitHub()
+                  setIsConnected(true)
+                  setLogin(name)
+                  toast.success(`GitHub connected as @${name}`)
                   await props.onTokenSaved?.()
                 } catch {
-                  toast.error("Could not delete GitHub token")
+                  toast.error("Sign-in did not complete")
                 } finally {
-                  setIsSaving(false)
+                  setIsBusy(false)
                 }
               }}
               size="sm"
-              variant="ghost"
             >
-              Delete Token
+              Sign in with GitHub
             </Button>
-          ) : null}
+          )}
         </div>
       </div>
     </div>
