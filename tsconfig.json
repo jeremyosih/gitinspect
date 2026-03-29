@@ -1,6 +1,5 @@
 {
   "include": [
-    "just-github/**/*.ts",
     "src/**/*.ts",
     "src/**/*.d.ts",
     "src/**/*.tsx",
@@ -35,8 +34,7 @@
     "allowJs": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"],
-      "@/just-github/*": ["./just-github/*"]
+      "@/*": ["./src/*"]
     }
   }
 }

@@ -2,7 +2,7 @@ import { toast } from "sonner"
 import {
   GitHubRateLimitController,
   type GitHubRateLimitKind,
-} from "../../just-github/src/github-rate-limit"
+} from "just-github"
 import { classifyRuntimeError } from "@/agent/runtime-errors"
 import { getGithubPersonalAccessToken } from "@/repo/github-token"
 import { appendSessionNotice } from "@/sessions/session-notices"

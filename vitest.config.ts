@@ -7,7 +7,6 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
-      "@/just-github": fileURLToPath(new URL("./just-github", import.meta.url)),
     },
   },
   test: {
@@ -16,7 +15,6 @@ export default defineConfig({
     include: [
       "tests/**/*.test.ts",
       "tests/**/*.test.tsx",
-      "just-github/tests/**/*.test.ts",
     ],
     setupFiles: ["./tests/setup.ts"],
   },
