@@ -1,4 +1,4 @@
-import { useNavigate, useSearch } from "@tanstack/react-router"
+import { Link } from "@tanstack/react-router"
 import { AlertCircle, AlertTriangle, Info } from "lucide-react"
 import {
   deriveAssistantView,
@@ -32,7 +32,6 @@ import {
 } from "@/components/ai-elements/sources"
 import { ToolExecution } from "@/components/tool-execution"
 import { ToolResultBubble } from "@/components/tool-result-bubble"
-import { useCurrentRouteTarget } from "@/hooks/use-current-route-target"
 import {
   Item,
   ItemActions,
@@ -48,14 +47,6 @@ export function ChatMessage(props: {
   isStreamingReasoning: boolean
   message: ChatMessageType
 }) {
-  const navigate = useNavigate()
-  const search = useSearch({ strict: false })
-  const currentRouteTarget = useCurrentRouteTarget()
-  const sidebar = search.sidebar === "open" ? "open" : undefined
-  const initialQuery =
-    typeof search.initialQuery === "string" ? search.initialQuery : undefined
-  const sessionId =
-    typeof search.session === "string" ? search.session : undefined
   const { message } = props
 
   if (message.role === "user") {
@@ -109,37 +100,18 @@ export function ChatMessage(props: {
           </ItemContent>
           {showGithubCta ? (
             <ItemActions className="shrink-0">
-              <Button
-                onClick={() => {
-                  if (currentRouteTarget.to === "/") {
-                    void navigate({
-                      to: "/",
-                      search: {
-                        ...search,
-                        settings: "github",
-                        sidebar,
-                      },
-                    })
-                    return
-                  }
-
-                  void navigate({
-                    ...currentRouteTarget,
-                    search: {
-                      initialQuery,
-                      session: sessionId,
-                      settings: "github",
-                      sidebar,
-                    },
-                  })
-                }}
-                size="sm"
-                type="button"
-                variant="outline"
-              >
-                {message.kind === "github_rate_limit"
-                  ? "Add GitHub token"
-                  : "GitHub settings"}
+              <Button asChild size="sm" variant="outline">
+                <Link
+                  search={(prev) => ({
+                    ...prev,
+                    settings: "github",
+                  })}
+                  to="."
+                >
+                  {message.kind === "github_rate_limit"
+                    ? "Add GitHub token"
+                    : "GitHub settings"}
+                </Link>
               </Button>
             </ItemActions>
           ) : null}

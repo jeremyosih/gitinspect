@@ -35,7 +35,7 @@ function getStableMessageId(message: Message, index: number): string {
   }
 }
 
-export function normalizeMessage(message: Message, index: number): ChatMessage {
+function normalizeMessage(message: Message, index: number): ChatMessage {
   const id = getStableMessageId(message, index)
 
   switch (message.role) {
@@ -97,7 +97,7 @@ export function toMessageRow(
   }
 }
 
-export function toChatMessage(message: MessageRow): ChatMessage {
+function toChatMessage(message: MessageRow): ChatMessage {
   const { sessionId: _sessionId, status: _status, ...chatMessage } = message
   return chatMessage as ChatMessage
 }

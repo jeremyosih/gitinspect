@@ -11,8 +11,9 @@ import {
   getModel,
   getModelsForGroup,
   getProviderGroups,
-  isFreeModel,
 } from "@/models/catalog"
+import { FIREWORKS_KIMI_K25_TURBO_ID } from "@/models/builtin-models"
+import type { ProviderGroupId } from "@/types/models"
 
 describe("model catalog", () => {
   it("does not treat a non-OAuth openai-codex key as connected", () => {
@@ -39,8 +40,14 @@ describe("model catalog", () => {
     expect(connected).toContain("openai-codex")
   })
 
-  it("sorts models by id descending (newer ids first)", () => {
-    const models = getModelsForGroup("openai")
+  it("limits OpenAI groups to GPT-5.4 / Mini / Nano in that order", () => {
+    const expected = ["gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano"]
+    expect(getModelsForGroup("openai").map((m) => m.id)).toEqual(expected)
+    expect(getModelsForGroup("openai-codex").map((m) => m.id)).toEqual(expected)
+  })
+
+  it("sorts non-OpenAI models by id descending (newer ids first)", () => {
+    const models = getModelsForGroup("anthropic")
     const ids = models.map((model) => model.id)
     const sorted = [...ids].sort((left, right) =>
       right.localeCompare(left, undefined, { numeric: true, sensitivity: "base" })
@@ -58,30 +65,29 @@ describe("model catalog", () => {
     expect(getModel("github-copilot", "missing-model").id).toBe("gpt-4o")
   })
 
-  it("exposes the OpenCode provider groups and canonicalizes the free group", () => {
+  it("exposes the Fireworks free group and canonicalizes to fireworks-ai", () => {
     expect(getProviderGroups()).toEqual(
-      expect.arrayContaining(["opencode", "opencode-free"])
+      expect.arrayContaining(["opencode", "fireworks-free"])
     )
-    expect(getCanonicalProvider("opencode-free")).toBe("opencode")
+    expect(getCanonicalProvider("fireworks-free")).toBe("fireworks-ai")
   })
 
-  it("filters the OpenCode free group to free-tier models only", () => {
-    const freeModels = getModelsForGroup("opencode-free")
-    const freeModelIds = freeModels.map((model) => model.id)
-
-    expect(freeModels.length).toBeGreaterThan(0)
-    expect(freeModels.every((model) => isFreeModel(model))).toBe(true)
-    expect(freeModelIds).toEqual(
-      expect.arrayContaining([
-        "mimo-v2-omni-free",
-        "mimo-v2-pro-free",
-        "minimax-m2.5-free",
-        "nemotron-3-super-free",
-      ])
+  it("exposes the Fireworks free tier builtin model", () => {
+    const freeModels = getModelsForGroup("fireworks-free")
+    expect(freeModels.map((m) => m.id)).toEqual([FIREWORKS_KIMI_K25_TURBO_ID])
+    expect(getDefaultModelForGroup("fireworks-free").id).toBe(
+      FIREWORKS_KIMI_K25_TURBO_ID
     )
-    expect(freeModelIds).not.toContain("gpt-5-nano")
-    expect(freeModelIds).not.toContain("big-pickle")
-    expect(getDefaultModelForGroup("opencode-free").id).toBe("mimo-v2-omni-free")
+    expect(getDefaultModel("fireworks-ai").id).toBe(FIREWORKS_KIMI_K25_TURBO_ID)
+  })
+
+  it("maps legacy opencode-free persisted group id to Fireworks models", () => {
+    expect(
+      getDefaultModelForGroup("opencode-free" as ProviderGroupId).id
+    ).toBe(FIREWORKS_KIMI_K25_TURBO_ID)
+    expect(getCanonicalProvider("opencode-free" as ProviderGroupId)).toBe(
+      "fireworks-ai"
+    )
   })
 
   it("calculates per-message cost from usage totals", () => {

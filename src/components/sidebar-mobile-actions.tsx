@@ -1,6 +1,6 @@
 "use client"
 
-import { useNavigate, useSearch } from "@tanstack/react-router"
+import { Link } from "@tanstack/react-router"
 import { useTheme } from "next-themes"
 import { Icons } from "@/components/icons"
 import {
@@ -9,46 +9,12 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useCurrentRouteTarget } from "@/hooks/use-current-route-target"
 import { GITHUB_APP_REPO, useGitHubRepoStargazers } from "@/hooks/use-github-repo-stargazers"
 import { formatGitHubStarCount } from "@/lib/format-github-stars"
 
 /** Mobile sidebar only: links and actions that are hidden from the header on small screens. Renders under the Home link. */
 export function SidebarMobileActions() {
-  const navigate = useNavigate()
-  const search = useSearch({ strict: false })
-  const currentRouteTarget = useCurrentRouteTarget()
   const { setTheme, theme } = useTheme()
-
-  const sidebar = search.sidebar === "open" ? "open" : undefined
-  const initialQuery =
-    typeof search.initialQuery === "string" ? search.initialQuery : undefined
-  const sessionId =
-    typeof search.session === "string" ? search.session : undefined
-
-  const openSettings = () => {
-    if (currentRouteTarget.to === "/") {
-      void navigate({
-        to: "/",
-        search: {
-          ...search,
-          settings: "providers",
-          sidebar,
-        },
-      })
-      return
-    }
-
-    void navigate({
-      ...currentRouteTarget,
-      search: {
-        initialQuery,
-        session: sessionId,
-        settings: "providers",
-        sidebar,
-      },
-    })
-  }
 
   return (
     <div className="md:hidden">
@@ -79,9 +45,17 @@ export function SidebarMobileActions() {
           </SidebarMenuButton>
         </SidebarMenuItem>
         <SidebarMenuItem>
-          <SidebarMenuButton className="h-9" onClick={openSettings}>
-            <Icons.cog className="text-sidebar-foreground" />
-            <span>Settings</span>
+          <SidebarMenuButton asChild className="h-9">
+            <Link
+              search={(prev) => ({
+                ...prev,
+                settings: "providers",
+              })}
+              to="."
+            >
+              <Icons.cog className="text-sidebar-foreground" />
+              <span>Settings</span>
+            </Link>
           </SidebarMenuButton>
         </SidebarMenuItem>
       </SidebarMenu>

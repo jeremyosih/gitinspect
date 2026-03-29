@@ -1,6 +1,6 @@
 import { defineHandler } from "nitro"
 
-const ALLOWED_HOSTS = new Set(["opencode.ai"])
+const ALLOWED_HOSTS = new Set(["api.fireworks.ai"])
 
 export default defineHandler(async (event) => {
   const targetUrl = event.url.searchParams.get("url")
@@ -23,7 +23,7 @@ export default defineHandler(async (event) => {
     return { error: `Host not allowed: ${target.host}` }
   }
 
-  const apiKey = process.env.OPENCODE_FREE_API_KEY
+  const apiKey = process.env.FIREWORKS_API_KEY
   if (!apiKey) {
     event.res.status = 503
     return { error: "Server proxy is not configured" }
@@ -51,15 +51,22 @@ export default defineHandler(async (event) => {
     }
   }
 
-  const body = event.req.method !== "GET" && event.req.method !== "HEAD"
-    ? await event.req.text()
-    : undefined
+  let body: string | undefined
+  if (event.req.method !== "GET" && event.req.method !== "HEAD") {
+    body = await event.req.text()
+  }
 
-  const response = await fetch(target.toString(), {
-    method: event.req.method,
-    headers: forwardHeaders,
-    body,
-  })
+  let response: Response
+
+  try {
+    response = await fetch(target.toString(), {
+      method: event.req.method,
+      headers: forwardHeaders,
+      body,
+    })
+  } catch {
+    throw
+  }
 
   event.res.headers.set(
     "content-type",
@@ -73,5 +80,17 @@ export default defineHandler(async (event) => {
     return ""
   }
 
-  return response
+  const headers = new Headers(response.headers)
+  headers.set(
+    "content-type",
+    response.headers.get("content-type") ?? "application/json",
+  )
+  headers.set("cache-control", "no-cache")
+  headers.set("access-control-allow-origin", "*")
+
+  return new Response(response.body, {
+    headers,
+    status: response.status,
+    statusText: response.statusText,
+  })
 })

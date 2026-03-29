@@ -1,4 +1,6 @@
+import type { MouseEvent } from "react"
 import { useMemo } from "react"
+import { Link } from "@tanstack/react-router"
 import { subDays, startOfDay } from "date-fns"
 import type { SessionData } from "@/types/storage"
 import { Icons } from "@/components/icons"
@@ -25,6 +27,30 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar"
 import { Trash2, X } from "lucide-react"
+import type { SettingsSection } from "@/navigation/search-state"
+
+type SessionRouteSearch = {
+  q: string | undefined
+  settings: SettingsSection | undefined
+  sidebar: string | undefined
+}
+
+type SessionLinkTarget =
+  | {
+      search: {
+        q: string | undefined
+        settings: SettingsSection | undefined
+        sidebar: string | undefined
+      }
+      to: "/chat"
+    }
+  | {
+      params: {
+        sessionId: string
+      }
+      search: SessionRouteSearch
+      to: "/chat/$sessionId"
+    }
 
 type CategorizedSessions = {
   last30Days: SessionData[]
@@ -84,8 +110,13 @@ function getCategorizedSessions(
 
 function renderSessions(props: {
   activeSessionId: string
+  getSessionTarget: (session: SessionData) => SessionLinkTarget
+  lockedSessionIds: string[]
   onDeleteSession: (sessionId: string) => void
-  onSelectSession: (sessionId: string) => void
+  onSelectSession: (
+    event: MouseEvent<HTMLAnchorElement>,
+    sessionId: string
+  ) => void
   runningSessionIds: string[]
   sessions: SessionData[]
 }) {
@@ -93,19 +124,26 @@ function renderSessions(props: {
     <SidebarMenu>
       {props.sessions.map((session) => {
         const isRunning = props.runningSessionIds.includes(session.id)
+        const isLocked = props.lockedSessionIds.includes(session.id)
 
         return (
           <SidebarMenuItem key={session.id}>
-            <SidebarMenuButton
-              isActive={session.id === props.activeSessionId}
-              onClick={() => props.onSelectSession(session.id)}
-            >
-              <span className="truncate">{session.title}</span>
-              {isRunning ? (
-                <span className="ml-auto text-[10px] uppercase tracking-[0.14em] text-emerald-600">
-                  Live
-                </span>
-              ) : null}
+            <SidebarMenuButton asChild isActive={session.id === props.activeSessionId}>
+              <Link
+                {...props.getSessionTarget(session)}
+                onClick={(event) => props.onSelectSession(event, session.id)}
+              >
+                <span className="truncate">{session.title}</span>
+                {isLocked ? (
+                  <span className="ml-auto text-[10px] uppercase tracking-[0.14em] text-amber-600">
+                    Locked
+                  </span>
+                ) : isRunning ? (
+                  <span className="ml-auto text-[10px] uppercase tracking-[0.14em] text-emerald-600">
+                    Live
+                  </span>
+                ) : null}
+              </Link>
             </SidebarMenuButton>
             <AlertDialog>
               <AlertDialogTrigger asChild>
@@ -146,9 +184,15 @@ function renderSessions(props: {
 
 export function ChatSessionList(props: {
   activeSessionId: string
-  onCreateSession: () => void
+  createSessionTarget: SessionLinkTarget
+  getSessionTarget: (session: SessionData) => SessionLinkTarget
+  lockedSessionIds: string[]
+  onCreateSession: (event: MouseEvent<HTMLAnchorElement>) => void
   onDeleteSession: (sessionId: string) => void
-  onSelectSession: (sessionId: string) => void
+  onSelectSession: (
+    event: MouseEvent<HTMLAnchorElement>,
+    sessionId: string
+  ) => void
   runningSessionIds: string[]
   sessions: SessionData[]
 }) {
@@ -174,13 +218,11 @@ export function ChatSessionList(props: {
   return (
     <>
       <div className="p-2">
-        <Button
-          className="h-10 w-full rounded-none bg-foreground text-primary-foreground hover:bg-foreground/90"
-          onClick={props.onCreateSession}
-          size="lg"
-        >
-          <Icons.writing />
-          New Chat
+        <Button asChild className="h-10 w-full rounded-none bg-foreground text-primary-foreground hover:bg-foreground/90" size="lg">
+          <Link {...props.createSessionTarget} onClick={props.onCreateSession}>
+            <Icons.writing />
+            New Chat
+          </Link>
         </Button>
       </div>
       <SidebarSeparator className="mx-0" />
@@ -208,6 +250,8 @@ export function ChatSessionList(props: {
               <SidebarGroupLabel>{labels[category]}</SidebarGroupLabel>
               {renderSessions({
                 activeSessionId: props.activeSessionId,
+                getSessionTarget: props.getSessionTarget,
+                lockedSessionIds: props.lockedSessionIds,
                 onDeleteSession: props.onDeleteSession,
                 onSelectSession: props.onSelectSession,
                 runningSessionIds: props.runningSessionIds,

@@ -1,5 +1,5 @@
 import * as React from "react"
-import { useNavigate, useSearch } from "@tanstack/react-router"
+import { Link, useNavigate, useSearch } from "@tanstack/react-router"
 import { useLiveQuery } from "dexie-react-hooks"
 import { ArrowRightIcon } from "@phosphor-icons/react"
 import { listRepositories } from "@/db/schema"
@@ -33,9 +33,10 @@ function useSuggestedRepos(count: number) {
 }
 
 export function LandingPage() {
-  const navigate = useNavigate()
   const search = useSearch({ from: "/" })
   const tab = search.tab
+  const settings = typeof search.settings === "string" ? search.settings : undefined
+  const sidebar = search.sidebar === "open" ? "open" : undefined
   const repositories = useLiveQuery(async () => await listRepositories(), [])
   const recentRepos = React.useMemo(
     () => (repositories ?? []).slice(0, 4),
@@ -63,28 +64,20 @@ export function LandingPage() {
           </p>
         </div>
 
-        <Tabs
-          value={resolvedTab}
-          onValueChange={(value) => {
-            void navigate({
-              to: "/",
-              search: {
-                ...search,
-                tab: value as "recent" | "suggested",
-              },
-              replace: true,
-            })
-          }}
-        >
+        <Tabs value={resolvedTab}>
           <div className="mb-3 flex justify-center">
             <TabsList variant="line">
-              <TabsTrigger disabled={!hasRecent} value="recent">
-                <Icons.clock className="size-3" />
-                Recent
+              <TabsTrigger asChild disabled={!hasRecent} value="recent">
+                <Link replace search={{ settings, sidebar, tab: "recent" }} to="/">
+                  <Icons.clock className="size-3" />
+                  Recent
+                </Link>
               </TabsTrigger>
-              <TabsTrigger value="suggested">
-                <Icons.sparkles className="size-3" />
-                Suggested
+              <TabsTrigger asChild value="suggested">
+                <Link replace search={{ settings, sidebar, tab: "suggested" }} to="/">
+                  <Icons.sparkles className="size-3" />
+                  Suggested
+                </Link>
               </TabsTrigger>
             </TabsList>
           </div>

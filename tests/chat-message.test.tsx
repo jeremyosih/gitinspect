@@ -1,14 +1,16 @@
+import * as React from "react"
 import { describe, expect, it, vi } from "vitest"
 import { render, screen } from "@testing-library/react"
 import type { ChatMessage as ChatMessageType } from "@/types/chat"
 
 vi.mock("@tanstack/react-router", () => ({
-  useNavigate: () => vi.fn(),
-  useSearch: () => ({}),
-}))
-
-vi.mock("@/hooks/use-current-route-target", () => ({
-  useCurrentRouteTarget: () => ({ to: "/chat" }),
+  Link: ({
+    children,
+    search: _search,
+    to: _to,
+    ...props
+  }: React.PropsWithChildren<Record<string, unknown>>) =>
+    React.createElement("a", props, children),
 }))
 
 function buildStreamingAssistant(): ChatMessageType & { status: "streaming" } {

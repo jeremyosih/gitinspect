@@ -36,11 +36,11 @@ vi.mock("@/models/catalog", () => ({
   }),
   getDefaultProviderGroup: (provider: string) => provider,
   getPreferredProviderGroup: () => "openai-codex",
-  getProviderGroups: () => ["opencode-free", "openai-codex"],
-  getVisibleProviderGroups: () => ["opencode-free", "openai-codex"],
+  getProviderGroups: () => ["fireworks-free", "openai-codex"],
+  getVisibleProviderGroups: () => ["fireworks-free", "openai-codex"],
   hasModelForGroup: () => true,
   isProviderGroupId: (value: string) =>
-    value === "opencode-free" || value === "openai-codex",
+    value === "fireworks-free" || value === "openai-codex",
 }))
 
 function buildSession(
@@ -66,10 +66,7 @@ function buildSession(
     ...overrides,
   }
 
-  return {
-    ...session,
-    bootstrapStatus: session.bootstrapStatus ?? "ready",
-  }
+  return session
 }
 
 describe("session-actions", () => {
@@ -83,39 +80,10 @@ describe("session-actions", () => {
     setSetting.mockReset()
   })
 
-  it("builds chat navigation for non-repo sessions", async () => {
-    const { sessionDestination } = await import("@/sessions/session-actions")
+  it("builds canonical session hrefs", async () => {
+    const { buildSessionHref } = await import("@/sessions/session-actions")
 
-    expect(
-      sessionDestination({
-        id: "session-1",
-        repoSource: undefined,
-      })
-    ).toEqual({
-      to: "/chat",
-    })
-  })
-
-  it("builds repo navigation for repo-backed sessions", async () => {
-    const { sessionDestination } = await import("@/sessions/session-actions")
-
-    expect(
-      sessionDestination({
-        id: "session-2",
-        repoSource: {
-          owner: "acme",
-          ref: "main",
-          repo: "demo",
-        },
-      })
-    ).toEqual({
-      params: {
-        _splat: "main",
-        owner: "acme",
-        repo: "demo",
-      },
-      to: "/$owner/$repo/$",
-    })
+    expect(buildSessionHref("session-1")).toBe("/chat/session-1")
   })
 
   it("creates empty chat sessions from provider defaults", async () => {
@@ -132,7 +100,7 @@ describe("session-actions", () => {
       providerGroup: "openai-codex",
       repoSource: undefined,
     })
-    expect(persistSessionSnapshot).toHaveBeenCalledWith(created)
+    expect(persistSessionSnapshot).not.toHaveBeenCalled()
     expect(session.id).toBe("session-new")
   })
 
@@ -164,6 +132,7 @@ describe("session-actions", () => {
         repo: "demo",
       },
     })
+    expect(persistSessionSnapshot).not.toHaveBeenCalled()
     expect(session.repoSource?.ref).toBe("dev")
   })
 
@@ -206,10 +175,7 @@ describe("session-actions", () => {
     expect(releaseSession).toHaveBeenCalledWith("session-current")
     expect(deleteSession).toHaveBeenCalledWith("session-current")
     expect(result).toEqual({
-      nextSession: {
-        id: "session-next",
-        repoSource: undefined,
-      },
+      nextSessionId: "session-next",
     })
   })
 
@@ -224,7 +190,7 @@ describe("session-actions", () => {
     })
 
     expect(result).toEqual({
-      nextSession: undefined,
+      nextSessionId: undefined,
     })
   })
 })

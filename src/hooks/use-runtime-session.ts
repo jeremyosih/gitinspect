@@ -1,6 +1,8 @@
 import * as React from "react"
-import { runtimeClient } from "@/agent/runtime-client"
-import { appendSessionNotice } from "@/sessions/session-notices"
+import {
+  runtimeClient,
+  type InterruptedResumeMode,
+} from "@/agent/runtime-client"
 
 export function useRuntimeSession(sessionId: string | undefined) {
   const runMutation = React.useEffectEvent(
@@ -9,25 +11,13 @@ export function useRuntimeSession(sessionId: string | undefined) {
         return
       }
 
-      try {
-        await action(sessionId)
-      } catch (error) {
-        try {
-          await appendSessionNotice(sessionId, error)
-        } catch (noticeError) {
-          console.error("[gitinspect:runtime] notice_persistence_failed", {
-            error,
-            noticeError,
-            sessionId,
-          })
-        }
-      }
+      await action(sessionId)
     }
   )
 
   const send = React.useEffectEvent(async (content: string) => {
     await runMutation(async (currentSessionId) => {
-      await runtimeClient.send(currentSessionId, content)
+      await runtimeClient.startTurn(currentSessionId, content)
     })
   })
 
@@ -37,6 +27,14 @@ export function useRuntimeSession(sessionId: string | undefined) {
     }
     await runtimeClient.abort(sessionId)
   })
+
+  const resumeInterrupted = React.useEffectEvent(
+    async (mode: InterruptedResumeMode) => {
+      await runMutation(async (currentSessionId) => {
+        await runtimeClient.resumeInterruptedTurn(currentSessionId, mode)
+      })
+    }
+  )
 
   const setModelSelection = React.useEffectEvent(
     async (
@@ -68,6 +66,7 @@ export function useRuntimeSession(sessionId: string | undefined) {
 
   return {
     abort,
+    resumeInterrupted,
     send,
     setModelSelection,
     setThinkingLevel,

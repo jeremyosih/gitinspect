@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { GitHubFsError } from "@/repo/github-fs"
 import {
-  BootstrapFailedRuntimeError,
   BusyRuntimeError,
   MissingSessionRuntimeError,
   StreamInterruptedRuntimeError,
@@ -9,16 +8,6 @@ import {
 import { buildSystemMessage, classifyRuntimeError } from "@/agent/runtime-errors"
 
 describe("classifyRuntimeError", () => {
-  it("detects bootstrap failures", () => {
-    const classified = classifyRuntimeError(
-      new BootstrapFailedRuntimeError("Bootstrap failed")
-    )
-
-    expect(classified.kind).toBe("bootstrap_failed")
-    expect(classified.severity).toBe("error")
-    expect(classified.source).toBe("runtime")
-  })
-
   it("detects busy runtime errors", () => {
     const classified = classifyRuntimeError(new BusyRuntimeError("session-1"))
 
@@ -54,5 +43,13 @@ describe("classifyRuntimeError", () => {
     expect(message.fingerprint).toBe(classified.fingerprint)
     expect(message.role).toBe("system")
     expect(message.kind).toBe(classified.kind)
+  })
+
+  it("detects provider rate limits", () => {
+    const classified = classifyRuntimeError(new Error("429 Too Many Requests"))
+
+    expect(classified.kind).toBe("provider_rate_limit")
+    expect(classified.severity).toBe("error")
+    expect(classified.source).toBe("provider")
   })
 })

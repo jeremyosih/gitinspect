@@ -102,8 +102,13 @@ export function ToolExecution(props: {
   const state = getToolState(props.toolResult)
   const output = props.toolResult ? renderToolResultBody(props.toolResult) : undefined
 
+  // Remount when a result arrives so `defaultOpen` applies. Radix Collapsible only
+  // reads `defaultOpen` on first mount; otherwise the block stays open after stream end.
   return (
-    <Tool defaultOpen={state !== "output-available"}>
+    <Tool
+      key={props.toolResult ? "resolved" : "pending"}
+      defaultOpen={state !== "output-available"}
+    >
       <ToolHeader
         state={state}
         toolName={props.toolCall.name}

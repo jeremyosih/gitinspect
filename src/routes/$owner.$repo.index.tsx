@@ -3,19 +3,14 @@ import type { RepoTarget } from "@/types/storage"
 import { Chat } from "@/components/chat"
 
 type RepoSearch = {
-  initialQuery?: string
-  session?: string
+  q?: string
 }
 
 export const Route = createFileRoute("/$owner/$repo/")({
   validateSearch: (search: RepoSearch) => ({
-    initialQuery:
-      typeof search.initialQuery === "string" && search.initialQuery.trim().length > 0
-        ? search.initialQuery
-        : undefined,
-    session:
-      typeof search.session === "string" && search.session.length > 0
-        ? search.session
+    q:
+      typeof search.q === "string" && search.q.trim().length > 0
+        ? search.q
         : undefined,
   }),
   component: RepoChatRoute,

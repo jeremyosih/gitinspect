@@ -7,6 +7,8 @@ import type {
   ProviderKeyRecord,
   RepositoryRow,
   SessionData,
+  SessionLeaseRow,
+  SessionRuntimeRow,
   SettingsRow,
 } from "@/types/storage"
 import type { JsonValue } from "@/types/common"
@@ -19,6 +21,8 @@ export class AppDb extends Dexie {
   messages!: EntityTable<MessageRow, "id">
   providerKeys!: EntityTable<ProviderKeyRecord, "provider">
   repositories!: Table<RepositoryRow, [string, string, string]>
+  sessionLeases!: EntityTable<SessionLeaseRow, "sessionId">
+  sessionRuntime!: EntityTable<SessionRuntimeRow, "sessionId">
   sessions!: EntityTable<SessionData, "id">
   settings!: EntityTable<SettingsRow, "key">
 
@@ -33,10 +37,23 @@ export class AppDb extends Dexie {
       sessions: "id, updatedAt, createdAt, provider, model, isStreaming",
       settings: "key, updatedAt",
     })
+    this.version(2).stores({
+      daily_costs: "date",
+      messages:
+        "id, sessionId, [sessionId+timestamp], [sessionId+status], timestamp, status",
+      "provider-keys": "provider, updatedAt",
+      repositories: "[owner+repo+ref], lastOpenedAt",
+      session_leases: "sessionId, ownerTabId, heartbeatAt",
+      session_runtime: "sessionId, status, ownerTabId, lastProgressAt, updatedAt",
+      sessions: "id, updatedAt, createdAt, provider, model, isStreaming",
+      settings: "key, updatedAt",
+    })
     this.dailyCosts = this.table("daily_costs")
     this.messages = this.table("messages")
     this.providerKeys = this.table("provider-keys")
     this.repositories = this.table("repositories")
+    this.sessionLeases = this.table("session_leases")
+    this.sessionRuntime = this.table("session_runtime")
     this.sessions = this.table("sessions")
     this.settings = this.table("settings")
   }
@@ -93,6 +110,32 @@ export async function putSessionAndMessages(
   })
 }
 
+export async function replaceSessionMessages(
+  session: SessionData,
+  messages: MessageRow[]
+): Promise<void> {
+  await db.transaction("rw", db.sessions, db.messages, async () => {
+    const existingMessages = await db.messages
+      .where("sessionId")
+      .equals(session.id)
+      .toArray()
+    const nextMessageIds = new Set(messages.map((message) => message.id))
+    const deletedMessageIds = existingMessages
+      .filter((message) => !nextMessageIds.has(message.id))
+      .map((message) => message.id)
+
+    await db.sessions.put(session)
+
+    if (deletedMessageIds.length > 0) {
+      await db.messages.bulkDelete(deletedMessageIds)
+    }
+
+    if (messages.length > 0) {
+      await db.messages.bulkPut(messages)
+    }
+  })
+}
+
 export async function getSession(id: string): Promise<SessionData | undefined> {
   return await db.sessions.get(id)
 }
@@ -133,10 +176,107 @@ export async function deleteMessagesBySession(sessionId: string): Promise<void> 
 }
 
 export async function deleteSession(id: string): Promise<void> {
-  await db.transaction("rw", db.sessions, db.messages, async () => {
+  await db.transaction(
+    "rw",
+    db.sessions,
+    db.messages,
+    db.sessionLeases,
+    db.sessionRuntime,
+    async () => {
     await db.sessions.delete(id)
     await deleteMessagesBySession(id)
-  })
+      await db.sessionLeases.delete(id)
+      await db.sessionRuntime.delete(id)
+    }
+  )
+}
+
+export async function getSessionLease(
+  sessionId: string
+): Promise<SessionLeaseRow | undefined> {
+  return await db.sessionLeases.get(sessionId)
+}
+
+export async function putSessionLease(row: SessionLeaseRow): Promise<void> {
+  await db.sessionLeases.put(row)
+}
+
+export async function deleteSessionLease(sessionId: string): Promise<void> {
+  await db.sessionLeases.delete(sessionId)
+}
+
+export async function listSessionLeases(): Promise<SessionLeaseRow[]> {
+  return await db.sessionLeases.toArray()
+}
+
+export async function getSessionRuntime(
+  sessionId: string
+): Promise<SessionRuntimeRow | undefined> {
+  return await db.sessionRuntime.get(sessionId)
+}
+
+export async function putSessionRuntime(row: SessionRuntimeRow): Promise<void> {
+  await db.sessionRuntime.put(row)
+}
+
+export async function deleteSessionRuntime(sessionId: string): Promise<void> {
+  await db.sessionRuntime.delete(sessionId)
+}
+
+export type ChatDataExportV1 = {
+  exportVersion: 1
+  exportedAt: string
+  sessions: Array<{
+    messages: MessageRow[]
+    session: SessionData
+  }>
+}
+
+export async function exportAllChatData(): Promise<ChatDataExportV1> {
+  const sessions = await listSessions()
+  const sessionsWithMessages = await Promise.all(
+    sessions.map(async (session) => ({
+      messages: await getSessionMessages(session.id),
+      session,
+    }))
+  )
+
+  return {
+    exportVersion: 1,
+    exportedAt: new Date().toISOString(),
+    sessions: sessionsWithMessages,
+  }
+}
+
+/**
+ * Clears every persisted store (sessions, messages, settings, provider keys,
+ * repositories, daily cost aggregates, runtime metadata). Release active
+ * runtime ownership before calling.
+ */
+export async function deleteAllLocalData(): Promise<void> {
+  await db.transaction(
+    "rw",
+    [
+      db.sessions,
+      db.messages,
+      db.settings,
+      db.providerKeys,
+      db.repositories,
+      db.dailyCosts,
+      db.sessionLeases,
+      db.sessionRuntime,
+    ],
+    async () => {
+      await db.sessions.clear()
+      await db.messages.clear()
+      await db.settings.clear()
+      await db.providerKeys.clear()
+      await db.repositories.clear()
+      await db.dailyCosts.clear()
+      await db.sessionLeases.clear()
+      await db.sessionRuntime.clear()
+    }
+  )
 }
 
 export async function setSetting(

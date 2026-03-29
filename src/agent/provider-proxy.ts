@@ -1,6 +1,6 @@
 import { streamSimple } from "@mariozechner/pi-ai"
 import type { Api, Model, SimpleStreamOptions } from "@mariozechner/pi-ai"
-import { isOpencodeFreeMarker } from "@/auth/public-provider-fallbacks"
+import { isFreeTierProxyMarker } from "@/auth/public-provider-fallbacks"
 import { getProxyConfig } from "@/proxy/settings"
 import { buildProxiedUrl } from "@/proxy/url"
 
@@ -8,6 +8,9 @@ export function shouldUseProxyForProvider(
   provider: string,
   apiKey: string
 ): boolean {
+  if (isFreeTierProxyMarker(apiKey)) {
+    return provider.toLowerCase() === "fireworks-ai"
+  }
   switch (provider.toLowerCase()) {
     case "anthropic":
       return apiKey.startsWith("sk-ant-oat") || apiKey.startsWith("{")
@@ -21,7 +24,7 @@ export function shouldUseProxyForProvider(
   }
 }
 
-export function applyProxyIfNeeded<TApi extends Api>(
+function applyProxyIfNeeded<TApi extends Api>(
   model: Model<TApi>,
   apiKey: string,
   proxyUrl?: string
@@ -49,10 +52,10 @@ export function createProxyAwareStreamFn() {
     const apiKey = options?.apiKey
 
     if (!apiKey) {
-      return streamSimple(model, context, options)
+      return await streamSimple(model, context, options)
     }
 
-    const proxyUrl = isOpencodeFreeMarker(apiKey)
+    const proxyUrl = isFreeTierProxyMarker(apiKey)
       ? "/api/proxy"
       : await (async () => {
           const proxy = await getProxyConfig()
@@ -60,13 +63,10 @@ export function createProxyAwareStreamFn() {
         })()
 
     if (!proxyUrl) {
-      return streamSimple(model, context, options)
+      return await streamSimple(model, context, options)
     }
 
-    return streamSimple(
-      applyProxyIfNeeded(model, apiKey, proxyUrl),
-      context,
-      options
-    )
+    const proxiedModel = applyProxyIfNeeded(model, apiKey, proxyUrl)
+    return await streamSimple(proxiedModel, context, options)
   }
 }

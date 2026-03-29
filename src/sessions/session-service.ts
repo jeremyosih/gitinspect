@@ -20,18 +20,7 @@ import {
   type Usage,
 } from "@/types/models"
 import type { ChatMessage } from "@/types/chat"
-import type {
-  MessageRow,
-  RepoSource,
-  SessionData,
-} from "@/types/storage"
-
-export function normalizeBootstrapStatus(session: SessionData): SessionData {
-  return {
-    ...session,
-    bootstrapStatus: session.bootstrapStatus ?? "ready",
-  }
-}
+import type { MessageRow, RepoSource, SessionData } from "@/types/storage"
 
 function mergeUsage(left: Usage, right: Usage): Usage {
   return {
@@ -51,7 +40,8 @@ function mergeUsage(left: Usage, right: Usage): Usage {
 }
 
 function toChatMessage(message: ChatMessage | MessageRow): ChatMessage {
-  const { sessionId: _sessionId, status: _status, ...chatMessage } = message as MessageRow
+  const { sessionId: _sessionId, status: _status, ...chatMessage } =
+    message as MessageRow
   return chatMessage as ChatMessage
 }
 
@@ -68,7 +58,6 @@ export function createSession(params: {
     cost: 0,
     createdAt: now,
     error: undefined,
-    bootstrapStatus: "ready",
     id: createId(),
     isStreaming: false,
     messageCount: 0,
@@ -85,9 +74,7 @@ export function createSession(params: {
 }
 
 export async function persistSession(session: SessionData): Promise<void> {
-  await putSession(
-    normalizeBootstrapStatus(normalizeSessionProviderGroup(session))
-  )
+  await putSession(normalizeSessionProviderGroup(session))
 }
 
 export async function persistSessionSnapshot(
@@ -98,16 +85,12 @@ export async function persistSessionSnapshot(
 
 export async function loadSession(id: string): Promise<SessionData | undefined> {
   const session = await getSession(id)
-  return session
-    ? normalizeBootstrapStatus(normalizeSessionProviderGroup(session))
-    : undefined
+  return session ? normalizeSessionProviderGroup(session) : undefined
 }
 
 export async function loadMostRecentSession(): Promise<SessionData | undefined> {
   const session = await getMostRecentSession()
-  return session
-    ? normalizeBootstrapStatus(normalizeSessionProviderGroup(session))
-    : undefined
+  return session ? normalizeSessionProviderGroup(session) : undefined
 }
 
 export async function loadSessionWithMessages(
@@ -141,12 +124,9 @@ export function buildPersistedSession(
   session: SessionData,
   messages: Array<ChatMessage | MessageRow>
 ): SessionData {
-  const normalizedSession = normalizeBootstrapStatus(session)
+  const normalizedSession = normalizeSessionProviderGroup(session)
   const chatMessages = messages.map(toChatMessage)
   const usage = aggregateSessionUsage(chatMessages)
-  const providerGroup =
-    normalizedSession.providerGroup ??
-    getDefaultProviderGroup(normalizedSession.provider)
 
   return {
     ...normalizedSession,
@@ -155,8 +135,6 @@ export function buildPersistedSession(
     isStreaming: normalizedSession.isStreaming,
     messageCount: chatMessages.length,
     preview: buildPreview(chatMessages),
-    provider: getCanonicalProvider(providerGroup),
-    providerGroup,
     repoSource: normalizeRepoSource(normalizedSession.repoSource),
     title: generateTitle(chatMessages),
     updatedAt: normalizedSession.updatedAt,
@@ -164,7 +142,9 @@ export function buildPersistedSession(
   }
 }
 
-export function shouldSaveSession(messages: Array<ChatMessage | MessageRow>): boolean {
+export function shouldSaveSession(
+  messages: Array<ChatMessage | MessageRow>
+): boolean {
   return hasPersistableExchange(messages.map(toChatMessage))
 }
 

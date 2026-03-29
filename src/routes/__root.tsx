@@ -5,6 +5,7 @@ import {
   Outlet,
   Scripts,
   createRootRoute,
+  retainSearchParams,
   useNavigate,
   useRouterState,
 } from "@tanstack/react-router"
@@ -13,12 +14,11 @@ import { TanStackDevtools } from "@tanstack/react-devtools"
 import appCss from "../styles.css?url"
 import {
   AppSettingsDialog,
-  isSettingsSection,
 } from "@/components/settings-dialog"
 import { AppHeader } from "@/components/app-header"
 import { AppSidebar } from "@/components/app-sidebar"
 import { RootGuard } from "@/components/root-guard"
-import { useCurrentRouteTarget } from "@/hooks/use-current-route-target"
+import { parseSettingsSection } from "@/navigation/search-state"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { Toaster } from "@/components/ui/sonner"
@@ -32,12 +32,12 @@ type RootSearchInput = {
 
 export const Route = createRootRoute({
   validateSearch: (search: RootSearchInput) => ({
-    settings:
-      typeof search.settings === "string" && isSettingsSection(search.settings)
-        ? (search.settings)
-        : undefined,
+    settings: parseSettingsSection(search.settings),
     sidebar: search.sidebar === "open" ? "open" : undefined,
   }),
+  search: {
+    middlewares: [retainSearchParams(["settings", "sidebar"])],
+  },
   head: () => ({
     meta: [
       {
@@ -129,7 +129,6 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 function RootLayout() {
   const navigate = useNavigate()
   const search = Route.useSearch()
-  const currentRouteTarget = useCurrentRouteTarget()
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   })
@@ -141,25 +140,12 @@ function RootLayout() {
   return (
     <SidebarProvider
       onOpenChange={(open) => {
-        if (currentRouteTarget.to === "/") {
-          void navigate({
-            to: "/",
-            search: (prev) => ({
-              ...prev,
-              sidebar: open ? "open" : undefined,
-            }),
-          })
-          return
-        }
-
         void navigate({
-          ...currentRouteTarget,
           search: (prev) => ({
-            initialQuery: prev.initialQuery,
-            session: prev.session,
-            settings: prev.settings,
+            ...prev,
             sidebar: open ? "open" : undefined,
           }),
+          to: ".",
         })
       }}
       open={search.sidebar === "open"}
@@ -189,6 +175,7 @@ function NotFoundPage() {
       <Link
         className="text-xs underline underline-offset-4 hover:text-foreground"
         search={{
+          tab: undefined,
           settings: undefined,
           sidebar: undefined,
         }}

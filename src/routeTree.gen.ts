@@ -11,6 +11,8 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ChatRouteImport } from './routes/chat'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ChatIndexRouteImport } from './routes/chat.index'
+import { Route as ChatSessionIdRouteImport } from './routes/chat.$sessionId'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as OwnerRepoIndexRouteImport } from './routes/$owner.$repo.index'
 import { Route as OwnerRepoSplatRouteImport } from './routes/$owner.$repo.$'
@@ -24,6 +26,16 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const ChatIndexRoute = ChatIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ChatRoute,
+} as any)
+const ChatSessionIdRoute = ChatSessionIdRouteImport.update({
+  id: '/$sessionId',
+  path: '/$sessionId',
+  getParentRoute: () => ChatRoute,
 } as any)
 const AuthCallbackRoute = AuthCallbackRouteImport.update({
   id: '/auth/callback',
@@ -43,23 +55,28 @@ const OwnerRepoSplatRoute = OwnerRepoSplatRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/chat': typeof ChatRoute
+  '/chat': typeof ChatRouteWithChildren
   '/auth/callback': typeof AuthCallbackRoute
+  '/chat/$sessionId': typeof ChatSessionIdRoute
+  '/chat/': typeof ChatIndexRoute
   '/$owner/$repo/$': typeof OwnerRepoSplatRoute
   '/$owner/$repo/': typeof OwnerRepoIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/chat': typeof ChatRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/chat/$sessionId': typeof ChatSessionIdRoute
+  '/chat': typeof ChatIndexRoute
   '/$owner/$repo/$': typeof OwnerRepoSplatRoute
   '/$owner/$repo': typeof OwnerRepoIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/chat': typeof ChatRoute
+  '/chat': typeof ChatRouteWithChildren
   '/auth/callback': typeof AuthCallbackRoute
+  '/chat/$sessionId': typeof ChatSessionIdRoute
+  '/chat/': typeof ChatIndexRoute
   '/$owner/$repo/$': typeof OwnerRepoSplatRoute
   '/$owner/$repo/': typeof OwnerRepoIndexRoute
 }
@@ -69,22 +86,32 @@ export interface FileRouteTypes {
     | '/'
     | '/chat'
     | '/auth/callback'
+    | '/chat/$sessionId'
+    | '/chat/'
     | '/$owner/$repo/$'
     | '/$owner/$repo/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/chat' | '/auth/callback' | '/$owner/$repo/$' | '/$owner/$repo'
+  to:
+    | '/'
+    | '/auth/callback'
+    | '/chat/$sessionId'
+    | '/chat'
+    | '/$owner/$repo/$'
+    | '/$owner/$repo'
   id:
     | '__root__'
     | '/'
     | '/chat'
     | '/auth/callback'
+    | '/chat/$sessionId'
+    | '/chat/'
     | '/$owner/$repo/$'
     | '/$owner/$repo/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  ChatRoute: typeof ChatRoute
+  ChatRoute: typeof ChatRouteWithChildren
   AuthCallbackRoute: typeof AuthCallbackRoute
   OwnerRepoSplatRoute: typeof OwnerRepoSplatRoute
   OwnerRepoIndexRoute: typeof OwnerRepoIndexRoute
@@ -105,6 +132,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/chat/': {
+      id: '/chat/'
+      path: '/'
+      fullPath: '/chat/'
+      preLoaderRoute: typeof ChatIndexRouteImport
+      parentRoute: typeof ChatRoute
+    }
+    '/chat/$sessionId': {
+      id: '/chat/$sessionId'
+      path: '/$sessionId'
+      fullPath: '/chat/$sessionId'
+      preLoaderRoute: typeof ChatSessionIdRouteImport
+      parentRoute: typeof ChatRoute
     }
     '/auth/callback': {
       id: '/auth/callback'
@@ -130,9 +171,21 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface ChatRouteChildren {
+  ChatSessionIdRoute: typeof ChatSessionIdRoute
+  ChatIndexRoute: typeof ChatIndexRoute
+}
+
+const ChatRouteChildren: ChatRouteChildren = {
+  ChatSessionIdRoute: ChatSessionIdRoute,
+  ChatIndexRoute: ChatIndexRoute,
+}
+
+const ChatRouteWithChildren = ChatRoute._addFileChildren(ChatRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  ChatRoute: ChatRoute,
+  ChatRoute: ChatRouteWithChildren,
   AuthCallbackRoute: AuthCallbackRoute,
   OwnerRepoSplatRoute: OwnerRepoSplatRoute,
   OwnerRepoIndexRoute: OwnerRepoIndexRoute,

@@ -62,13 +62,14 @@ export function getApiKeyProvidersForSettings(): KnownProvider[] {
 
 /**
  * Providers that participate in model selection / runtime (union of API-key list and
- * subscription-only backends).
+ * subscription-only backends), plus app builtins (e.g. Fireworks free tier).
  */
-export function getRuntimeSupportedProviders(): KnownProvider[] {
+export function getRuntimeSupportedProviders(): ProviderId[] {
   const apiKeys = getApiKeyProvidersForSettings()
-  const merged = new Set<KnownProvider>([
+  const merged = new Set<ProviderId>([
     ...apiKeys,
     ...SUBSCRIPTION_OAUTH_PROVIDER_ORDER,
+    "fireworks-ai",
   ])
   return [...merged].sort((a, b) => a.localeCompare(b))
 }
@@ -113,11 +114,11 @@ export const PROVIDER_GROUPS: Partial<
     id: "opencode-go",
     label: "OpenCode Go",
   },
-  "opencode-free": {
-    canonicalProvider: "opencode",
-    description: "OpenCode free-tier models only",
-    id: "opencode-free",
-    label: "OpenCode Free",
+  "fireworks-free": {
+    canonicalProvider: "fireworks-ai",
+    description: "Fireworks serverless Kimi (hosted API access)",
+    id: "fireworks-free",
+    label: "Fireworks",
   },
   "openai-codex": {
     canonicalProvider: "openai-codex",
@@ -136,7 +137,7 @@ const PROVIDER_GROUP_BASE_ORDER: readonly ProviderGroupId[] = [
   "openai-codex",
   "opencode",
   "opencode-go",
-  "opencode-free",
+  "fireworks-free",
 ] as const
 
 function prettyProviderLabel(provider: string): string {
@@ -148,13 +149,12 @@ function prettyProviderLabel(provider: string): string {
 
 export function getAtlasProviderGroups(): ProviderGroupId[] {
   const supported = new Set(getRuntimeSupportedProviders())
-  const hasOpencode = supported.has("opencode")
   const ordered: ProviderGroupId[] = []
 
   for (const id of PROVIDER_GROUP_BASE_ORDER) {
-    if (id === "opencode-free") {
-      if (hasOpencode) {
-        ordered.push("opencode-free")
+    if (id === "fireworks-free") {
+      if (supported.has("fireworks-ai")) {
+        ordered.push("fireworks-free")
       }
       continue
     }
@@ -163,16 +163,17 @@ export function getAtlasProviderGroups(): ProviderGroupId[] {
     }
   }
 
+  const orderedSet = new Set<string>(ordered)
   const rest = [...supported]
-    .filter((id) => !ordered.includes(id))
+    .filter((id) => !orderedSet.has(id) && id !== "fireworks-ai")
     .sort((a, b) => a.localeCompare(b))
-  ordered.push(...rest)
+  ordered.push(...(rest as ProviderGroupId[]))
 
   return ordered
 }
 
 export function isProviderGroupId(value: string): value is ProviderGroupId {
-  if (value === "opencode-free") {
+  if (value === "fireworks-free") {
     return true
   }
   return (getRegistryProviders() as string[]).includes(value)
@@ -197,13 +198,19 @@ export function getProviderGroupMetadata(
 export function getCanonicalProvider(
   providerGroup: ProviderGroupId
 ): ProviderId {
-  if (providerGroup === "opencode-free") {
-    return "opencode"
+  if (providerGroup === "fireworks-free") {
+    return "fireworks-ai"
+  }
+  if ((providerGroup as string) === "opencode-free") {
+    return "fireworks-ai"
   }
   return getProviderGroupMetadata(providerGroup).canonicalProvider
 }
 
 export function getDefaultProviderGroup(provider: ProviderId): ProviderGroupId {
+  if (provider === "fireworks-ai") {
+    return "fireworks-free"
+  }
   const meta = PROVIDER_GROUPS[provider as ProviderGroupId]
   if (meta) {
     return meta.id

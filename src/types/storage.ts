@@ -21,16 +21,6 @@ export interface RepoTarget {
   token?: string
 }
 
-/**
- * Session bootstrap lifecycle (worker runs `AgentHost` after Dexie has a row).
- *
- * - `bootstrap`: row exists; first prompt not yet durably started (`persistPromptStart` in
- *   `session-persistence.ts` promotes to `ready`).
- * - `ready`: normal chat; also the default when `bootstrapStatus` is missing in older rows.
- * - `failed`: repo resolution or first-send failed; see `session-bootstrap.ts` + notices.
- */
-export type BootstrapStatus = "bootstrap" | "failed" | "ready"
-
 export interface RepositoryRow {
   lastOpenedAt: string
   owner: string
@@ -42,7 +32,6 @@ export interface SessionData {
   cost: number
   createdAt: string
   error?: string
-  bootstrapStatus: BootstrapStatus
   id: string
   isStreaming: boolean
   messageCount: number
@@ -62,6 +51,34 @@ export type MessageStatus = "aborted" | "completed" | "error" | "streaming"
 export type MessageRow = ChatMessage & {
   sessionId: string
   status: MessageStatus
+}
+
+export interface SessionLeaseRow {
+  acquiredAt: string
+  heartbeatAt: string
+  ownerTabId: string
+  ownerToken: string
+  sessionId: string
+}
+
+export type SessionRuntimeStatus =
+  | "aborted"
+  | "completed"
+  | "error"
+  | "idle"
+  | "interrupted"
+  | "streaming"
+
+export interface SessionRuntimeRow {
+  assistantMessageId?: string
+  lastError?: string
+  lastProgressAt?: string
+  ownerTabId?: string
+  sessionId: string
+  startedAt?: string
+  status: SessionRuntimeStatus
+  turnId?: string
+  updatedAt: string
 }
 
 export interface SettingsRow {

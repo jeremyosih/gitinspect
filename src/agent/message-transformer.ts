@@ -5,6 +5,7 @@ import type {
   ToolResultMessage,
 } from "@/types/chat"
 import type { JsonValue } from "@/types/common"
+import type { MessageRow } from "@/types/storage"
 
 function isLlmMessage(message: AgentMessage): message is Message {
   return (
@@ -68,6 +69,50 @@ function isToolResultFor(
   return message.role === "toolResult" && toolCallIds.has(message.toolCallId)
 }
 
+type ReplayMessage = Message | MessageRow
+
+function getAssistantToolCallIds(message: ReplayMessage): Set<string> {
+  if (message.role !== "assistant") {
+    return new Set()
+  }
+
+  return new Set(
+    message.content.flatMap((block) =>
+      block.type === "toolCall" ? [block.id] : []
+    )
+  )
+}
+
+export function pruneOrphanToolResults<TMessage extends ReplayMessage>(
+  messages: readonly TMessage[]
+): TMessage[] {
+  const seenToolCallIds = new Set<string>()
+  const result: TMessage[] = []
+
+  for (const message of messages) {
+    if (message.role === "assistant") {
+      for (const toolCallId of getAssistantToolCallIds(message)) {
+        seenToolCallIds.add(toolCallId)
+      }
+
+      result.push(message)
+      continue
+    }
+
+    if (message.role === "toolResult") {
+      if (seenToolCallIds.has(message.toolCallId)) {
+        result.push(message)
+      }
+
+      continue
+    }
+
+    result.push(message)
+  }
+
+  return result
+}
+
 function reorderMessages(messages: Message[]): Message[] {
   const result: Message[] = []
   let index = 0
@@ -109,11 +154,11 @@ function reorderMessages(messages: Message[]): Message[] {
 }
 
 export function webMessageTransformer(messages: AgentMessage[]): Message[] {
-  return reorderMessages(messages.filter(isLlmMessage))
+  return reorderMessages(pruneOrphanToolResults(messages.filter(isLlmMessage)))
 }
 
 export function toOpenAIResponsesInput(messages: Message[]) {
-  return messages.flatMap((message) => {
+  return pruneOrphanToolResults(messages).flatMap((message) => {
     if (message.role === "assistant") {
       const items: Array<Record<string, JsonValue>> = []
       const text = getMessageText(message)

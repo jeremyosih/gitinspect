@@ -1,18 +1,22 @@
 import * as React from "react"
-import { useNavigate, useSearch } from "@tanstack/react-router"
+import {
+  Link,
+  useNavigate,
+  useRouterState,
+  useSearch,
+} from "@tanstack/react-router"
 import { ArrowUpRight, BadgeCheck } from "lucide-react"
+import type { SettingsSection } from "@/navigation/search-state"
+
 import { runtimeClient } from "@/agent/runtime-client"
 import { Icons } from "@/components/icons"
 import { CostsPanel } from "@/components/costs-panel"
+import { DataSettings } from "@/components/data-settings"
 import { GithubTokenSettings } from "@/components/github-token-settings"
 import { ProviderSettings } from "@/components/provider-settings"
 import { ProxySettings } from "@/components/proxy-settings"
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import {
   Item,
   ItemActions,
@@ -40,15 +44,9 @@ import {
   SidebarMenuItem,
   SidebarProvider,
 } from "@/components/ui/sidebar"
-import { useCurrentRouteTarget } from "@/hooks/use-current-route-target"
+import { isSettingsSection } from "@/navigation/search-state"
 import { useSelectedSessionSummary } from "@/hooks/use-selected-session-summary"
 
-export type SettingsSection =
-  | "providers"
-  | "github"
-  | "costs"
-  | "proxy"
-  | "about"
 type AboutDemoState = "update" | "latest"
 
 const SETTINGS_SECTIONS: Array<{
@@ -82,6 +80,12 @@ const SETTINGS_SECTIONS: Array<{
     label: "Proxy",
   },
   {
+    description: "Export chat or wipe all local app data",
+    icon: Icons.bank,
+    id: "data",
+    label: "Data",
+  },
+  {
     description: "What gitinspect.com is and how it works",
     icon: Icons.faceThinking,
     id: "about",
@@ -92,9 +96,13 @@ const SETTINGS_SECTIONS: Array<{
 export function AppSettingsDialog() {
   const navigate = useNavigate()
   const search = useSearch({ strict: false })
-  const currentRouteTarget = useCurrentRouteTarget()
+  const currentMatch = useRouterState({
+    select: (state) => state.matches[state.matches.length - 1],
+  })
   const sessionId =
-    typeof search.session === "string" ? search.session : undefined
+    currentMatch.routeId === "/chat/$sessionId"
+      ? currentMatch.params.sessionId
+      : undefined
   const session = useSelectedSessionSummary(sessionId)
   const section =
     typeof search.settings === "string" && isSettingsSection(search.settings)
@@ -102,33 +110,17 @@ export function AppSettingsDialog() {
       : "providers"
   const open =
     typeof search.settings === "string" && isSettingsSection(search.settings)
-  const sidebar = search.sidebar === "open" ? "open" : undefined
-  const initialQuery =
-    typeof search.initialQuery === "string" ? search.initialQuery : undefined
   const activeSection =
-    SETTINGS_SECTIONS.find((item) => item.id === section) ?? SETTINGS_SECTIONS[0]
+    SETTINGS_SECTIONS.find((item) => item.id === section) ??
+    SETTINGS_SECTIONS[0]
 
   const navigateWithSettings = (nextSection: SettingsSection | undefined) => {
-    if (currentRouteTarget.to === "/") {
-      void navigate({
-        to: "/",
-        search: {
-          ...search,
-          settings: nextSection,
-          sidebar,
-        },
-      })
-      return
-    }
-
     void navigate({
-      ...currentRouteTarget,
-      search: {
-        initialQuery,
-        session: sessionId,
+      search: (prev) => ({
+        ...prev,
         settings: nextSection,
-        sidebar,
-      },
+      }),
+      to: ".",
     })
   }
 
@@ -141,10 +133,13 @@ export function AppSettingsDialog() {
       }}
       open={open}
     >
-      <DialogContent className="overflow-hidden p-0 md:max-h-[620px] md:max-w-5xl">
+      <DialogContent className="flex max-h-[90dvh] min-h-0 w-full max-w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[min(100%-2rem,36rem)] md:h-[620px] md:max-h-[620px] md:min-h-[620px] md:max-w-5xl">
         <DialogTitle className="sr-only">Settings</DialogTitle>
-        <SidebarProvider className="items-start">
-          <Sidebar className="hidden border-r border-foreground/10 md:flex" collapsible="none">
+        <SidebarProvider className="flex min-h-0 min-w-0 flex-1 flex-row items-stretch overflow-hidden md:h-full md:min-h-0">
+          <Sidebar
+            className="hidden border-r border-foreground/10 md:flex md:h-full md:min-h-0 md:self-stretch"
+            collapsible="none"
+          >
             <SidebarContent>
               <SidebarGroup>
                 <SidebarGroupContent>
@@ -152,13 +147,19 @@ export function AppSettingsDialog() {
                     {SETTINGS_SECTIONS.map((item) => (
                       <SidebarMenuItem key={item.id}>
                         <SidebarMenuButton
+                          asChild
                           isActive={section === item.id}
-                          onClick={() => {
-                            navigateWithSettings(item.id)
-                          }}
                         >
-                          <item.icon />
-                          <span>{item.label}</span>
+                          <Link
+                            search={(prev) => ({
+                              ...prev,
+                              settings: item.id,
+                            })}
+                            to="."
+                          >
+                            <item.icon />
+                            <span>{item.label}</span>
+                          </Link>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
                     ))}
@@ -167,7 +168,7 @@ export function AppSettingsDialog() {
               </SidebarGroup>
             </SidebarContent>
           </Sidebar>
-          <main className="flex h-[620px] min-w-0 flex-1 flex-col overflow-hidden">
+          <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden md:min-h-0">
             <header className="shrink-0 border-b border-foreground/10 px-5 pt-4 md:h-16 md:pt-0">
               <div className="flex min-h-11 items-center">
                 <Breadcrumb>
@@ -182,30 +183,33 @@ export function AppSettingsDialog() {
                   </BreadcrumbList>
                 </Breadcrumb>
               </div>
-              <Tabs
-                className="gap-0 md:hidden"
-                onValueChange={(value) => {
-                  if (isSettingsSection(value)) {
-                    navigateWithSettings(value)
-                  }
-                }}
-                value={section}
-              >
-                <TabsList
-                  className="-mx-1 h-auto w-[calc(100%+0.5rem)] justify-start overflow-x-auto px-1"
-                  variant="line"
-                >
-                  {SETTINGS_SECTIONS.map((item) => (
-                    <TabsTrigger
-                      className="shrink-0 gap-1.5 px-0 pb-2"
-                      key={item.id}
-                      value={item.id}
-                    >
-                      <item.icon className="size-4 shrink-0" />
-                      {item.label}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
+              <Tabs className="gap-0 md:hidden" value={section}>
+                <div className="w-full min-w-0 touch-pan-x overflow-x-auto overflow-y-hidden overscroll-x-contain pb-0.5 [-webkit-overflow-scrolling:touch] [scrollbar-width:thin]">
+                  <TabsList
+                    className="inline-flex h-auto w-max flex-nowrap justify-start gap-4 bg-transparent p-0 px-1 data-[variant=line]:gap-4"
+                    variant="line"
+                  >
+                    {SETTINGS_SECTIONS.map((item) => (
+                      <TabsTrigger
+                        asChild
+                        className="flex-none gap-1.5 px-1.5 pb-2"
+                        key={item.id}
+                        value={item.id}
+                      >
+                        <Link
+                          search={(prev) => ({
+                            ...prev,
+                            settings: item.id,
+                          })}
+                          to="."
+                        >
+                          <item.icon className="size-4 shrink-0" />
+                          {item.label}
+                        </Link>
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </div>
               </Tabs>
             </header>
             <div className="min-h-0 flex-1 overflow-y-auto p-5">
@@ -235,9 +239,8 @@ export function AppSettingsDialog() {
                   />
                 ) : null}
                 {section === "proxy" ? <ProxySettings /> : null}
-                {section === "costs" ? (
-                  <CostsPanel session={session} />
-                ) : null}
+                {section === "costs" ? <CostsPanel session={session} /> : null}
+                {section === "data" ? <DataSettings /> : null}
                 {section === "about" ? <AboutPanel /> : null}
               </div>
             </div>
@@ -246,10 +249,6 @@ export function AppSettingsDialog() {
       </DialogContent>
     </Dialog>
   )
-}
-
-export function isSettingsSection(value: string): value is SettingsSection {
-  return SETTINGS_SECTIONS.some((section) => section.id === value)
 }
 
 function AboutPanel() {
@@ -261,7 +260,7 @@ function AboutPanel() {
       <div className="rounded-none border border-dashed border-foreground/15 p-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div className="space-y-1">
-            <div className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+            <div className="text-xs font-medium tracking-[0.2em] text-muted-foreground uppercase">
               Demo only
             </div>
             <div className="text-sm font-medium">Preview about states</div>
@@ -319,9 +318,7 @@ function AboutPanel() {
               Update
             </Button>
           ) : (
-            <div className="text-xs font-medium text-emerald-600">
-              Latest
-            </div>
+            <div className="text-xs font-medium text-emerald-600">Latest</div>
           )}
         </ItemActions>
       </Item>

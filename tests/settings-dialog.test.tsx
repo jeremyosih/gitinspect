@@ -15,14 +15,27 @@ const {
       settings: "providers",
       tab: "suggested",
     } as Record<string, unknown>,
-    tabsOnValueChange: undefined as
-      | ((value: string) => void)
-      | undefined,
   },
 }))
 
 vi.mock("@tanstack/react-router", () => ({
+  Link: ({
+    children,
+    search: _search,
+    to: _to,
+    ...props
+  }: React.PropsWithChildren<Record<string, unknown>>) =>
+    React.createElement("a", props, children),
   useNavigate: () => navigate,
+  useRouterState: ({ select }: { select: (state: { matches: Array<{ params: Record<string, string>; routeId: string }> }) => unknown }) =>
+    select({
+      matches: [
+        {
+          params: {},
+          routeId: "/",
+        },
+      ],
+    }),
   useSearch: () => state.search,
 }))
 
@@ -30,10 +43,6 @@ vi.mock("@/agent/runtime-client", () => ({
   runtimeClient: {
     refreshGithubToken: vi.fn(() => Promise.resolve()),
   },
-}))
-
-vi.mock("@/hooks/use-current-route-target", () => ({
-  useCurrentRouteTarget: () => ({ to: "/" }),
 }))
 
 vi.mock("@/hooks/use-selected-session-summary", () => ({
@@ -62,6 +71,7 @@ vi.mock("@/components/icons", () => {
   return {
     Icons: {
       badgeCheck: Icon,
+      bank: Icon,
       cost: Icon,
       faceThinking: Icon,
       gitHub: Icon,
@@ -89,26 +99,24 @@ vi.mock("@/components/ui/dialog", () => ({
 }))
 
 vi.mock("@/components/ui/tabs", () => ({
-  Tabs: ({
-    children,
-    onValueChange,
-  }: {
-    children: React.ReactNode
-    onValueChange?: (value: string) => void
-    value?: string
-  }) => {
-    state.tabsOnValueChange = onValueChange
-    return React.createElement("div", undefined, children)
-  },
+  Tabs: ({ children }: { children: React.ReactNode; value?: string }) =>
+    React.createElement("div", undefined, children),
   TabsList: ({ children }: { children: React.ReactNode }) =>
     React.createElement("div", undefined, children),
   TabsTrigger: ({
     children,
+    asChild,
+    className,
     value,
   }: {
     children: React.ReactNode
+    asChild?: boolean
+    className?: string
     value: string
-  }) => React.createElement("button", { type: "button", "data-value": value }, children),
+  }) =>
+    asChild
+      ? React.createElement("div", { className, "data-value": value }, children)
+      : React.createElement("button", { className, type: "button", "data-value": value }, children),
 }))
 
 vi.mock("@/components/ui/toggle-group", () => ({
@@ -184,7 +192,6 @@ vi.mock("@/components/ui/item", () => {
 describe("settings dialog", () => {
   beforeEach(() => {
     state.dialogOnOpenChange = undefined
-    state.tabsOnValueChange = undefined
     state.search = { settings: "providers", tab: "suggested" }
     navigate.mockReset()
   })
@@ -198,23 +205,10 @@ describe("settings dialog", () => {
 
     render(React.createElement(AppSettingsDialog))
 
-    expect(state.tabsOnValueChange).toBeTypeOf("function")
     expect(state.dialogOnOpenChange).toBeTypeOf("function")
-
-    state.tabsOnValueChange?.("github")
-
-    expect(navigate).toHaveBeenCalledTimes(1)
-    expect(navigate).toHaveBeenLastCalledWith({
-      search: {
-        settings: "github",
-        sidebar: undefined,
-        tab: "suggested",
-      },
-      to: "/",
-    })
 
     state.dialogOnOpenChange?.(true)
 
-    expect(navigate).toHaveBeenCalledTimes(1)
+    expect(navigate).not.toHaveBeenCalled()
   })
 })

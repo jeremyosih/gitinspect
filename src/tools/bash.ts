@@ -7,7 +7,7 @@ import type { AppToolDefinition } from "@/tools/types"
 const bashSchema = Type.Object({
   command: Type.String({
     description:
-      "Command to execute in the active repository's virtual read-only shell",
+      "Shell command (read-only virtual shell on the repo snapshot; not host OS)",
   }),
 })
 
@@ -27,8 +27,9 @@ export function createBashTool(
 ): AppToolDefinition<typeof bashSchema, BashToolDetails> {
   return {
     description:
-      "Execute a command in the active repository's virtual read-only shell. " +
-      "This is not system bash and only has access to the selected GitHub repository.",
+      "Run a command in the repo's read-only virtual shell (browser snapshot). " +
+      "Banned: writes, installs, network, git, node/npm/python/sqlite/curl. " +
+      "OK: pipes + grep/sed/awk/cat/head/tail/ls/find.",
     async execute(_toolCallId, params, signal) {
       if (signal?.aborted) {
         throw new Error("Command aborted")

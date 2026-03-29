@@ -61,6 +61,15 @@ function apiKeyProviderLabel(provider: ProviderId): string {
   return getProviderGroupMetadata(provider as ProviderGroupId).label
 }
 
+function hasStoredPlainApiKey(
+  providerKeys: { provider: ProviderId; value: string }[],
+  provider: ProviderId
+): boolean {
+  const record = providerKeys.find((item) => item.provider === provider)
+  const trimmed = record?.value?.trim() ?? ""
+  return Boolean(trimmed && !trimmed.startsWith("{"))
+}
+
 export function ProviderSettings(props: {
   onNavigateToProxy?: () => void
 }) {
@@ -287,52 +296,76 @@ export function ProviderSettings(props: {
         </div>
 
         <div className="flex flex-col gap-6">
-          {apiKeyProviders.map((provider) => (
-            <div className="space-y-2" key={provider}>
-              <div className="text-sm font-medium text-foreground">
-                {apiKeyProviderLabel(provider)}
-              </div>
-              <div className="flex gap-2">
-                <Input
-                  autoComplete="off"
-                  className="min-w-0 flex-1"
-                  onChange={(event) =>
-                    setDraftValues((current) => ({
-                      ...current,
-                      [provider]: event.target.value,
-                    }))
-                  }
-                  placeholder="Enter API key"
-                  type="password"
-                  value={draftValues[provider] ?? ""}
-                />
-                <Button
-                  className="shrink-0"
-                  onClick={async () => {
-                    const value = draftValues[provider]?.trim()
+          {apiKeyProviders.map((provider) => {
+            const keySaved = hasStoredPlainApiKey(providerKeys, provider)
 
-                    if (!value) {
-                      toast.warning("Enter an API key first")
-                      return
+            return (
+              <div className="space-y-2" key={provider}>
+                <div className="text-sm font-medium text-foreground">
+                  {apiKeyProviderLabel(provider)}
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    autoComplete="off"
+                    className="min-w-0 flex-1"
+                    onChange={(event) =>
+                      setDraftValues((current) => ({
+                        ...current,
+                        [provider]: event.target.value,
+                      }))
                     }
+                    placeholder="Enter API key"
+                    type="password"
+                    value={draftValues[provider] ?? ""}
+                  />
+                  {keySaved ? (
+                    <Button
+                      className="shrink-0"
+                      onClick={async () => {
+                        try {
+                          await disconnectProvider(provider)
+                          toast.success(
+                            `${apiKeyProviderLabel(provider)} API key removed`
+                          )
+                        } catch {
+                          toast.error("Could not remove API key")
+                        }
+                      }}
+                      size="sm"
+                      variant="outline"
+                    >
+                      Clear
+                    </Button>
+                  ) : (
+                    <Button
+                      className="shrink-0"
+                      onClick={async () => {
+                        const value = draftValues[provider]?.trim()
 
-                    try {
-                      await setProviderApiKey(provider, value)
-                      toast.success(
-                        `${apiKeyProviderLabel(provider)} API key saved`
-                      )
-                    } catch {
-                      toast.error("Could not save API key")
-                    }
-                  }}
-                  size="sm"
-                  variant="secondary"
-                >
-                  Save
-                </Button>
+                        if (!value) {
+                          toast.warning("Enter an API key first")
+                          return
+                        }
+
+                        try {
+                          await setProviderApiKey(provider, value)
+                          toast.success(
+                            `${apiKeyProviderLabel(provider)} API key saved`
+                          )
+                        } catch {
+                          toast.error("Could not save API key")
+                        }
+                      }}
+                      size="sm"
+                      variant="secondary"
+                    >
+                      Save
+                    </Button>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </section>
     </div>

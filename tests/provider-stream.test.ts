@@ -224,7 +224,7 @@ describe("provider stream", () => {
     resolveProviderAuthForProvider.mockResolvedValue({
       apiKey: "api-key",
       isOAuth: false,
-      provider: "opencode",
+      provider: "fireworks-ai",
       storedValue: "api-key",
     })
     getProxyConfig.mockResolvedValue({
@@ -264,12 +264,12 @@ describe("provider stream", () => {
     await expect(
       streamChat({
         messages: [],
-        model: "gpt-5-nano",
+        model: "accounts/fireworks/routers/kimi-k2p5-turbo",
         onTextDelta(delta) {
           deltas.push(delta)
         },
-        provider: "opencode",
-        providerGroup: "opencode-free",
+        provider: "fireworks-ai",
+        providerGroup: "fireworks-free",
         sessionId: "session-error",
         signal: new AbortController().signal,
         thinkingLevel: "medium",

@@ -1,25 +1,19 @@
-import { createFileRoute } from "@tanstack/react-router"
-import { Chat } from "@/components/chat"
+import { Outlet, createFileRoute } from "@tanstack/react-router"
 
 type ChatSearch = {
-  initialQuery?: string
-  session?: string
+  q?: string
 }
 
 export const Route = createFileRoute("/chat")({
   validateSearch: (search: ChatSearch) => ({
-    initialQuery:
-      typeof search.initialQuery === "string" && search.initialQuery.trim().length > 0
-        ? search.initialQuery
-        : undefined,
-    session:
-      typeof search.session === "string" && search.session.length > 0
-        ? search.session
+    q:
+      typeof search.q === "string" && search.q.trim().length > 0
+        ? search.q
         : undefined,
   }),
   component: ChatRoute,
 })
 
 function ChatRoute() {
-  return <Chat />
+  return <Outlet />
 }

@@ -45,6 +45,7 @@ const THINKING_LEVELS: Array<{ label: string; value: ThinkingLevel }> = [
 
 function ChatComposerInner(props: {
   composerDisabled?: boolean
+  disabledReason?: string
   isStreaming: boolean
   model: string
   onAbort: () => void
@@ -97,7 +98,7 @@ function ChatComposerInner(props: {
             disabled={locked}
             placeholder={
               locked
-                ? "Select a repository to get started"
+                ? props.disabledReason ?? "Select a repository to get started"
                 : "What would you like to know?"
             }
           />
@@ -191,6 +192,7 @@ function PromptInputAttachmentsRow() {
 
 export function ChatComposer(props: {
   composerDisabled?: boolean
+  disabledReason?: string
   initialInput?: string
   isStreaming: boolean
   model: string

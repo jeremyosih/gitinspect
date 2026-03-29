@@ -1,14 +1,12 @@
 import { GitHubFsError } from "@/repo/github-fs"
 import type { SystemMessage } from "@/types/chat"
 import {
-  BootstrapFailedRuntimeError,
   BusyRuntimeError,
   MissingSessionRuntimeError,
   StreamInterruptedRuntimeError,
 } from "@/agent/runtime-command-errors"
 
 export type RuntimeErrorKind =
-  | "bootstrap_failed"
   | "missing_session"
   | "github_rate_limit"
   | "github_auth"
@@ -16,6 +14,7 @@ export type RuntimeErrorKind =
   | "github_permission"
   | "github_api"
   | "runtime_busy"
+  | "provider_rate_limit"
   | "repo_network"
   | "provider_connection"
   | "stream_interrupted"
@@ -31,6 +30,20 @@ export interface ClassifiedRuntimeError {
 }
 
 const RATE_LIMIT_SUBSTR = "github api rate limit exceeded"
+
+function isProviderRateLimitMessage(lower: string): boolean {
+  if (lower.includes("github")) {
+    return false
+  }
+
+  return (
+    lower.includes("too many requests") ||
+    lower.includes(" 429") ||
+    lower.startsWith("429") ||
+    (lower.includes("rate limit") &&
+      !lower.includes("github api rate limit exceeded"))
+  )
+}
 
 function normalizeMessage(error: unknown): string {
   if (error instanceof Error) {
@@ -55,16 +68,6 @@ function fingerprintFor(
 export function classifyRuntimeError(error: unknown): ClassifiedRuntimeError {
   const message = normalizeMessage(error)
   const lower = message.toLowerCase()
-
-  if (error instanceof BootstrapFailedRuntimeError) {
-    return {
-      fingerprint: fingerprintFor("bootstrap_failed", message),
-      kind: "bootstrap_failed",
-      message,
-      severity: "error",
-      source: "runtime",
-    }
-  }
 
   if (error instanceof StreamInterruptedRuntimeError) {
     return {
@@ -187,6 +190,16 @@ export function classifyRuntimeError(error: unknown): ClassifiedRuntimeError {
       message,
       severity: "error",
       source: "github",
+    }
+  }
+
+  if (isProviderRateLimitMessage(lower)) {
+    return {
+      fingerprint: fingerprintFor("provider_rate_limit", message),
+      kind: "provider_rate_limit",
+      message,
+      severity: "error",
+      source: "provider",
     }
   }
 
