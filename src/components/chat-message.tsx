@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router"
-import { AlertCircle, AlertTriangle, Info } from "lucide-react"
+import { AlertCircle, AlertTriangle, ChevronDown, Info } from "lucide-react"
 import {
   deriveAssistantView,
   getUserText,
@@ -41,6 +41,12 @@ import {
   ItemTitle,
 } from "@/components/ui/item"
 import { Button } from "@/components/ui/button"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
+import { cn } from "@/lib/utils"
 
 export function ChatMessage(props: {
   followingMessages?: ReadonlyArray<ChatMessageType>
@@ -82,6 +88,7 @@ export function ChatMessage(props: {
       )
 
     const showGithubCta = message.action === "open-github-settings"
+    const showHtmlDetails = Boolean(message.detailsHtml)
 
     return (
       <div className="flex w-full justify-start py-1">
@@ -97,6 +104,41 @@ export function ChatMessage(props: {
             <ItemDescription className="line-clamp-none text-[13px] text-inherit opacity-90">
               {message.message}
             </ItemDescription>
+            {showHtmlDetails ? (
+              <Collapsible className="mt-3 overflow-hidden rounded-md border border-border/60 bg-background/70 text-foreground">
+                <CollapsibleTrigger className="group flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs font-medium transition-colors hover:bg-muted/40">
+                  <span>HTML response</span>
+                  <ChevronDown className="size-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="border-t border-border/60 px-3 py-3">
+                  <div className="space-y-3">
+                    {message.detailsContext ? (
+                      <p className="rounded border border-border/60 bg-muted/40 px-2 py-1 font-mono text-[11px] text-muted-foreground">
+                        {message.detailsContext}
+                      </p>
+                    ) : null}
+                    <p className="text-xs text-muted-foreground">
+                      Sandboxed preview for inspection only. It won&apos;t satisfy
+                      the original challenge request.
+                    </p>
+                    <iframe
+                      className="h-72 w-full rounded border border-border/60 bg-background"
+                      sandbox="allow-scripts"
+                      srcDoc={message.detailsHtml}
+                      title={`HTML response preview ${message.id}`}
+                    />
+                    <pre
+                      className={cn(
+                        "max-h-72 overflow-auto rounded border border-border/60 bg-muted/40 p-3 font-mono text-[11px] whitespace-pre-wrap break-all",
+                        "selection:bg-primary/20"
+                      )}
+                    >
+                      {message.detailsHtml}
+                    </pre>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            ) : null}
           </ItemContent>
           {showGithubCta ? (
             <ItemActions className="shrink-0">

@@ -83,6 +83,14 @@ export function getRuntimeCommandErrorMessage(
   const lower = normalized.message.toLowerCase()
 
   if (
+    lower.includes("vercel security checkpoint") ||
+    lower.includes("we're verifying your browser") ||
+    lower.includes("we are verifying your browser")
+  ) {
+    return "A Vercel security checkpoint blocked this request. Expand the system notice to inspect the returned HTML."
+  }
+
+  if (
     lower.includes("too many requests") ||
     lower.startsWith("429") ||
     lower.includes(" 429")

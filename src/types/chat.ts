@@ -48,6 +48,8 @@ export interface SystemMessage {
   message: string
   fingerprint: string
   action?: SystemNoticeAction
+  detailsContext?: string
+  detailsHtml?: string
 }
 
 export type ChatMessage =

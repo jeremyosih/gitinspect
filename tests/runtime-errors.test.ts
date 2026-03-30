@@ -64,4 +64,22 @@ describe("classifyRuntimeError", () => {
     expect(classified.severity).toBe("error")
     expect(classified.source).toBe("provider")
   })
+
+  it("extracts HTML payloads into structured system message details", () => {
+    const classified = classifyRuntimeError(
+      new Error(
+        '429 <!DOCTYPE html><html><head><title>Vercel Security Checkpoint</title></head><body><p>We\'re verifying your browser</p></body></html> [fireworks-ai/accounts/fireworks/routers/kimi-k2p5-turbo → https://api.fireworks.ai/inference/v1]'
+      )
+    )
+    const message = buildSystemMessage(classified, "system-html", 456)
+
+    expect(classified.kind).toBe("provider_rate_limit")
+    expect(classified.message).toBe(
+      "429 — Vercel Security Checkpoint"
+    )
+    expect(message.detailsContext).toBe(
+      "[fireworks-ai/accounts/fireworks/routers/kimi-k2p5-turbo → https://api.fireworks.ai/inference/v1]"
+    )
+    expect(message.detailsHtml).toContain("<title>Vercel Security Checkpoint</title>")
+  })
 })

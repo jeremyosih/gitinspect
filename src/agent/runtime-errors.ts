@@ -28,6 +28,8 @@ export interface ClassifiedRuntimeError {
   severity: SystemMessage["severity"]
   source: SystemMessage["source"]
   action?: SystemMessage["action"]
+  detailsContext?: string
+  detailsHtml?: string
 }
 
 const RATE_LIMIT_SUBSTR = "github api rate limit exceeded"
@@ -67,6 +69,56 @@ function normalizeMessage(error: unknown): string {
   return String(error)
 }
 
+interface HtmlErrorDetail {
+  context?: string
+  html: string
+  summary: string
+}
+
+function extractHtmlTitle(html: string): string | undefined {
+  const match = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)
+
+  if (!match) {
+    return undefined
+  }
+
+  const normalized = match[1]
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+
+  return normalized || undefined
+}
+
+function extractHtmlErrorDetail(message: string): HtmlErrorDetail | undefined {
+  const match = message.match(/(<!doctype html[\s\S]*<\/html>|<html[\s\S]*<\/html>)/i)
+
+  if (!match || match.index === undefined) {
+    return undefined
+  }
+
+  const html = match[1].trim()
+  const prefix = message
+    .slice(0, match.index)
+    .replace(/\s+/g, " ")
+    .trim()
+  const suffix = message
+    .slice(match.index + match[1].length)
+    .replace(/\s+/g, " ")
+    .trim()
+  const title = extractHtmlTitle(html)
+  const summaryPrefix = prefix || "HTML response"
+  const summary = title
+    ? `${summaryPrefix} — ${title}`
+    : `${summaryPrefix} — HTML response`
+
+  return {
+    context: suffix || undefined,
+    html,
+    summary,
+  }
+}
+
 function isProviderMessage(lower: string, message: string): boolean {
   if (lower.includes("github")) {
     return false
@@ -92,11 +144,16 @@ function fingerprintFor(
  * Classify thrown errors from repo tools, provider stream, or agent prompt.
  */
 export function classifyRuntimeError(error: unknown): ClassifiedRuntimeError {
-  const message = normalizeMessage(error)
+  const rawMessage = normalizeMessage(error)
+  const htmlDetail = extractHtmlErrorDetail(rawMessage)
+  const message = htmlDetail?.summary ?? rawMessage
   const lower = message.toLowerCase()
+  const rawLower = rawMessage.toLowerCase()
 
   if (error instanceof StreamInterruptedRuntimeError) {
     return {
+      detailsContext: htmlDetail?.context,
+      detailsHtml: htmlDetail?.html,
       fingerprint: fingerprintFor("stream_interrupted", message),
       kind: "stream_interrupted",
       message,
@@ -107,6 +164,8 @@ export function classifyRuntimeError(error: unknown): ClassifiedRuntimeError {
 
   if (error instanceof BusyRuntimeError) {
     return {
+      detailsContext: htmlDetail?.context,
+      detailsHtml: htmlDetail?.html,
       fingerprint: fingerprintFor("runtime_busy", message),
       kind: "runtime_busy",
       message,
@@ -117,6 +176,8 @@ export function classifyRuntimeError(error: unknown): ClassifiedRuntimeError {
 
   if (error instanceof MissingSessionRuntimeError) {
     return {
+      detailsContext: htmlDetail?.context,
+      detailsHtml: htmlDetail?.html,
       fingerprint: fingerprintFor("missing_session", message),
       kind: "missing_session",
       message,
@@ -134,6 +195,8 @@ export function classifyRuntimeError(error: unknown): ClassifiedRuntimeError {
     ) {
       return {
         action: "open-github-settings",
+        detailsContext: htmlDetail?.context,
+        detailsHtml: htmlDetail?.html,
         fingerprint: fingerprintFor("github_rate_limit", message, path),
         kind: "github_rate_limit",
         message,
@@ -148,6 +211,8 @@ export function classifyRuntimeError(error: unknown): ClassifiedRuntimeError {
     ) {
       return {
         action: "open-github-settings",
+        detailsContext: htmlDetail?.context,
+        detailsHtml: htmlDetail?.html,
         fingerprint: fingerprintFor("github_auth", message, path),
         kind: "github_auth",
         message,
@@ -158,6 +223,8 @@ export function classifyRuntimeError(error: unknown): ClassifiedRuntimeError {
 
     if (error.code === "ENOENT") {
       return {
+        detailsContext: htmlDetail?.context,
+        detailsHtml: htmlDetail?.html,
         fingerprint: fingerprintFor("github_not_found", message, path),
         kind: "github_not_found",
         message,
@@ -169,6 +236,8 @@ export function classifyRuntimeError(error: unknown): ClassifiedRuntimeError {
     if (error.code === "EACCES") {
       return {
         action: "open-github-settings",
+        detailsContext: htmlDetail?.context,
+        detailsHtml: htmlDetail?.html,
         fingerprint: fingerprintFor("github_permission", message, path),
         kind: "github_permission",
         message,
@@ -178,6 +247,8 @@ export function classifyRuntimeError(error: unknown): ClassifiedRuntimeError {
     }
 
     return {
+      detailsContext: htmlDetail?.context,
+      detailsHtml: htmlDetail?.html,
       fingerprint: fingerprintFor("github_api", message, path),
       kind: "github_api",
       message,
@@ -187,21 +258,23 @@ export function classifyRuntimeError(error: unknown): ClassifiedRuntimeError {
   }
 
   if (
-    lower.includes("connection error") ||
-    lower.includes("failed to fetch") ||
-    lower.includes("networkerror") ||
-    lower.includes("load failed") ||
-    lower.includes("the network connection was lost")
+    rawLower.includes("connection error") ||
+    rawLower.includes("failed to fetch") ||
+    rawLower.includes("networkerror") ||
+    rawLower.includes("load failed") ||
+    rawLower.includes("the network connection was lost")
   ) {
     const isProvider =
-      lower.includes("provider") ||
-      lower.includes("api.openai") ||
-      lower.includes("anthropic") ||
-      lower.includes("google") ||
-      lower.includes("proxy")
+      rawLower.includes("provider") ||
+      rawLower.includes("api.openai") ||
+      rawLower.includes("anthropic") ||
+      rawLower.includes("google") ||
+      rawLower.includes("proxy")
 
-    if (isProvider || message.includes("Connection error.")) {
+    if (isProvider || rawMessage.includes("Connection error.")) {
       return {
+        detailsContext: htmlDetail?.context,
+        detailsHtml: htmlDetail?.html,
         fingerprint: fingerprintFor("provider_connection", message),
         kind: "provider_connection",
         message,
@@ -211,6 +284,8 @@ export function classifyRuntimeError(error: unknown): ClassifiedRuntimeError {
     }
 
     return {
+      detailsContext: htmlDetail?.context,
+      detailsHtml: htmlDetail?.html,
       fingerprint: fingerprintFor("repo_network", message),
       kind: "repo_network",
       message,
@@ -219,8 +294,10 @@ export function classifyRuntimeError(error: unknown): ClassifiedRuntimeError {
     }
   }
 
-  if (isProviderRateLimitMessage(lower)) {
+  if (isProviderRateLimitMessage(rawLower)) {
     return {
+      detailsContext: htmlDetail?.context,
+      detailsHtml: htmlDetail?.html,
       fingerprint: fingerprintFor("provider_rate_limit", message),
       kind: "provider_rate_limit",
       message,
@@ -229,8 +306,10 @@ export function classifyRuntimeError(error: unknown): ClassifiedRuntimeError {
     }
   }
 
-  if (isProviderMessage(lower, message)) {
+  if (isProviderMessage(rawLower, rawMessage)) {
     return {
+      detailsContext: htmlDetail?.context,
+      detailsHtml: htmlDetail?.html,
       fingerprint: fingerprintFor("provider_api", message),
       kind: "provider_api",
       message,
@@ -242,6 +321,8 @@ export function classifyRuntimeError(error: unknown): ClassifiedRuntimeError {
   if (lower.includes(RATE_LIMIT_SUBSTR) || lower.includes("rate limit")) {
     return {
       action: "open-github-settings",
+      detailsContext: htmlDetail?.context,
+      detailsHtml: htmlDetail?.html,
       fingerprint: fingerprintFor("github_rate_limit", message),
       kind: "github_rate_limit",
       message,
@@ -251,6 +332,8 @@ export function classifyRuntimeError(error: unknown): ClassifiedRuntimeError {
   }
 
   return {
+    detailsContext: htmlDetail?.context,
+    detailsHtml: htmlDetail?.html,
     fingerprint: fingerprintFor("unknown", message),
     kind: "unknown",
     message,
@@ -266,6 +349,8 @@ export function buildSystemMessage(
 ): SystemMessage {
   return {
     action: classified.action,
+    detailsContext: classified.detailsContext,
+    detailsHtml: classified.detailsHtml,
     fingerprint: classified.fingerprint,
     id,
     kind: classified.kind,
