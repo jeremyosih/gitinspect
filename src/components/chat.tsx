@@ -3,6 +3,7 @@
 import * as React from "react"
 import { useNavigate, useSearch } from "@tanstack/react-router"
 import { useLiveQuery } from "dexie-react-hooks"
+import { event as trackEvent } from "onedollarstats"
 import { toast } from "sonner"
 import { getAssistantText, getFoldedToolResultIds } from "./chat-adapter"
 import { ChatComposer } from "./chat-composer"
@@ -147,6 +148,12 @@ function getLastAssistantMessage(
     .find(
       (message): message is AssistantMessage => message.role === "assistant"
     )
+}
+
+function trackMessageSent(path?: string) {
+  void trackEvent("Message sent", path).catch(() => {
+    // Analytics must never interfere with chat sends.
+  })
 }
 
 export function Chat(props: ChatProps) {
@@ -547,6 +554,7 @@ export function Chat(props: ChatProps) {
             })
           : await createSessionForChat(base)
         await runtimeClient.startInitialTurn(session, content)
+        trackMessageSent()
         await navigate({
           params: {
             sessionId: session.id,
@@ -591,6 +599,7 @@ export function Chat(props: ChatProps) {
 
         try {
           await runtime.send(content)
+          trackMessageSent("/chat")
         } catch (error) {
           reportRuntimeFailure(
             error instanceof Error ? error : new Error(String(error))
