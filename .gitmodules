@@ -1,6 +1,0 @@
-[submodule "docs/sitegeist"]
-	path = docs/sitegeist
-	url = https://github.com/badlogic/sitegeist
-[submodule "docs/pi-mono"]
-	path = docs/pi-mono
-	url = https://github.com/badlogic/pi-mono

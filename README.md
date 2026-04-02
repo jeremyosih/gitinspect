@@ -1,31 +1,80 @@
 # gitinspect
 
-![Screenshot 2026-03-28 at 01 36 31](https://github.com/user-attachments/assets/a39a420d-a538-4e8e-82a3-16794b3e0e6f)
+This project was created with [Better-T-Stack](https://github.com/AmanVarshney01/create-better-t-stack), a modern TypeScript stack that combines React, TanStack Start, Self, and more.
 
-Ask questions to any GitHub repo — from your browser, without cloning.
+## Features
 
-You can also replace hub with inspect in any GitHub URL to access the corresponding digest.
+- **TypeScript** - For type safety and improved developer experience
+- **TanStack Start** - SSR framework with TanStack Router
+- **TailwindCSS** - Utility-first CSS for rapid UI development
+- **Shared UI package** - shadcn/ui primitives live in `packages/ui`
+- **Authentication** - Better-Auth
+- **Husky** - Git hooks for code quality
+- **Oxlint** - Oxlint + Oxfmt (linting & formatting)
+- **Turborepo** - Optimized monorepo build system
 
-[website](https://gitinspect.com/) 
+## Getting Started
 
-## How it works
+First, install the dependencies:
 
-- **Research agent** — Pick a repository, chat in natural language; answers are grounded in the code.
-- **Stack** — [pi-mono](https://github.com/badlogic/pi-mono), read-only shell via [just-bash](https://github.com/vercel-labs/just-bash), virtual FS from the GitHub API via the internal `src/lib/github` runtime.
-- **Private by design** — Sessions, settings, provider keys, and usage stay on device ([Dexie](https://github.com/dexie/Dexie.js) / IndexedDB); chat is client-side, no backend for your data.
-- **Local first** — Agent execution runs in a per-tab `DedicatedWorker`; durable state stays in IndexedDB on the main thread.
-- **Resilient by design** — Lease ownership, runtime recovery, and interrupted-turn repair stay on the main thread; the worker improves responsiveness, not hidden-tab guarantees.
-- **Lazy loading** — Nothing fetched at construction; everything on demand.
-- **Tree cache** — Full repo tree once via Git Trees API; `stat`, `exists`, and `readdir` from cache.
-- **Content cache** — File contents by blob SHA (content-addressable, never stale).
-- **Smart API selection** — Contents API for small files; raw endpoint for large files (>1 MB).
+```bash
+bun install
+```
 
-Inspired by [Sitegeist](https://sitegeist.ai), [btca](https://github.com/davis7dotsh/better-context) & [repogrep](https://repogrep.com).
+Then, run the development server:
 
-## Rate limits
+```bash
+bun run dev
+```
 
-Unauthenticated: 60 requests/hour. Authenticated: 5,000 requests/hour. Set `GITHUB_TOKEN` to avoid limits. The tree cache keeps actual API usage low — after the initial load, only `readFile` for new files costs an API call.
+Open [http://localhost:3001](http://localhost:3001) in your browser to see the fullstack application.
 
-## License
+## UI Customization
 
-[AGPL-3.0](LICENSE)
+React web apps in this stack share shadcn/ui primitives through `packages/ui`.
+
+- Change design tokens and global styles in `packages/ui/src/styles/globals.css`
+- Update shared primitives in `packages/ui/src/components/*`
+- Adjust shadcn aliases or style config in `packages/ui/components.json` and `apps/web/components.json`
+
+### Add more shared components
+
+Run this from the project root to add more primitives to the shared UI package:
+
+```bash
+npx shadcn@latest add accordion dialog popover sheet table -c packages/ui
+```
+
+Import shared components like this:
+
+```tsx
+import { Button } from "@gitinspect/ui/components/button";
+```
+
+### Add app-specific blocks
+
+If you want to add app-specific blocks instead of shared primitives, run the shadcn CLI from `apps/web`.
+
+## Git Hooks and Formatting
+
+- Initialize hooks: `bun run prepare`
+- Format and lint fix: `bun run check`
+
+## Project Structure
+
+```
+gitinspect/
+├── apps/
+│   └── web/         # Fullstack application (React + TanStack Start)
+├── packages/
+│   ├── ui/          # Shared shadcn/ui components and styles
+│   ├── auth/        # Authentication configuration & logic
+```
+
+## Available Scripts
+
+- `bun run dev`: Start all applications in development mode
+- `bun run build`: Build all applications
+- `bun run dev:web`: Start only the web application
+- `bun run check-types`: Check TypeScript types across all apps
+- `bun run check`: Run Oxlint and Oxfmt
