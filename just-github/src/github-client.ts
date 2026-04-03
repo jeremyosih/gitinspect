@@ -4,7 +4,7 @@ import {
   type GitHubContentResponse,
   type GitHubTreeResponse,
 } from "./types.js";
-import { displayResolvedRef, toCommitApiRef, type GitHubResolvedRef } from "./refs.js";
+import { displayResolvedRef, type GitHubResolvedRef } from "./refs.js";
 import { GitHubRateLimitController, parseGitHubRateLimitInfo } from "./github-rate-limit.js";
 import {
   readGitHubErrorMessage,
@@ -29,8 +29,10 @@ export interface RateLimitInfo {
 
 interface GitHubCommitResponse {
   sha: string;
-  tree: {
-    sha: string;
+  commit: {
+    tree: {
+      sha: string;
+    };
   };
 }
 
@@ -48,6 +50,8 @@ interface GitHubAnnotatedTagResponse {
   };
 }
 
+type GitHubRefNamespace = "heads" | "tags";
+
 export class GitHubClient {
   private readonly owner: string;
   private readonly repo: string;
@@ -55,6 +59,7 @@ export class GitHubClient {
   private readonly token?: string;
   private readonly baseUrl: string;
   private readonly rateLimitController = new GitHubRateLimitController();
+  private resolvedCommitPromise?: Promise<GitHubCommitResponse>;
   rateLimit: RateLimitInfo | null = null;
 
   constructor(options: GitHubClientOptions) {
@@ -67,7 +72,8 @@ export class GitHubClient {
 
   async fetchContents(path: string): Promise<GitHubContentResponse | GitHubContentResponse[]> {
     const normalized = normalizePath(path);
-    const url = `${this.baseUrl}/repos/${this.owner}/${this.repo}/contents/${normalized}?ref=${encodeURIComponent(toCommitApiRef(this.ref))}`;
+    const commit = await this.fetchResolvedCommit();
+    const url = `${this.baseUrl}/repos/${this.owner}/${this.repo}/contents/${normalized}?ref=${encodeURIComponent(commit.sha)}`;
     return this.request<GitHubContentResponse | GitHubContentResponse[]>(url, path);
   }
 
@@ -75,7 +81,7 @@ export class GitHubClient {
     const commit = await this.fetchResolvedCommit();
 
     return this.request<GitHubTreeResponse>(
-      `${this.baseUrl}/repos/${this.owner}/${this.repo}/git/trees/${commit.tree.sha}?recursive=1`,
+      `${this.baseUrl}/repos/${this.owner}/${this.repo}/git/trees/${commit.commit.tree.sha}?recursive=1`,
       "/",
     );
   }
@@ -86,22 +92,33 @@ export class GitHubClient {
   }
 
   private async fetchResolvedCommit(): Promise<GitHubCommitResponse> {
-    try {
-      return await this.request<GitHubCommitResponse>(
-        `${this.baseUrl}/repos/${this.owner}/${this.repo}/commits/${encodeURIComponent(toCommitApiRef(this.ref))}`,
-        displayResolvedRef(this.ref),
-      );
-    } catch (error) {
-      if (
-        this.ref.kind === "tag" &&
-        error instanceof GitHubFsError &&
-        (error.kind === "conflict" || error.kind === "not_found" || error.kind === "validation")
-      ) {
-        await this.throwUnsupportedTagTarget();
-      }
-
-      throw error;
+    if (!this.resolvedCommitPromise) {
+      this.resolvedCommitPromise = this.loadResolvedCommit().catch((error: unknown) => {
+        this.resolvedCommitPromise = undefined;
+        throw error;
+      });
     }
+
+    return await this.resolvedCommitPromise;
+  }
+
+  private async loadResolvedCommit(): Promise<GitHubCommitResponse> {
+    if (this.ref.kind === "commit") {
+      return await this.request<GitHubCommitResponse>(
+        `${this.baseUrl}/repos/${this.owner}/${this.repo}/commits/${encodeURIComponent(this.ref.sha)}`,
+        this.ref.sha,
+      );
+    }
+
+    const commitSha =
+      this.ref.kind === "branch"
+        ? await this.fetchRefCommitSha("heads", this.ref.name)
+        : await this.fetchTagCommitSha(this.ref.name);
+
+    return await this.request<GitHubCommitResponse>(
+      `${this.baseUrl}/repos/${this.owner}/${this.repo}/commits/${encodeURIComponent(commitSha)}`,
+      displayResolvedRef(this.ref),
+    );
   }
 
   private async request<T>(url: string, pathForError: string): Promise<T> {
@@ -212,38 +229,67 @@ export class GitHubClient {
     return toGitHubFsError(res, path, await readGitHubErrorMessage(res));
   }
 
-  private async throwUnsupportedTagTarget(): Promise<never> {
-    const refName = this.ref.kind === "tag" ? this.ref.name : displayResolvedRef(this.ref);
+  private async fetchRefCommitSha(namespace: GitHubRefNamespace, name: string): Promise<string> {
     const refData = await this.request<GitHubRefResponse>(
-      `${this.baseUrl}/repos/${this.owner}/${this.repo}/git/ref/tags/${encodeURIComponent(refName)}`,
-      refName,
+      `${this.baseUrl}/repos/${this.owner}/${this.repo}/git/ref/${namespace}/${encodeURIComponent(name)}`,
+      name,
     );
 
-    const target =
-      refData.object.type === "tag"
-        ? await this.request<GitHubAnnotatedTagResponse>(
-            `${this.baseUrl}/repos/${this.owner}/${this.repo}/git/tags/${refData.object.sha}`,
-            refName,
-          )
-        : refData;
+    if (refData.object.type === "commit") {
+      return refData.object.sha;
+    }
 
-    if (target.object.type !== "commit") {
-      throw new GitHubFsError({
-        code: "ENOTSUP",
-        isRetryable: false,
-        kind: "unsupported",
-        message: "gitinspect v0 does not support annotated tags that target trees or blobs.",
-        path: refName,
-      });
+    if (namespace === "tags" && refData.object.type === "tag") {
+      return await this.fetchTagCommitSha(name, refData);
     }
 
     throw new GitHubFsError({
       code: "EIO",
       isRetryable: false,
       kind: "unknown",
-      message: `GitHub API error while resolving tag: ${refName}`,
-      path: refName,
+      message: `GitHub API returned an unexpected ${namespace.slice(0, -1)} target: ${name}`,
+      path: name,
     });
+  }
+
+  private async fetchTagCommitSha(name: string, refData?: GitHubRefResponse): Promise<string> {
+    const tagRef =
+      refData ??
+      (await this.request<GitHubRefResponse>(
+        `${this.baseUrl}/repos/${this.owner}/${this.repo}/git/ref/tags/${encodeURIComponent(name)}`,
+        name,
+      ));
+
+    if (tagRef.object.type === "commit") {
+      return tagRef.object.sha;
+    }
+
+    if (tagRef.object.type !== "tag") {
+      throw new GitHubFsError({
+        code: "EIO",
+        isRetryable: false,
+        kind: "unknown",
+        message: `GitHub API returned an unexpected tag target: ${name}`,
+        path: name,
+      });
+    }
+
+    const tagObject = await this.request<GitHubAnnotatedTagResponse>(
+      `${this.baseUrl}/repos/${this.owner}/${this.repo}/git/tags/${tagRef.object.sha}`,
+      name,
+    );
+
+    if (tagObject.object.type !== "commit") {
+      throw new GitHubFsError({
+        code: "ENOTSUP",
+        isRetryable: false,
+        kind: "unsupported",
+        message: "gitinspect v0 does not support annotated tags that target trees or blobs.",
+        path: name,
+      });
+    }
+
+    return tagObject.object.sha;
   }
 }
 

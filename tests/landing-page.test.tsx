@@ -111,7 +111,7 @@ describe("LandingPage", () => {
     render(<LandingPage />);
 
     expect(screen.getByTestId("repo-anomalyco-opencode").getAttribute("data-to")).toBe(
-      "/anomalyco/opencode/dev",
+      "/anomalyco/opencode/tree/dev",
     );
   });
 
@@ -158,7 +158,7 @@ describe("LandingPage", () => {
         settings: undefined,
         sidebar: undefined,
       },
-      to: "/acme/demo/feature/foo",
+      to: "/acme/demo/tree/feature/foo",
     });
   });
 });

@@ -219,7 +219,7 @@ describe("repoSourceToPath", () => {
     ).toBe("/acme/demo");
   });
 
-  it("collapses explicit slash refs to shorthand repo-ref routes", () => {
+  it("canonicalizes explicit branch refs to tree routes", () => {
     expect(
       repoSourceToPath({
         owner: "acme",
@@ -227,10 +227,21 @@ describe("repoSourceToPath", () => {
         refOrigin: "explicit",
         repo: "demo",
       }),
-    ).toBe("/acme/demo/feature/foo");
+    ).toBe("/acme/demo/tree/feature/foo");
   });
 
-  it("includes commit refs when they are explicitly selected", () => {
+  it("canonicalizes explicit tag refs to tree routes", () => {
+    expect(
+      repoSourceToPath({
+        owner: "acme",
+        ref: "v1.2.3",
+        refOrigin: "explicit",
+        repo: "demo",
+      }),
+    ).toBe("/acme/demo/tree/v1.2.3");
+  });
+
+  it("canonicalizes explicit commit refs to commit routes", () => {
     expect(
       repoSourceToPath({
         owner: "acme",
@@ -238,6 +249,34 @@ describe("repoSourceToPath", () => {
         refOrigin: "explicit",
         repo: "demo",
       }),
-    ).toBe("/acme/demo/0123456789abcdef0123456789abcdef01234567");
+    ).toBe("/acme/demo/commit/0123456789abcdef0123456789abcdef01234567");
+  });
+
+  it("round-trips generated canonical paths back through the parser", () => {
+    const branchPath = repoSourceToPath({
+      owner: "acme",
+      ref: "feature/foo",
+      refOrigin: "explicit",
+      repo: "demo",
+    });
+    const commitPath = repoSourceToPath({
+      owner: "acme",
+      ref: "0123456789abcdef0123456789abcdef01234567",
+      refOrigin: "explicit",
+      repo: "demo",
+    });
+
+    expect(parseRepoRoutePath(branchPath)).toEqual({
+      owner: "acme",
+      repo: "demo",
+      tail: "feature/foo",
+      type: "tree-page",
+    });
+    expect(parseRepoRoutePath(commitPath)).toEqual({
+      owner: "acme",
+      repo: "demo",
+      sha: "0123456789abcdef0123456789abcdef01234567",
+      type: "commit-page",
+    });
   });
 });

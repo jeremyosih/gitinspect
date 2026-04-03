@@ -65,8 +65,8 @@ const mockDirectoryContent = [
 ];
 
 const mockCommitResponse = {
+  commit: { tree: { sha: "tree-sha" } },
   sha: "commit-sha",
-  tree: { sha: "tree-sha" },
 };
 
 export const TEST_REPO_SOURCE: ResolvedRepoSource = {
@@ -86,7 +86,11 @@ export function installMockRepoFetch() {
   const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
 
-    if (url.includes("commits/heads/main")) {
+    if (url.includes("git/ref/heads/main")) {
+      return createJsonResponse({ object: { sha: "commit-sha", type: "commit" } });
+    }
+
+    if (url.includes("commits/commit-sha")) {
       return createJsonResponse(mockCommitResponse);
     }
 
@@ -94,7 +98,7 @@ export function installMockRepoFetch() {
       return createJsonResponse(mockTreeResponse);
     }
 
-    if (url.includes("contents/src?ref=")) {
+    if (url.includes("contents/src?ref=commit-sha")) {
       return createJsonResponse(mockDirectoryContent);
     }
 

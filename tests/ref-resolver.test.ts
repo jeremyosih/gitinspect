@@ -19,8 +19,16 @@ function createNotFoundResponse(): Response {
   return createJsonResponse({ message: "Not Found" }, 404);
 }
 
+function createValidationResponse(message = "No commit found for SHA"): Response {
+  return createJsonResponse({ message }, 422);
+}
+
 function createCommitResponse(sha: string): Response {
   return createJsonResponse({ sha });
+}
+
+function createGitRefResponse(sha: string, type: string = "commit"): Response {
+  return createJsonResponse({ object: { sha, type } });
 }
 
 describe("resolveRepoIntent", () => {
@@ -34,8 +42,8 @@ describe("resolveRepoIntent", () => {
         return createJsonResponse({ default_branch: "main" });
       }
 
-      if (path === "/repos/acme/demo/commits/heads%2Fmain") {
-        return createCommitResponse("commit-main");
+      if (path === "/repos/acme/demo/git/ref/heads/main") {
+        return createGitRefResponse("commit-main");
       }
 
       return createNotFoundResponse();
@@ -65,18 +73,18 @@ describe("resolveRepoIntent", () => {
     });
   });
 
-  it("resolves explicit branches", async () => {
+  it("resolves explicit single-segment branches", async () => {
     githubApiFetchMock.mockImplementation(async (path) => {
-      if (path === "/repos/acme/demo/commits/heads%2Fcanary") {
-        return createCommitResponse("commit-canary");
+      if (path === "/repos/acme/demo/git/ref/heads/canary") {
+        return createGitRefResponse("commit-canary");
       }
 
-      if (path === "/repos/acme/demo/commits/tags%2Fcanary") {
+      if (path === "/repos/acme/demo/git/ref/tags/canary") {
         return createNotFoundResponse();
       }
 
       if (path === "/repos/acme/demo/commits/canary") {
-        return createNotFoundResponse();
+        return createValidationResponse();
       }
 
       return createNotFoundResponse();
@@ -104,18 +112,55 @@ describe("resolveRepoIntent", () => {
     });
   });
 
-  it("resolves explicit tags", async () => {
+  it("resolves explicit slash branches", async () => {
     githubApiFetchMock.mockImplementation(async (path) => {
-      if (path === "/repos/acme/demo/commits/heads%2Fv1.2.3") {
+      if (path === "/repos/acme/demo/git/ref/heads/feature%2Ffoo") {
+        return createGitRefResponse("commit-feature-foo");
+      }
+
+      if (path === "/repos/acme/demo/git/ref/tags/feature%2Ffoo") {
         return createNotFoundResponse();
       }
 
-      if (path === "/repos/acme/demo/commits/tags%2Fv1.2.3") {
-        return createCommitResponse("commit-tag");
+      if (path === "/repos/acme/demo/commits/feature%2Ffoo") {
+        return createValidationResponse();
+      }
+
+      return createNotFoundResponse();
+    });
+
+    const { resolveRepoIntent } = await import("@/repo/ref-resolver");
+
+    await expect(
+      resolveRepoIntent({
+        owner: "acme",
+        rawRef: "feature/foo",
+        repo: "demo",
+        type: "shorthand-ref",
+      }),
+    ).resolves.toMatchObject({
+      ref: "feature/foo",
+      resolvedRef: {
+        apiRef: "heads/feature/foo",
+        fullRef: "refs/heads/feature/foo",
+        kind: "branch",
+        name: "feature/foo",
+      },
+    });
+  });
+
+  it("resolves explicit tags", async () => {
+    githubApiFetchMock.mockImplementation(async (path) => {
+      if (path === "/repos/acme/demo/git/ref/heads/v1.2.3") {
+        return createNotFoundResponse();
+      }
+
+      if (path === "/repos/acme/demo/git/ref/tags/v1.2.3") {
+        return createGitRefResponse("tag-object", "tag");
       }
 
       if (path === "/repos/acme/demo/commits/v1.2.3") {
-        return createNotFoundResponse();
+        return createValidationResponse();
       }
 
       return createNotFoundResponse();
@@ -138,6 +183,37 @@ describe("resolveRepoIntent", () => {
         fullRef: "refs/tags/v1.2.3",
         kind: "tag",
         name: "v1.2.3",
+      },
+      view: "repo",
+    });
+  });
+
+  it("resolves explicit commits", async () => {
+    const sha = "0123456789abcdef0123456789abcdef01234567";
+
+    githubApiFetchMock.mockImplementation(async (path) => {
+      if (path === `/repos/acme/demo/commits/${sha}`) {
+        return createCommitResponse(sha);
+      }
+
+      return createNotFoundResponse();
+    });
+
+    const { resolveRepoIntent } = await import("@/repo/ref-resolver");
+
+    await expect(
+      resolveRepoIntent({
+        owner: "acme",
+        rawRef: sha,
+        repo: "demo",
+        type: "shorthand-ref",
+      }),
+    ).resolves.toMatchObject({
+      ref: sha,
+      refOrigin: "explicit",
+      resolvedRef: {
+        kind: "commit",
+        sha,
       },
       view: "repo",
     });
@@ -174,26 +250,26 @@ describe("resolveRepoIntent", () => {
     });
   });
 
-  it("resolves tree pages with slash refs and preserves leftover subpath", async () => {
+  it("resolves tree pages with slash branches and preserves the leftover subpath", async () => {
     githubApiFetchMock.mockImplementation(async (path) => {
-      if (path === "/repos/acme/demo/commits/heads%2Ffeature%2Ffoo%2Fsrc%2Flib") {
+      if (path === "/repos/acme/demo/git/ref/heads/feature%2Ffoo%2Fsrc%2Flib") {
         return createNotFoundResponse();
       }
 
-      if (path === "/repos/acme/demo/commits/tags%2Ffeature%2Ffoo%2Fsrc%2Flib") {
+      if (path === "/repos/acme/demo/git/ref/tags/feature%2Ffoo%2Fsrc%2Flib") {
         return createNotFoundResponse();
       }
 
-      if (path === "/repos/acme/demo/commits/heads%2Ffeature%2Ffoo%2Fsrc") {
+      if (path === "/repos/acme/demo/git/ref/heads/feature%2Ffoo%2Fsrc") {
         return createNotFoundResponse();
       }
 
-      if (path === "/repos/acme/demo/commits/tags%2Ffeature%2Ffoo%2Fsrc") {
+      if (path === "/repos/acme/demo/git/ref/tags/feature%2Ffoo%2Fsrc") {
         return createNotFoundResponse();
       }
 
-      if (path === "/repos/acme/demo/commits/heads%2Ffeature%2Ffoo") {
-        return createCommitResponse("commit-feature-foo");
+      if (path === "/repos/acme/demo/git/ref/heads/feature%2Ffoo") {
+        return createGitRefResponse("commit-feature-foo");
       }
 
       return createNotFoundResponse();
@@ -222,18 +298,18 @@ describe("resolveRepoIntent", () => {
     });
   });
 
-  it("resolves blob pages with slash refs and preserves leftover subpath", async () => {
+  it("resolves blob pages with slash branches and preserves the leftover subpath", async () => {
     githubApiFetchMock.mockImplementation(async (path) => {
-      if (path === "/repos/acme/demo/commits/heads%2Frelease%2Fcandidate%2FREADME.md") {
+      if (path === "/repos/acme/demo/git/ref/heads/release%2Fcandidate%2FREADME.md") {
         return createNotFoundResponse();
       }
 
-      if (path === "/repos/acme/demo/commits/tags%2Frelease%2Fcandidate%2FREADME.md") {
+      if (path === "/repos/acme/demo/git/ref/tags/release%2Fcandidate%2FREADME.md") {
         return createNotFoundResponse();
       }
 
-      if (path === "/repos/acme/demo/commits/heads%2Frelease%2Fcandidate") {
-        return createCommitResponse("commit-release-candidate");
+      if (path === "/repos/acme/demo/git/ref/heads/release%2Fcandidate") {
+        return createGitRefResponse("commit-release-candidate");
       }
 
       return createNotFoundResponse();
@@ -262,14 +338,69 @@ describe("resolveRepoIntent", () => {
     });
   });
 
+  it("lets tree routes fall through to commit resolution after branch and tag probes miss", async () => {
+    const sha = "0123456789abcdef0123456789abcdef01234567";
+
+    githubApiFetchMock.mockImplementation(async (path) => {
+      if (path === `/repos/acme/demo/git/ref/heads/${sha}%2Fsrc%2Flib`) {
+        return createNotFoundResponse();
+      }
+
+      if (path === `/repos/acme/demo/git/ref/tags/${sha}%2Fsrc%2Flib`) {
+        return createNotFoundResponse();
+      }
+
+      if (path === `/repos/acme/demo/git/ref/heads/${sha}%2Fsrc`) {
+        return createNotFoundResponse();
+      }
+
+      if (path === `/repos/acme/demo/git/ref/tags/${sha}%2Fsrc`) {
+        return createNotFoundResponse();
+      }
+
+      if (path === `/repos/acme/demo/git/ref/heads/${sha}`) {
+        return createNotFoundResponse();
+      }
+
+      if (path === `/repos/acme/demo/git/ref/tags/${sha}`) {
+        return createNotFoundResponse();
+      }
+
+      if (path === `/repos/acme/demo/commits/${sha}`) {
+        return createCommitResponse(sha);
+      }
+
+      return createNotFoundResponse();
+    });
+
+    const { resolveRepoIntent } = await import("@/repo/ref-resolver");
+
+    await expect(
+      resolveRepoIntent({
+        owner: "acme",
+        repo: "demo",
+        tail: `${sha}/src/lib`,
+        type: "tree-page",
+      }),
+    ).resolves.toMatchObject({
+      ref: sha,
+      resolvedRef: {
+        kind: "commit",
+        sha,
+      },
+      subpath: "src/lib",
+      view: "tree",
+    });
+  });
+
   it("falls back unsupported repo pages to the repo root", async () => {
     githubApiFetchMock.mockImplementation(async (path) => {
       if (path === "/repos/acme/demo") {
         return createJsonResponse({ default_branch: "main" });
       }
 
-      if (path === "/repos/acme/demo/commits/heads%2Fmain") {
-        return createCommitResponse("commit-main");
+      if (path === "/repos/acme/demo/git/ref/heads/main") {
+        return createGitRefResponse("commit-main");
       }
 
       return createNotFoundResponse();
@@ -292,42 +423,14 @@ describe("resolveRepoIntent", () => {
     });
   });
 
-  it("throws explicit errors for invalid input", async () => {
-    const { resolveRepoIntent } = await import("@/repo/ref-resolver");
-
-    await expect(
-      resolveRepoIntent({
-        reason: "Empty repository input",
-        type: "invalid",
-      }),
-    ).rejects.toThrow("Empty repository input");
-  });
-
-  it("throws explicit missing-ref errors", async () => {
-    githubApiFetchMock.mockResolvedValue(createNotFoundResponse());
-
-    const { resolveRepoIntent } = await import("@/repo/ref-resolver");
-
-    await expect(
-      resolveRepoIntent({
-        owner: "acme",
-        rawRef: "does-not-exist",
-        repo: "demo",
-        type: "shorthand-ref",
-      }),
-    ).rejects.toMatchObject({
-      message: "GitHub ref not found: does-not-exist",
-    });
-  });
-
   it("prefers branches over tags when names collide", async () => {
     githubApiFetchMock.mockImplementation(async (path) => {
-      if (path === "/repos/acme/demo/commits/heads%2Fstable") {
-        return createCommitResponse("branch-commit");
+      if (path === "/repos/acme/demo/git/ref/heads/stable") {
+        return createGitRefResponse("branch-commit");
       }
 
-      if (path === "/repos/acme/demo/commits/tags%2Fstable") {
-        return createCommitResponse("tag-commit");
+      if (path === "/repos/acme/demo/git/ref/tags/stable") {
+        return createGitRefResponse("tag-object", "tag");
       }
 
       return createNotFoundResponse();
@@ -350,6 +453,40 @@ describe("resolveRepoIntent", () => {
         kind: "branch",
         name: "stable",
       },
+    });
+  });
+
+  it("throws explicit errors for invalid input", async () => {
+    const { resolveRepoIntent } = await import("@/repo/ref-resolver");
+
+    await expect(
+      resolveRepoIntent({
+        reason: "Empty repository input",
+        type: "invalid",
+      }),
+    ).rejects.toThrow("Empty repository input");
+  });
+
+  it("throws explicit missing-ref errors", async () => {
+    githubApiFetchMock.mockImplementation(async (path) => {
+      if (path.startsWith("/repos/acme/demo/commits/")) {
+        return createValidationResponse();
+      }
+
+      return createNotFoundResponse();
+    });
+
+    const { resolveRepoIntent } = await import("@/repo/ref-resolver");
+
+    await expect(
+      resolveRepoIntent({
+        owner: "acme",
+        rawRef: "does-not-exist",
+        repo: "demo",
+        type: "shorthand-ref",
+      }),
+    ).rejects.toMatchObject({
+      message: "GitHub ref not found: does-not-exist",
     });
   });
 });

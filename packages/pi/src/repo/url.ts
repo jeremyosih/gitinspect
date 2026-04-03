@@ -1,4 +1,6 @@
-import type { ResolvedRepoSource } from "@gitinspect/db/storage-types";
+import type { ResolvedRepoRef, ResolvedRepoSource } from "@gitinspect/db/storage-types";
+
+const FULL_COMMIT_SHA_PATTERN = /^[0-9a-f]{40}$/i;
 
 function encodePathSegments(path: string | undefined): string {
   return (
@@ -11,24 +13,34 @@ function encodePathSegments(path: string | undefined): string {
   );
 }
 
-function buildRepoPathname(owner: string, repo: string, ref?: string): string {
+function buildRepoPathname(owner: string, repo: string, path?: string): string {
   const encodedOwner = encodeURIComponent(owner.trim());
   const encodedRepo = encodeURIComponent(repo.trim());
-  const encodedRef = encodePathSegments(ref);
+  const encodedPath = encodePathSegments(path);
 
-  return encodedRef
-    ? `/${encodedOwner}/${encodedRepo}/${encodedRef}`
+  return encodedPath
+    ? `/${encodedOwner}/${encodedRepo}/${encodedPath}`
     : `/${encodedOwner}/${encodedRepo}`;
 }
 
+function isCommitRef(ref: string, resolvedRef?: ResolvedRepoRef): boolean {
+  return resolvedRef?.kind === "commit" || FULL_COMMIT_SHA_PATTERN.test(ref);
+}
+
 export function repoSourceToPath(
-  source: Pick<ResolvedRepoSource, "owner" | "repo" | "ref" | "refOrigin">,
+  source: Pick<ResolvedRepoSource, "owner" | "repo" | "ref" | "refOrigin"> & {
+    resolvedRef?: ResolvedRepoRef;
+  },
 ): string {
-  return buildRepoPathname(
-    source.owner,
-    source.repo,
-    source.refOrigin === "default" ? undefined : source.ref,
-  );
+  if (source.refOrigin === "default") {
+    return buildRepoPathname(source.owner, source.repo);
+  }
+
+  if (isCommitRef(source.ref, source.resolvedRef)) {
+    return buildRepoPathname(source.owner, source.repo, `commit/${source.ref}`);
+  }
+
+  return buildRepoPathname(source.owner, source.repo, `tree/${source.ref}`);
 }
 
 export function githubRepoUrl(owner: string, repo: string): string {

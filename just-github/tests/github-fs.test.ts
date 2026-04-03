@@ -17,7 +17,14 @@ const mockFileContent = {
 };
 
 const mockDirContent = [
-  { name: "index.ts", path: "src/index.ts", sha: "abc123", size: 42, type: "file", download_url: null },
+  {
+    name: "index.ts",
+    path: "src/index.ts",
+    sha: "abc123",
+    size: 42,
+    type: "file",
+    download_url: null,
+  },
   { name: "utils", path: "src/utils", sha: "def456", size: 0, type: "dir", download_url: null },
 ];
 
@@ -36,7 +43,7 @@ const mockTreeResponse = {
 
 const mockCommitResponse = {
   sha: "commit-sha",
-  tree: { sha: "tree-sha" },
+  commit: { tree: { sha: "tree-sha" } },
 };
 
 const MAIN_REF: GitHubResolvedRef = {
@@ -44,6 +51,13 @@ const MAIN_REF: GitHubResolvedRef = {
   fullRef: "refs/heads/main",
   kind: "branch",
   name: "main",
+};
+
+const TAG_REF: GitHubResolvedRef = {
+  apiRef: "tags/v1.2.3",
+  fullRef: "refs/tags/v1.2.3",
+  kind: "tag",
+  name: "v1.2.3",
 };
 
 function mockFetch(handlers: Record<string, any>) {
@@ -55,13 +69,21 @@ function mockFetch(handlers: Record<string, any>) {
         if (response === null) {
           return new Response("Not Found", {
             status: 404,
-            headers: { "x-ratelimit-limit": "5000", "x-ratelimit-remaining": "4999", "x-ratelimit-reset": "1700000000" },
+            headers: {
+              "x-ratelimit-limit": "5000",
+              "x-ratelimit-remaining": "4999",
+              "x-ratelimit-reset": "1700000000",
+            },
           });
         }
         if (typeof response === "string") {
           return new Response(response, {
             status: 200,
-            headers: { "x-ratelimit-limit": "5000", "x-ratelimit-remaining": "4999", "x-ratelimit-reset": "1700000000" },
+            headers: {
+              "x-ratelimit-limit": "5000",
+              "x-ratelimit-remaining": "4999",
+              "x-ratelimit-reset": "1700000000",
+            },
           });
         }
         return new Response(JSON.stringify(response), {
@@ -86,9 +108,10 @@ describe("GitHubFs", () => {
   beforeEach(() => {
     fetchSpy = mockFetch({
       "contents/src/index.ts": mockFileContent,
-      "contents/src?ref=": mockDirContent,
+      "contents/src?ref=commit-sha": mockDirContent,
       "contents/nonexistent": null,
-      "commits/heads/main": mockCommitResponse,
+      "git/ref/heads/main": { object: { sha: "commit-sha", type: "commit" } },
+      "commits/commit-sha": mockCommitResponse,
       "git/trees/tree-sha?recursive=1": mockTreeResponse,
     });
     vi.stubGlobal("fetch", fetchSpy);
@@ -117,7 +140,11 @@ describe("GitHubFs", () => {
     });
 
     it("throws EISDIR for directories", async () => {
-      fetchSpy = mockFetch({ "contents/src": mockDirContent });
+      fetchSpy = mockFetch({
+        "git/ref/heads/main": { object: { sha: "commit-sha", type: "commit" } },
+        "commits/commit-sha": mockCommitResponse,
+        "contents/src?ref=commit-sha": mockDirContent,
+      });
       vi.stubGlobal("fetch", fetchSpy);
       fs = new GitHubFs({ owner: "o", repo: "r", ref: MAIN_REF });
 
@@ -195,6 +222,35 @@ describe("GitHubFs", () => {
       expect(paths).toContain("src/utils/helper.ts");
     });
 
+    it("loads trees for lightweight tags", async () => {
+      fetchSpy = mockFetch({
+        "git/ref/tags/v1.2.3": { object: { sha: "tag-commit-sha", type: "commit" } },
+        "commits/tag-commit-sha": {
+          sha: "tag-commit-sha",
+          commit: { tree: { sha: "tree-sha" } },
+        },
+        "git/trees/tree-sha?recursive=1": mockTreeResponse,
+      });
+      vi.stubGlobal("fetch", fetchSpy);
+      fs = new GitHubFs({ owner: "o", repo: "r", ref: TAG_REF });
+
+      await expect(fs.tree()).resolves.toContain("src/index.ts");
+    });
+
+    it("throws a clear error for annotated tags that target trees", async () => {
+      fetchSpy = mockFetch({
+        "git/ref/tags/v1.2.3": { object: { sha: "tag-object-sha", type: "tag" } },
+        "git/tags/tag-object-sha": { object: { sha: "tree-sha", type: "tree" } },
+      });
+      vi.stubGlobal("fetch", fetchSpy);
+      fs = new GitHubFs({ owner: "o", repo: "r", ref: TAG_REF });
+
+      await expect(fs.tree()).rejects.toMatchObject({
+        code: "ENOTSUP",
+        message: "gitinspect v0 does not support annotated tags that target trees or blobs.",
+      });
+    });
+
     it("correctly identifies symlinks in tree", async () => {
       await fs.tree(); // load tree
       const info = await fs.stat("link");
@@ -235,21 +291,25 @@ describe("GitHubFs", () => {
       vi.setSystemTime(new Date("2026-03-29T10:00:00.000Z"));
 
       const resetAtSeconds = Math.floor((Date.now() + 2 * 60_000) / 1000);
-      fetchSpy = vi
-        .fn()
-        .mockResolvedValueOnce(
-          new Response(JSON.stringify({ message: "API rate limit exceeded" }), {
-            status: 403,
-            headers: {
-              "Content-Type": "application/json",
-              "x-ratelimit-limit": "60",
-              "x-ratelimit-remaining": "0",
-              "x-ratelimit-reset": String(resetAtSeconds),
-            },
-          }),
-        )
-        .mockResolvedValueOnce(
-          new Response(JSON.stringify(mockFileContent), {
+      let shouldRateLimit = true;
+      fetchSpy = vi.fn(async (url: string | URL | Request) => {
+        const urlStr = typeof url === "string" ? url : url.toString();
+
+        if (urlStr.includes("git/ref/heads/main")) {
+          if (shouldRateLimit) {
+            shouldRateLimit = false;
+            return new Response(JSON.stringify({ message: "API rate limit exceeded" }), {
+              status: 403,
+              headers: {
+                "Content-Type": "application/json",
+                "x-ratelimit-limit": "60",
+                "x-ratelimit-remaining": "0",
+                "x-ratelimit-reset": String(resetAtSeconds),
+              },
+            });
+          }
+
+          return new Response(JSON.stringify({ object: { sha: "commit-sha", type: "commit" } }), {
             status: 200,
             headers: {
               "Content-Type": "application/json",
@@ -257,8 +317,31 @@ describe("GitHubFs", () => {
               "x-ratelimit-remaining": "59",
               "x-ratelimit-reset": String(resetAtSeconds + 3600),
             },
-          }),
-        );
+          });
+        }
+
+        if (urlStr.includes("commits/commit-sha")) {
+          return new Response(JSON.stringify(mockCommitResponse), {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+              "x-ratelimit-limit": "60",
+              "x-ratelimit-remaining": "59",
+              "x-ratelimit-reset": String(resetAtSeconds + 3600),
+            },
+          });
+        }
+
+        return new Response(JSON.stringify(mockFileContent), {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+            "x-ratelimit-limit": "60",
+            "x-ratelimit-remaining": "59",
+            "x-ratelimit-reset": String(resetAtSeconds + 3600),
+          },
+        });
+      });
       vi.stubGlobal("fetch", fetchSpy);
       fs = new GitHubFs({ owner: "o", repo: "r", ref: MAIN_REF });
 
@@ -278,14 +361,40 @@ describe("GitHubFs", () => {
 
       const content = await fs.readFile("src/index.ts");
       expect(content).toBe("export const hello = 'world';");
-      expect(fetchSpy).toHaveBeenCalledTimes(2);
+      expect(fetchSpy).toHaveBeenCalledTimes(4);
     });
 
     it("falls back to anonymous reads when a token cannot access a public repo", async () => {
-      fetchSpy = vi
-        .fn()
-        .mockResolvedValueOnce(
-          new Response(
+      fetchSpy = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+        const urlStr = typeof url === "string" ? url : url.toString();
+        const headers = init?.headers as Record<string, string> | undefined;
+
+        if (urlStr.includes("git/ref/heads/main")) {
+          return new Response(JSON.stringify({ object: { sha: "commit-sha", type: "commit" } }), {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+              "x-ratelimit-limit": "5000",
+              "x-ratelimit-remaining": "4999",
+              "x-ratelimit-reset": "1900000000",
+            },
+          });
+        }
+
+        if (urlStr.includes("commits/commit-sha")) {
+          return new Response(JSON.stringify(mockCommitResponse), {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+              "x-ratelimit-limit": "5000",
+              "x-ratelimit-remaining": "4999",
+              "x-ratelimit-reset": "1900000000",
+            },
+          });
+        }
+
+        if (headers?.Authorization) {
+          return new Response(
             JSON.stringify({
               message: "Resource not accessible by personal access token",
             }),
@@ -298,19 +407,19 @@ describe("GitHubFs", () => {
                 "x-ratelimit-reset": "1900000000",
               },
             },
-          ),
-        )
-        .mockResolvedValueOnce(
-          new Response(JSON.stringify(mockFileContent), {
-            status: 200,
-            headers: {
-              "Content-Type": "application/json",
-              "x-ratelimit-limit": "60",
-              "x-ratelimit-remaining": "59",
-              "x-ratelimit-reset": "1900000000",
-            },
-          }),
-        );
+          );
+        }
+
+        return new Response(JSON.stringify(mockFileContent), {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+            "x-ratelimit-limit": "60",
+            "x-ratelimit-remaining": "59",
+            "x-ratelimit-reset": "1900000000",
+          },
+        });
+      });
       vi.stubGlobal("fetch", fetchSpy);
       fs = new GitHubFs({
         owner: "o",
@@ -322,7 +431,7 @@ describe("GitHubFs", () => {
       const content = await fs.readFile("src/index.ts");
 
       expect(content).toBe("export const hello = 'world';");
-      expect(fetchSpy).toHaveBeenCalledTimes(2);
+      expect(fetchSpy).toHaveBeenCalledTimes(4);
       expect(fetchSpy.mock.calls[0]?.[1]).toEqual(
         expect.objectContaining({
           headers: expect.objectContaining({
@@ -330,7 +439,7 @@ describe("GitHubFs", () => {
           }),
         }),
       );
-      expect(fetchSpy.mock.calls[1]?.[1]).toEqual(
+      expect(fetchSpy.mock.calls[3]?.[1]).toEqual(
         expect.objectContaining({
           headers: expect.not.objectContaining({
             Authorization: expect.any(String),

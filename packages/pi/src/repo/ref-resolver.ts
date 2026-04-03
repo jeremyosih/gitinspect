@@ -16,6 +16,13 @@ type GitHubCommitLookup = {
   sha: string;
 };
 
+type GitHubGitRefLookup = {
+  object: {
+    sha: string;
+    type: string;
+  };
+};
+
 type GitHubRepositoryPayload = {
   default_branch?: string;
 };
@@ -63,9 +70,10 @@ async function requestGitHubJson<T>(path: string, pathForError: string): Promise
 async function requestGitHubJsonOrUndefined<T>(
   path: string,
   pathForError: string,
+  allowedMissingStatuses: readonly number[] = [404],
 ): Promise<T | undefined> {
   const response = await githubApiFetch(path);
-  if (response.status === 404) {
+  if (allowedMissingStatuses.includes(response.status)) {
     return undefined;
   }
   if (!response.ok) {
@@ -94,15 +102,28 @@ async function lookupCommitByRef(
   return await requestGitHubJsonOrUndefined<GitHubCommitLookup>(
     `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits/${encodeURIComponent(ref)}`,
     ref,
+    [404, 422],
+  );
+}
+
+async function lookupGitRef(
+  owner: string,
+  repo: string,
+  namespace: "heads" | "tags",
+  name: string,
+): Promise<GitHubGitRefLookup | undefined> {
+  return await requestGitHubJsonOrUndefined<GitHubGitRefLookup>(
+    `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/ref/${namespace}/${encodeURIComponent(name)}`,
+    name,
   );
 }
 
 async function lookupBranch(owner: string, repo: string, name: string): Promise<boolean> {
-  return (await lookupCommitByRef(owner, repo, `heads/${name}`)) !== undefined;
+  return (await lookupGitRef(owner, repo, "heads", name)) !== undefined;
 }
 
 async function lookupTag(owner: string, repo: string, name: string): Promise<boolean> {
-  return (await lookupCommitByRef(owner, repo, `tags/${name}`)) !== undefined;
+  return (await lookupGitRef(owner, repo, "tags", name)) !== undefined;
 }
 
 async function lookupCommit(owner: string, repo: string, sha: string): Promise<string | undefined> {

@@ -61,6 +61,10 @@ describe("chat routes", () => {
         name: "main",
       },
     });
+    vi.spyOn(Route, "useParams").mockReturnValue({
+      owner: "acme",
+      repo: "demo",
+    });
 
     const Component = Route.options.component;
 
@@ -86,6 +90,11 @@ describe("chat routes", () => {
         kind: "branch",
         name: "feature/foo",
       },
+    });
+    vi.spyOn(Route, "useParams").mockReturnValue({
+      _splat: "tree/feature/foo",
+      owner: "acme",
+      repo: "demo",
     });
 
     const Component = Route.options.component;
