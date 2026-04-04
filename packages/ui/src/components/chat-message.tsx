@@ -1,5 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { AlertCircle, AlertTriangle, ChevronDown, Info } from "lucide-react";
+import { getGitHubNoticeCta } from "@gitinspect/pi/repo/github-access";
+import { useGitHubAuthContext } from "@gitinspect/ui/components/github-auth-context";
 import {
   deriveAssistantView,
   getUserText,
@@ -54,6 +56,7 @@ export function ChatMessage(props: {
   message: ChatMessageType;
 }) {
   const { message } = props;
+  const auth = useGitHubAuthContext();
 
   if (message.role === "user") {
     return (
@@ -89,6 +92,12 @@ export function ChatMessage(props: {
 
     const showGithubCta = message.action === "open-github-settings";
     const showHtmlDetails = Boolean(message.detailsHtml);
+    const githubCta = auth
+      ? getGitHubNoticeCta({
+          kind: message.kind,
+          state: auth.authState,
+        })
+      : null;
 
     return (
       <div className="flex w-full justify-start py-1">
@@ -142,17 +151,29 @@ export function ChatMessage(props: {
           </ItemContent>
           {showGithubCta ? (
             <ItemActions className="shrink-0">
-              <Button asChild size="sm" variant="outline">
-                <Link
-                  search={(prev) => ({
-                    ...prev,
-                    settings: "github",
-                  })}
-                  to="."
+              {auth && githubCta ? (
+                <Button
+                  onClick={() => {
+                    void auth.runNoticeIntent(githubCta.intent);
+                  }}
+                  size="sm"
+                  variant="outline"
                 >
-                  {message.kind === "github_rate_limit" ? "Add GitHub token" : "GitHub settings"}
-                </Link>
-              </Button>
+                  {githubCta.label}
+                </Button>
+              ) : (
+                <Button asChild size="sm" variant="outline">
+                  <Link
+                    search={(prev) => ({
+                      ...prev,
+                      settings: "github",
+                    })}
+                    to="."
+                  >
+                    GitHub settings
+                  </Link>
+                </Button>
+              )}
             </ItemActions>
           ) : null}
         </Item>

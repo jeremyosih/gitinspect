@@ -114,9 +114,9 @@ export const PROVIDER_GROUPS: Partial<Record<ProviderGroupId, ProviderGroupDefin
   },
   "fireworks-free": {
     canonicalProvider: "fireworks-ai",
-    description: "Fireworks serverless Kimi (hosted API access)",
+    description: "Gitinspect free models",
     id: "fireworks-free",
-    label: "Fireworks",
+    label: "Gitinspect",
   },
   "openai-codex": {
     canonicalProvider: "openai-codex",

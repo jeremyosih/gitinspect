@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Download, Trash2 } from "lucide-react";
 import { runtimeClient } from "@gitinspect/pi/agent/runtime-client";
 import { deleteAllLocalData, exportAllChatData } from "@gitinspect/db/schema";
+import { useGitHubAuthContext } from "@gitinspect/ui/components/github-auth-context";
 import { Button } from "@gitinspect/ui/components/button";
 import {
   AlertDialog,
@@ -46,6 +47,7 @@ export function DataSettings() {
   const search = useSearch({ strict: false });
   const [isExporting, setIsExporting] = React.useState(false);
   const [isDeleting, setIsDeleting] = React.useState(false);
+  const auth = useGitHubAuthContext();
 
   const navigateAfterWipe = React.useCallback(() => {
     const sidebar = search.sidebar === "open" ? "open" : undefined;
@@ -104,6 +106,7 @@ export function DataSettings() {
     setIsDeleting(true);
     try {
       await runtimeClient.releaseAll();
+      await auth?.signOut();
       await deleteAllLocalData();
       toast.success("All local data removed from this browser");
       navigateAfterWipe();
@@ -142,8 +145,9 @@ export function DataSettings() {
         <ItemContent>
           <ItemTitle>Delete all local data</ItemTitle>
           <ItemDescription>
-            Remove everything stored in this browser: chats, recent repos, provider keys and OAuth,
-            app settings (including proxy), and usage / cost history.
+            Remove everything stored in this browser: chats, recent repos, provider keys, PAT
+            fallback tokens, app settings, local caches, usage totals, and any secure auth cookies
+            for the product session.
           </ItemDescription>
         </ItemContent>
         <ItemActions>
@@ -163,8 +167,9 @@ export function DataSettings() {
               <AlertDialogHeader>
                 <AlertDialogTitle>Delete all local data?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This wipes chats, repositories, credentials, settings, and usage totals from
-                  IndexedDB. It cannot be undone. Export chat JSON first if you want a transcript
+                  This wipes IndexedDB data, clears PAT fallback storage, signs you out of the
+                  cookie-backed Better Auth session, and resets the app to a clean signed-out
+                  baseline. It cannot be undone. Export chat JSON first if you want a transcript
                   backup.
                 </AlertDialogDescription>
               </AlertDialogHeader>

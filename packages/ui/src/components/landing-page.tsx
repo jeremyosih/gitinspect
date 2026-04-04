@@ -50,7 +50,7 @@ export function LandingPage() {
             size="hero"
           />
           <p className="max-w-md mx-auto text-sm text-muted-foreground">
-            GitInspect is an AI coding agent that lives on your browser and can answer questions
+            Gitinspect is an AI coding agent that lives on your browser and can answer questions
             about any GitHub repository.
           </p>
         </div>
@@ -135,8 +135,9 @@ export function LandingPage() {
           </a>
         </p>
         <p className="mt-2 max-w-md mx-auto text-[11px] leading-relaxed text-muted-foreground/70">
-          This page respects your privacy by not using cookies or similar technologies and not
-          collecting personal information.
+          Chats and repo state stay local-first in your browser. If you sign in, the product session
+          uses secure cookies, and public repo cards may fetch stars and language through a tiny
+          public metadata endpoint.
         </p>
       </footer>
     </div>

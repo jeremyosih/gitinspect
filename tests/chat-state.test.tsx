@@ -63,7 +63,7 @@ vi.mock("@/repo/github-fetch", () => ({
 
     toastErrorMock("GitHub requests are rate limited right now.", {
       action: {
-        label: "Add token",
+        label: "Sign in with GitHub",
         onClick: vi.fn(),
       },
     });
@@ -196,6 +196,7 @@ function mockChatQueries(options: {
     providerGroup: string;
     thinkingLevel: string;
   };
+  guestChatAcknowledged?: boolean;
   loadedSessionState:
     | { kind: "none" | "missing" }
     | { kind: "active"; messages: Array<MessageRow>; session: SessionData };
@@ -204,13 +205,15 @@ function mockChatQueries(options: {
   useLiveQueryMock.mockImplementation(() => {
     const callIndex = useLiveQueryMock.mock.calls.length;
 
-    switch ((callIndex - 1) % 3) {
+    switch ((callIndex - 1) % 4) {
       case 0:
         return options.loadedSessionState;
       case 1:
         return options.sessionRuntime;
-      default:
+      case 2:
         return options.defaults;
+      default:
+        return options.guestChatAcknowledged ?? true;
     }
   });
 }
@@ -419,7 +422,7 @@ describe("Chat state", () => {
         "GitHub requests are rate limited right now.",
         expect.objectContaining({
           action: expect.objectContaining({
-            label: "Add token",
+            label: "Sign in with GitHub",
           }),
         }),
       );

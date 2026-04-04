@@ -2,6 +2,7 @@ import * as React from "react";
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { ChatMessage as ChatMessageType } from "@/types/chat";
+import { GitHubAuthProvider } from "@/components/github-auth-context";
 
 vi.mock("@tanstack/react-router", () => ({
   Link: ({
@@ -91,5 +92,52 @@ describe("ChatMessage", () => {
     ).toBeTruthy();
     expect(screen.getByText(/<title>Vercel Security Checkpoint<\/title>/)).toBeTruthy();
     expect(screen.getByTitle("HTML response preview system-1")).toBeTruthy();
+  });
+
+  it("renders auth-aware GitHub CTAs for signed-out users", async () => {
+    const { ChatMessage } = await import("@/components/chat-message");
+
+    render(
+      <GitHubAuthProvider
+        value={{
+          authState: {
+            fallbackPat: false,
+            githubLink: "unlinked",
+            preferredSource: "none",
+            repoAccess: "missing",
+            session: "signed-out",
+          },
+          closeAuthDialog: () => {},
+          consumeReadyAuthAction: () => null,
+          continueAsGuest: async () => {},
+          dialogOpen: false,
+          dialogVariant: "default",
+          ensureRepoAccess: async () => {},
+          openAuthDialog: () => {},
+          openGithubSettings: () => {},
+          runNoticeIntent: async () => {},
+          signIn: async () => {},
+          signOut: async () => {},
+        }}
+      >
+        <ChatMessage
+          followingMessages={[]}
+          isStreamingReasoning={false}
+          message={{
+            action: "open-github-settings",
+            fingerprint: "github_auth:1",
+            id: "system-auth-1",
+            kind: "github_auth",
+            message: "GitHub authentication failed.",
+            role: "system",
+            severity: "error",
+            source: "github",
+            timestamp: 1,
+          }}
+        />
+      </GitHubAuthProvider>,
+    );
+
+    expect(screen.getByRole("button", { name: "Sign in with GitHub" })).toBeTruthy();
   });
 });

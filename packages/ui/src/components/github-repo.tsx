@@ -3,16 +3,9 @@ import { Link } from "@tanstack/react-router";
 import { ArrowRightIcon, KeyIcon, StarIcon } from "@phosphor-icons/react";
 
 import { Icons } from "@gitinspect/ui/components/icons";
-import { Button } from "@gitinspect/ui/components/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitinspect/ui/components/tooltip";
 import { formatGitHubStarCount } from "@gitinspect/pi/lib/format-github-stars";
 import { cn } from "@gitinspect/ui/lib/utils";
-import {
-  githubApiFetch,
-  handleGithubError,
-  openGithubTokenSettings,
-} from "@gitinspect/pi/repo/github-fetch";
-import { getGithubPersonalAccessToken } from "@gitinspect/pi/repo/github-token";
 import { githubOwnerAvatarUrl } from "@gitinspect/pi/repo/url";
 import type { RepoRefOrigin } from "@gitinspect/db/storage-types";
 
@@ -60,7 +53,6 @@ function usePublicRepoMeta(owner: string, repo: string) {
     | { status: "loading" }
     | { status: "ok"; language: string | null; stargazers: number }
     | { status: "error" }
-    | { status: "no-token" }
   >({ status: "loading" });
 
   React.useEffect(() => {
@@ -69,31 +61,26 @@ function usePublicRepoMeta(owner: string, repo: string) {
 
     void (async () => {
       try {
-        const token = await getGithubPersonalAccessToken();
-        if (!token) {
-          if (!ac.signal.aborted) {
-            setState({ status: "no-token" });
-          }
-          return;
-        }
-
-        const res = await githubApiFetch(
-          `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`,
-          { signal: ac.signal },
+        const response = await fetch(
+          `/api/github/public?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}`,
+          {
+            signal: ac.signal,
+          },
         );
-        if (!res.ok) {
+
+        if (!response.ok) {
           setState({ status: "error" });
           return;
         }
-        const data = (await res.json()) as RepoApiPayload;
+
+        const data = (await response.json()) as RepoApiPayload;
         setState({
           status: "ok",
           language: data.language,
           stargazers: data.stargazers_count,
         });
-      } catch (err) {
+      } catch {
         if (!ac.signal.aborted) {
-          await handleGithubError(err);
           setState({ status: "error" });
         }
       }
@@ -105,37 +92,22 @@ function usePublicRepoMeta(owner: string, repo: string) {
   return state;
 }
 
-function GithubRepoNoTokenMeta() {
+function GithubRepoMetaUnavailable() {
   return (
-    <div className="flex min-w-0 shrink-0 items-center gap-1.5 sm:gap-2">
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="inline-flex max-w-[11rem] items-center gap-1.5 rounded-none border border-dashed border-border bg-muted/25 px-1.5 py-0.5">
-            <KeyIcon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
-            <span className="hidden truncate text-[10px] text-muted-foreground sm:inline">
-              No API token
-            </span>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="inline-flex max-w-[11rem] items-center gap-1.5 rounded-none border border-dashed border-border bg-muted/25 px-1.5 py-0.5">
+          <KeyIcon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+          <span className="hidden truncate text-[10px] text-muted-foreground sm:inline">
+            Metadata unavailable
           </span>
-        </TooltipTrigger>
-        <TooltipContent className="max-w-[280px] text-left" side="top" sideOffset={6}>
-          Star count and primary language come from the GitHub API. Add a personal access token
-          under Settings → GitHub (stored only on this device) to load them and avoid rate limits.
-        </TooltipContent>
-      </Tooltip>
-      <Button
-        className="h-7 shrink-0 px-2 text-[10px]"
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          openGithubTokenSettings();
-        }}
-        size="sm"
-        type="button"
-        variant="outline"
-      >
-        Add token
-      </Button>
-    </div>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-[280px] text-left" side="top" sideOffset={6}>
+        Stars and language come from a tiny public metadata endpoint. Private repo reads still stay
+        client-side with your GitHub connection or PAT fallback.
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -168,8 +140,8 @@ export function GithubRepo({
   );
 
   const metaColumns =
-    meta.status === "no-token" ? (
-      <GithubRepoNoTokenMeta />
+    meta.status === "error" ? (
+      <GithubRepoMetaUnavailable />
     ) : (
       <>
         <div className="hidden min-w-0 shrink-0 items-center gap-1.5 sm:flex">
@@ -279,6 +251,7 @@ export function GithubRepo({
       <Link
         aria-label={workspaceLabel}
         className="absolute inset-0 z-0 rounded-none"
+        preload={false}
         {...(search ? { search } : {})}
         to={to}
       />

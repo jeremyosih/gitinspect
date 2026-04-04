@@ -1,7 +1,7 @@
 import * as React from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useNavigate } from "@tanstack/react-router";
-import { CheckIcon, Plus } from "lucide-react";
+import { CheckIcon, Lock, Plus } from "lucide-react";
 import { db } from "@gitinspect/db/schema";
 import type { ProviderGroupId } from "@gitinspect/pi/types/models";
 import {
@@ -25,6 +25,7 @@ import {
   getProviderGroupMetadata,
   getVisibleProviderGroups,
 } from "@gitinspect/pi/models/catalog";
+import { useGitHubAuthContext } from "@gitinspect/ui/components/github-auth-context";
 import { cn } from "@gitinspect/ui/lib/utils";
 
 export function ChatModelSelector(props: {
@@ -35,9 +36,12 @@ export function ChatModelSelector(props: {
 }) {
   const [open, setOpen] = React.useState(false);
   const navigate = useNavigate();
-  const providerKeys = useLiveQuery(() => db.providerKeys.toArray(), []) ?? [];
+  const auth = useGitHubAuthContext();
+  const providerKeysResult = useLiveQuery(() => db.providerKeys.toArray(), []);
+  const providerKeys = Array.isArray(providerKeysResult) ? providerKeysResult : [];
   const connectedProviders = getConnectedProviders(providerKeys);
   const showAddProviderCta = connectedProviders.length === 0;
+  const gitinspectModelsUnlocked = auth?.authState.session === "signed-in";
   const providerGroups = getVisibleProviderGroups(connectedProviders);
   const activeProviderGroup = providerGroups.includes(props.providerGroup)
     ? props.providerGroup
@@ -65,12 +69,20 @@ export function ChatModelSelector(props: {
               {getModelsForGroup(groupId).map((model) => {
                 const value = `${groupId}:${model.id}`;
                 const isSelected = groupId === activeProviderGroup && model.id === activeModelId;
+                const isLockedGitinspect =
+                  groupId === "fireworks-free" && !gitinspectModelsUnlocked;
 
                 return (
                   <ModelSelectorItem
-                    className="gap-2"
+                    className={cn("gap-2", isLockedGitinspect ? "opacity-75" : undefined)}
                     key={value}
                     onSelect={() => {
+                      if (isLockedGitinspect) {
+                        auth?.openAuthDialog({ mode: "github-only" });
+                        setOpen(false);
+                        return;
+                      }
+
                       props.onSelect(groupId, model.id);
                       setOpen(false);
                     }}
@@ -81,18 +93,24 @@ export function ChatModelSelector(props: {
                       <span className="flex min-w-0 flex-1 flex-col gap-0.5 text-left">
                         <span className="truncate leading-tight">{model.name}</span>
                         <span className="text-xs font-normal text-muted-foreground">
-                          Free (with limits)
+                          {gitinspectModelsUnlocked
+                            ? "Free (with limits)"
+                            : "Sign in with GitHub to use"}
                         </span>
                       </span>
                     ) : (
                       <ModelSelectorName>{model.name}</ModelSelectorName>
                     )}
-                    <CheckIcon
-                      className={cn(
-                        "ml-auto size-4 shrink-0",
-                        isSelected ? "opacity-100" : "opacity-0",
-                      )}
-                    />
+                    {isLockedGitinspect ? (
+                      <Lock className="ml-auto size-4 shrink-0 text-muted-foreground" />
+                    ) : (
+                      <CheckIcon
+                        className={cn(
+                          "ml-auto size-4 shrink-0",
+                          isSelected ? "opacity-100" : "opacity-0",
+                        )}
+                      />
+                    )}
                   </ModelSelectorItem>
                 );
               })}
@@ -117,7 +135,12 @@ export function ChatModelSelector(props: {
                   value="__add_provider__"
                 >
                   <Plus className="size-3.5 shrink-0 text-muted-foreground" />
-                  <span className="flex-1 text-left text-sm">Add provider</span>
+                  <span className="flex min-w-0 flex-1 flex-col text-left">
+                    <span className="text-sm">Add AI provider</span>
+                    <span className="text-xs font-normal text-muted-foreground">
+                      Use your own model without signing in.
+                    </span>
+                  </span>
                 </ModelSelectorItem>
               </ModelSelectorGroup>
             </>

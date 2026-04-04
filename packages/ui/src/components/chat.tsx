@@ -6,6 +6,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { event as trackEvent } from "onedollarstats";
 import { toast } from "sonner";
 import { getAssistantText, getFoldedToolResultIds } from "@gitinspect/pi/lib/chat-adapter";
+import { useGitHubAuthContext } from "@gitinspect/ui/components/github-auth-context";
 import { ChatComposer } from "./chat-composer";
 import { ChatEmptyState } from "./chat-empty-state";
 import { ChatMessage as ChatMessageBlock } from "./chat-message";
@@ -23,12 +24,18 @@ import { StatusShimmer } from "@gitinspect/ui/components/ai-elements/shimmer";
 import { ProgressiveBlur } from "@gitinspect/ui/components/progressive-blur";
 import { Icons } from "@gitinspect/ui/components/icons";
 import { copySessionToClipboard } from "@gitinspect/pi/lib/copy-session-markdown";
-import { getSessionRuntime, touchRepository } from "@gitinspect/db/schema";
+import { db, getSessionRuntime, touchRepository } from "@gitinspect/db/schema";
 import { runtimeClient } from "@gitinspect/pi/agent/runtime-client";
 import { getRuntimeCommandErrorMessage } from "@gitinspect/pi/agent/runtime-command-errors";
 import { useRuntimeSession } from "@gitinspect/pi/hooks/use-runtime-session";
 import { useSessionOwnership } from "@gitinspect/pi/hooks/use-session-ownership";
-import { getCanonicalProvider, getDefaultProviderGroup } from "@gitinspect/pi/models/catalog";
+import {
+  getCanonicalProvider,
+  getConnectedProviders,
+  getDefaultModelForGroup,
+  getDefaultProviderGroup,
+  getVisibleProviderGroups,
+} from "@gitinspect/pi/models/catalog";
 import { showGithubSystemNoticeToast } from "@gitinspect/pi/repo/github-fetch";
 import {
   createSessionForChat,
@@ -175,9 +182,12 @@ export function Chat(props: ChatProps) {
       thinkingLevel: "medium" as ThinkingLevel,
     } satisfies EmptyChatDraft;
   }, []);
+  const providerKeysResult = useLiveQuery(() => db.providerKeys.toArray(), []);
+  const providerKeys = Array.isArray(providerKeysResult) ? providerKeysResult : [];
   const [draft, setDraft] = React.useState<EmptyChatDraft | undefined>(undefined);
   const [isStartingSession, setIsStartingSession] = React.useState(false);
   const runtime = useRuntimeSession(props.sessionId);
+  const auth = useGitHubAuthContext();
   const ownership = useSessionOwnership(
     loadedSessionState?.kind === "active" ? loadedSessionState.session.id : undefined,
   );
@@ -211,6 +221,10 @@ export function Chat(props: ChatProps) {
   const activeSession =
     loadedSessionState?.kind === "active" ? loadedSessionState.session : undefined;
   const displayRepoSource = activeSession?.repoSource ?? props.repoSource;
+  const connectedProviders = React.useMemo(
+    () => getConnectedProviders(providerKeys),
+    [providerKeys],
+  );
 
   React.useEffect(() => {
     if (!displayRepoSource) {
@@ -227,6 +241,31 @@ export function Chat(props: ChatProps) {
 
     setDraft((currentDraft) => currentDraft ?? defaults);
   }, [defaults]);
+
+  React.useEffect(() => {
+    if (activeSession || !draft) {
+      return;
+    }
+
+    const visibleProviderGroups = getVisibleProviderGroups(connectedProviders);
+
+    if (visibleProviderGroups.includes(draft.providerGroup)) {
+      return;
+    }
+
+    const fallbackProviderGroup = visibleProviderGroups[0] ?? "fireworks-free";
+    setDraft((currentDraft) => {
+      if (!currentDraft || visibleProviderGroups.includes(currentDraft.providerGroup)) {
+        return currentDraft;
+      }
+
+      return {
+        ...currentDraft,
+        model: getDefaultModelForGroup(fallbackProviderGroup).id,
+        providerGroup: fallbackProviderGroup,
+      };
+    });
+  }, [activeSession, connectedProviders, draft]);
 
   const messages = loadedSessionState?.kind === "active" ? loadedSessionState.messages : [];
   const hasAssistantMessage = React.useMemo(
@@ -436,6 +475,26 @@ export function Chat(props: ChatProps) {
         return;
       }
 
+      if (
+        auth &&
+        auth.authState.session === "signed-out" &&
+        draft.providerGroup === "fireworks-free"
+      ) {
+        auth.openAuthDialog({
+          mode: "github-only",
+          postAuthAction: {
+            content,
+            route:
+              typeof window === "undefined"
+                ? "/"
+                : `${window.location.pathname}${window.location.search}`,
+            type: "send-first-message",
+          },
+          variant: "first-message",
+        });
+        return;
+      }
+
       setIsStartingSession(true);
 
       try {
@@ -474,12 +533,47 @@ export function Chat(props: ChatProps) {
         setIsStartingSession(false);
       }
     },
-    [draft, isStartingSession, navigate, props.repoSource, reportRuntimeFailure, settings, sidebar],
+    [
+      auth,
+      draft,
+      isStartingSession,
+      navigate,
+      props.repoSource,
+      reportRuntimeFailure,
+      settings,
+      sidebar,
+    ],
   );
+
+  React.useEffect(() => {
+    if (!auth || activeSession || isStartingSession || !draft) {
+      return;
+    }
+
+    const readyAction = auth.consumeReadyAuthAction();
+
+    if (!readyAction || readyAction.type !== "send-first-message") {
+      return;
+    }
+
+    void handleFirstSend(readyAction.content);
+  }, [activeSession, auth, draft, handleFirstSend, isStartingSession]);
 
   const handleSend = React.useCallback(
     async (content: string) => {
       if (activeSession) {
+        if (
+          auth &&
+          auth.authState.session === "signed-out" &&
+          (activeSession.providerGroup ?? getDefaultProviderGroup(activeSession.provider)) ===
+            "fireworks-free"
+        ) {
+          auth.openAuthDialog({
+            mode: "github-only",
+          });
+          return;
+        }
+
         if (!activeComposerState?.canSend) {
           if (activeComposerState?.disabledReason) {
             toast.error(activeComposerState.disabledReason);
@@ -500,7 +594,7 @@ export function Chat(props: ChatProps) {
 
       await handleFirstSend(content);
     },
-    [activeComposerState, activeSession, handleFirstSend, reportRuntimeFailure, runtime],
+    [auth, activeComposerState, activeSession, handleFirstSend, reportRuntimeFailure, runtime],
   );
 
   const handleResumeInterrupted = React.useCallback(async () => {

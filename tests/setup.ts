@@ -16,6 +16,17 @@ Object.defineProperty(window, "matchMedia", {
   }),
 });
 
+class MockResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
+Object.defineProperty(globalThis, "ResizeObserver", {
+  configurable: true,
+  value: MockResizeObserver,
+});
+
 afterAll(() => {
   db.close();
 });

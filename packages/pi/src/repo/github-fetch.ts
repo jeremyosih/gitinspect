@@ -9,7 +9,12 @@ import {
   stripAuthorization,
 } from "@gitinspect/just-github/github-http";
 import { classifyRuntimeError } from "@gitinspect/pi/agent/runtime-errors";
-import { getGithubPersonalAccessToken } from "@gitinspect/pi/repo/github-token";
+import {
+  getGitHubNoticeCta,
+  resolveRegisteredGitHubAccess,
+  type GitHubAuthState,
+} from "@gitinspect/pi/repo/github-access";
+import { getGitHubAuthUiBridge } from "@gitinspect/pi/repo/github-auth-ui";
 import { appendSessionNotice } from "@gitinspect/pi/sessions/session-notices";
 import type { SystemMessage } from "@gitinspect/pi/types/chat";
 
@@ -180,7 +185,8 @@ export async function githubApiFetch(
   options?: { signal?: AbortSignal },
 ): Promise<Response> {
   const url = `https://api.github.com${path}`;
-  const token = await getGithubPersonalAccessToken();
+  const access = await resolveRegisteredGitHubAccess({ requireRepoScope: true });
+  const token = access.ok ? access.token : undefined;
 
   if (typeof caches !== "undefined") {
     const cache = await caches.open(CACHE_NAME);
@@ -229,6 +235,7 @@ export function isRateLimitError(err: unknown): err is GitHubRateLimitError {
 function showGithubActionToast(input: {
   actionLabel: string;
   message: string;
+  onAction?: () => void;
   signature: string;
 }): void {
   if (shouldSuppressToast(input.signature)) {
@@ -239,10 +246,43 @@ function showGithubActionToast(input: {
     action: {
       label: input.actionLabel,
       onClick: () => {
-        openGithubTokenSettings();
+        input.onAction?.();
       },
     },
   });
+}
+
+function getFallbackAuthState(): GitHubAuthState {
+  return {
+    fallbackPat: false,
+    githubLink: "unknown",
+    preferredSource: "none",
+    repoAccess: "unknown",
+    session: "signed-out",
+  };
+}
+
+function getGithubToastAction(kind: SystemMessage["kind"]): {
+  label: string;
+  onAction: () => void;
+} {
+  const bridge = getGitHubAuthUiBridge();
+  const cta = getGitHubNoticeCta({
+    kind,
+    state: bridge?.getState() ?? getFallbackAuthState(),
+  });
+
+  return {
+    label: cta.label,
+    onAction: () => {
+      if (!bridge) {
+        openGithubTokenSettings();
+        return;
+      }
+
+      void bridge.runNoticeIntent(cta.intent);
+    },
+  };
 }
 
 function showClassifiedGithubToast(
@@ -255,29 +295,38 @@ function showClassifiedGithubToast(
     const retryAt =
       error instanceof GitHubRateLimitError ? formatRetryTime(error.blockedUntilMs) : undefined;
 
+    const action = getGithubToastAction(kind);
+
     showGithubActionToast({
-      actionLabel: "Add token",
+      actionLabel: action.label,
       message: retryAt
-        ? `GitHub requests are rate limited until ${retryAt}. Add a token to raise the limit.`
-        : "GitHub requests are rate limited right now. Add a token to raise the limit.",
+        ? `GitHub requests are rate limited until ${retryAt}. Sign in or connect GitHub for better limits.`
+        : "GitHub requests are rate limited right now. Sign in or connect GitHub for better limits.",
+      onAction: action.onAction,
       signature,
     });
     return;
   }
 
   if (kind === "github_auth") {
+    const action = getGithubToastAction(kind);
+
     showGithubActionToast({
-      actionLabel: "GitHub settings",
-      message: "GitHub authentication failed. Update your token in Settings.",
+      actionLabel: action.label,
+      message: "GitHub authentication failed. Reconnect GitHub or use your PAT fallback.",
+      onAction: action.onAction,
       signature,
     });
     return;
   }
 
   if (kind === "github_permission") {
+    const action = getGithubToastAction(kind);
+
     showGithubActionToast({
-      actionLabel: "GitHub settings",
-      message: "GitHub denied repository access. Check your token permissions in Settings.",
+      actionLabel: action.label,
+      message: "GitHub denied repository access. Grant repo access or switch to a PAT fallback.",
+      onAction: action.onAction,
       signature,
     });
     return;
@@ -288,9 +337,12 @@ function showClassifiedGithubToast(
       return;
     }
 
+    const action = getGithubToastAction(kind);
+
     showGithubActionToast({
-      actionLabel: "GitHub settings",
-      message: "GitHub request failed. Open Settings to review your GitHub token.",
+      actionLabel: action.label,
+      message: "GitHub request failed. Review your GitHub connection or fallback token.",
+      onAction: action.onAction,
       signature,
     });
   }

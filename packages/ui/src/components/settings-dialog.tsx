@@ -344,9 +344,10 @@ function AboutPanel() {
               read-only shell via just-bash, and a virtual filesystem from the GitHub API.
             </li>
             <li>
-              <span className="font-medium text-foreground">Private by design</span> — Sessions,
-              settings, provider keys, and usage stay on your device (Dexie / IndexedDB); chat is
-              client-side, with no backend for your data.
+              <span className="font-medium text-foreground">Private by design</span> — Chats,
+              settings, provider keys, and usage stay local-first in Dexie / IndexedDB. Product auth
+              session data and linked GitHub account state can live in secure cookies, while repo
+              and chat fetches remain client-side.
             </li>
             <li>
               <span className="font-medium text-foreground">Local first</span> — Agent execution
@@ -376,9 +377,10 @@ function AboutPanel() {
           </ul>
         </div>
         <p className="text-xs text-muted-foreground">
+          Public repo cards fetch stars and language through a tiny server endpoint for public
+          metadata only. Private repo trees, file reads, and chat grounding still stay client-side.
           Unauthenticated GitHub API requests are limited to 60/hour; authenticated requests get
-          5,000/hour. Set a GitHub token under GitHub settings to avoid limits; the tree cache keeps
-          actual API usage low after the initial load.
+          5,000/hour.
         </p>
       </div>
 
