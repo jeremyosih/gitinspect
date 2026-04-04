@@ -1,5 +1,129 @@
 # Durable fix plan: transcript/runtime split + orphaned tool-result cleanup
 
+## locked decisions
+
+1. **repair historical bad rows on read, with write-back**
+   - when a session is loaded, run linker/canonicalizer
+   - rewrite wrong `parentAssistantId`
+   - drop true orphan tool results
+   - persist cleaned rows back once
+
+2. **keep a short compat window**
+   - runtime `phase` becomes source of truth
+   - legacy `session.isStreaming` / `status` can be mirrored temporarily
+   - delete later after callers move
+
+3. **single ownership law**
+   - tool-result ownership derived from assistant `toolCall.id`
+   - not from stored `parentAssistantId`
+   - not from positional scan
+   - not from replay-only pruning
+
+4. **streaming stays in Dexie, but in `session_runtime`, not `messages`**
+
+5. **one session view-model livequery**
+   - selector merges transcript + runtime + linking before UI sees data
+
+---
+
+## condensed implementation steps
+
+### phase 1. fix read-path first
+
+- add shared linker
+- use linker in:
+  - `packages/pi/src/lib/chat-adapter.ts`
+  - `packages/pi/src/agent/message-transformer.ts`
+  - `packages/pi/src/lib/copy-session-markdown.ts`
+  - `packages/pi/src/lib/export-markdown.ts`
+- repair historical rows on load in:
+  - `packages/pi/src/sessions/session-service.ts`
+
+### phase 2. move streaming state to runtime row
+
+- extend runtime row + helpers:
+  - `packages/db/src/storage-types.ts`
+  - `packages/db/src/session-runtime.ts`
+- add:
+  - `phase`
+  - `streamMessage`
+  - `pendingToolCallOwners`
+
+### phase 3. replace snapshot reconstruction with event-driven writes
+
+- create `packages/pi/src/agent/turn-event-store.ts`
+- migrate:
+  - `packages/pi/src/agent/agent-host.ts`
+  - `packages/pi/src/agent/runtime-worker.ts`
+  - `packages/pi/src/agent/worker-backed-agent-host.ts`
+- eventually replace `packages/pi/src/agent/agent-turn-persistence.ts`
+
+### phase 4. move chat UI to one selector
+
+- create `packages/pi/src/sessions/session-view-model.ts`
+- update `packages/ui/src/components/chat.tsx`
+
+### phase 5. shrink FSM
+
+- runtime `phase` becomes core truth:
+  - `idle`
+  - `running`
+  - `interrupted`
+- update:
+  - `packages/pi/src/sessions/session-view-state.ts`
+  - `packages/pi/src/agent/runtime-client.ts`
+  - `packages/pi/src/sessions/session-notices.ts`
+
+---
+
+## files an agent should read first
+
+### mandatory
+
+1. `plan.md`
+2. `packages/ui/src/components/chat.tsx`
+3. `packages/pi/src/sessions/session-service.ts`
+4. `packages/db/src/storage-types.ts`
+5. `packages/db/src/session-runtime.ts`
+6. `packages/db/src/schema.ts`
+7. `packages/pi/src/agent/session-adapter.ts`
+8. `packages/pi/src/lib/chat-adapter.ts`
+9. `packages/pi/src/agent/message-transformer.ts`
+10. `packages/pi/src/agent/agent-turn-persistence.ts`
+
+### runtime/event flow
+
+11. `packages/pi/src/agent/agent-host.ts`
+12. `packages/pi/src/agent/runtime-worker-types.ts`
+13. `packages/pi/src/agent/runtime-worker.ts`
+14. `packages/pi/src/agent/worker-backed-agent-host.ts`
+15. `packages/pi/src/agent/runtime-client.ts`
+16. `packages/pi/src/sessions/session-view-state.ts`
+17. `packages/pi/src/sessions/session-notices.ts`
+
+### upstream semantics
+
+18. `node_modules/@mariozechner/pi-agent-core/dist/agent-loop.js`
+19. `node_modules/@mariozechner/pi-agent-core/dist/agent.js`
+
+### tests before edits
+
+20. `tests/agent-host-persistence.test.ts`
+21. `tests/message-transformer.test.ts`
+22. `tests/session-notices.test.ts`
+23. `tests/runtime-worker.test.ts`
+24. `tests/chat-adapter.test.ts`
+25. `tests/chat-message.test.tsx`
+26. `tests/copy-session-markdown.test.ts`
+
+### new tests to add
+
+27. `tests/tool-result-linker.test.ts`
+28. `tests/session-view-model.test.ts`
+29. `tests/turn-event-store.test.ts`
+
+---
+
 ## 0. outcome
 
 Ship a refactor that:
