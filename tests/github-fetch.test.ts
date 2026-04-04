@@ -161,7 +161,7 @@ describe("github-fetch", () => {
       expect.stringContaining("GitHub requests are rate limited"),
       expect.objectContaining({
         action: expect.objectContaining({
-          label: "Add token",
+          label: "GitHub settings",
         }),
       })
     )

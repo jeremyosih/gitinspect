@@ -1,67 +1,69 @@
 import { deleteSetting, getSetting, setSetting } from "@/db/schema"
+import {
+  loginGitHub,
+  refreshGitHub,
+  type GitHubCredentials,
+} from "@/auth/providers/github"
 
-const GITHUB_PAT_KEY = "github.pat"
+const GITHUB_KEY = "github.credentials"
 
-/** Opens GitHub’s new fine-grained PAT form with name, expiry, and repository read access prefilled. */
-export const GITHUB_CREATE_PAT_URL =
-  "https://github.com/settings/personal-access-tokens/new?name=gitinspect&expires_in=none&contents=read"
+export async function getGithubPersonalAccessToken(): Promise<string | undefined> {
+  const credentials = await loadCredentials()
+  if (!credentials) return undefined
 
-export type GithubTokenValidation =
-  | { ok: true; login: string }
-  | { ok: false; message: string }
+  if (Date.now() < credentials.expiresAt) {
+    return credentials.accessToken
+  }
 
-/** Confirms the token works by calling the GitHub API (same auth as the app’s repo tools). */
-export async function validateGithubPersonalAccessToken(
-  token: string
-): Promise<GithubTokenValidation> {
-  const trimmed = token.trim()
-  if (!trimmed) {
-    return { ok: false, message: "Token is empty" }
+  if (Date.now() >= credentials.refreshTokenExpiresAt) {
+    await deleteCredentials()
+    return undefined
   }
 
   try {
-    const response = await fetch("https://api.github.com/user", {
-      headers: {
-        Accept: "application/vnd.github+json",
-        Authorization: `Bearer ${trimmed}`,
-        "X-GitHub-Api-Version": "2022-11-28",
-      },
-    })
-
-    if (response.status === 401) {
-      return { ok: false, message: "Invalid or expired token" }
+    const refreshed = await refreshGitHub(credentials.refreshToken)
+    const updated: GitHubCredentials = {
+      ...credentials,
+      ...refreshed,
     }
-
-    if (!response.ok) {
-      return { ok: false, message: "Could not verify token with GitHub" }
-    }
-
-    const data = (await response.json()) as { login?: string }
-    return { ok: true, login: data.login ?? "user" }
+    await saveCredentials(updated)
+    return updated.accessToken
   } catch {
-    return { ok: false, message: "Could not reach GitHub — check your connection" }
+    await deleteCredentials()
+    return undefined
   }
 }
 
-function trimToUndefined(value: string | undefined): string | undefined {
-  const trimmed = value?.trim()
-  return trimmed ? trimmed : undefined
+export async function getGithubLogin(): Promise<string | undefined> {
+  const credentials = await loadCredentials()
+  return credentials?.login
 }
 
-export async function getGithubPersonalAccessToken(): Promise<string | undefined> {
-  const value = await getSetting(GITHUB_PAT_KEY)
-  return typeof value === "string" ? trimToUndefined(value) : undefined
+export async function loginWithGitHub(): Promise<string> {
+  const redirectUri = `${window.location.origin}/auth/callback`
+  const credentials = await loginGitHub(redirectUri)
+  await saveCredentials(credentials)
+  return credentials.login
 }
 
-export async function setGithubPersonalAccessToken(
-  token: string | undefined
-): Promise<void> {
-  const normalized = trimToUndefined(token)
+export async function logoutGitHub(): Promise<void> {
+  await deleteCredentials()
+}
 
-  if (!normalized) {
-    await deleteSetting(GITHUB_PAT_KEY)
-    return
+async function loadCredentials(): Promise<GitHubCredentials | undefined> {
+  const raw = await getSetting(GITHUB_KEY)
+  if (!raw || typeof raw !== "string") return undefined
+  try {
+    return JSON.parse(raw) as GitHubCredentials
+  } catch {
+    return undefined
   }
+}
 
-  await setSetting(GITHUB_PAT_KEY, normalized)
+async function saveCredentials(credentials: GitHubCredentials): Promise<void> {
+  await setSetting(GITHUB_KEY, JSON.stringify(credentials))
+}
+
+async function deleteCredentials(): Promise<void> {
+  await deleteSetting(GITHUB_KEY)
 }

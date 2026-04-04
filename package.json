@@ -46,6 +46,7 @@
     "geist": "^1.7.0",
     "input-otp": "^1.4.2",
     "just-bash": "^2.14.0",
+    "just-github": "^0.2.0",
     "lucide-react": "^1.0.1",
     "media-chrome": "^4.18.2",
     "motion": "^12.38.0",

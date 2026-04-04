@@ -1,22 +1,15 @@
 import * as React from "react"
 import { Link } from "@tanstack/react-router"
-import { ArrowRightIcon, KeyIcon, StarIcon } from "@phosphor-icons/react"
+import { ArrowRightIcon, StarIcon } from "@phosphor-icons/react"
 
 import { Icons } from "@/components/icons"
-import { Button } from "@/components/ui/button"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
+
 import { formatGitHubStarCount } from "@/lib/format-github-stars"
 import { cn } from "@/lib/utils"
 import {
   githubApiFetch,
   handleGithubError,
-  openGithubTokenSettings,
 } from "@/repo/github-fetch"
-import { getGithubPersonalAccessToken } from "@/repo/github-token"
 import { githubOwnerAvatarUrl } from "@/repo/url"
 
 export type GithubRepoProps = {
@@ -63,7 +56,6 @@ function usePublicRepoMeta(owner: string, repo: string) {
     | { status: "loading" }
     | { status: "ok"; language: string | null; stargazers: number }
     | { status: "error" }
-    | { status: "no-token" }
   >({ status: "loading" })
 
   React.useEffect(() => {
@@ -72,14 +64,6 @@ function usePublicRepoMeta(owner: string, repo: string) {
 
     void (async () => {
       try {
-        const token = await getGithubPersonalAccessToken()
-        if (!token) {
-          if (!ac.signal.aborted) {
-            setState({ status: "no-token" })
-          }
-          return
-        }
-
         const res = await githubApiFetch(
           `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`,
           { signal: ac.signal }
@@ -106,44 +90,6 @@ function usePublicRepoMeta(owner: string, repo: string) {
   }, [owner, repo])
 
   return state
-}
-
-function GithubRepoNoTokenMeta() {
-  return (
-    <div className="flex min-w-0 shrink-0 items-center gap-1.5 sm:gap-2">
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="inline-flex max-w-[11rem] items-center gap-1.5 rounded-none border border-dashed border-border bg-muted/25 px-1.5 py-0.5">
-            <KeyIcon
-              aria-hidden
-              className="size-3.5 shrink-0 text-muted-foreground"
-            />
-            <span className="hidden truncate text-[10px] text-muted-foreground sm:inline">
-              No API token
-            </span>
-          </span>
-        </TooltipTrigger>
-        <TooltipContent className="max-w-[280px] text-left" side="top" sideOffset={6}>
-          Star count and primary language come from the GitHub API. Add a personal
-          access token under Settings → GitHub (stored only on this device) to load
-          them and avoid rate limits.
-        </TooltipContent>
-      </Tooltip>
-      <Button
-        className="h-7 shrink-0 px-2 text-[10px]"
-        onClick={(e) => {
-          e.preventDefault()
-          e.stopPropagation()
-          openGithubTokenSettings()
-        }}
-        size="sm"
-        type="button"
-        variant="outline"
-      >
-        Add token
-      </Button>
-    </div>
-  )
 }
 
 export function GithubRepo({
@@ -175,10 +121,7 @@ export function GithubRepo({
     className
   )
 
-  const metaColumns =
-    meta.status === "no-token" ? (
-      <GithubRepoNoTokenMeta />
-    ) : (
+  const metaColumns = (
       <>
         <div className="hidden min-w-0 shrink-0 items-center gap-1.5 sm:flex">
           {meta.status === "loading" ? (

@@ -22,10 +22,8 @@ export interface BashToolDetails {
   warnings?: string[]
 }
 
-function takeActionableGithubError(runtime: RepoRuntime): GitHubFsError | undefined {
-  const error = runtime.fs.consumeLastError()
-
-  if (!error) {
+function takeActionableGithubError(error: unknown): GitHubFsError | undefined {
+  if (!(error instanceof GitHubFsError)) {
     return undefined
   }
 
@@ -46,15 +44,12 @@ export function createBashTool(
         throw new Error("Command aborted")
       }
 
-      runtime.fs.clearLastError()
-
       let result: Awaited<ReturnType<typeof execInRepoShell>>
 
       try {
         result = await execInRepoShell(runtime, params.command, signal)
       } catch (error) {
-        const githubError = takeActionableGithubError(runtime)
-        const nextError = githubError ?? error
+        const nextError = takeActionableGithubError(error) ?? error
 
         if (onRepoError) {
           await onRepoError(nextError)
@@ -73,8 +68,7 @@ export function createBashTool(
 
       if (result.exitCode !== 0) {
         output += `\n\nCommand exited with code ${result.exitCode}`
-        const githubError = takeActionableGithubError(runtime)
-        const err = githubError ?? new Error(output)
+        const err = new Error(output)
         if (onRepoError) {
           await onRepoError(err)
         }

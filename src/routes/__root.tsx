@@ -17,7 +17,7 @@ import {
 } from "@/components/settings-dialog"
 import { AppHeader } from "@/components/app-header"
 import { AppSidebar } from "@/components/app-sidebar"
-import { RootGuard } from "@/components/root-guard"
+import { AuthGate } from "@/components/root-guard"
 import { parseSettingsSection } from "@/navigation/search-state"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { TooltipProvider } from "@/components/ui/tooltip"
@@ -105,7 +105,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <body>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <TooltipProvider>
-            <RootGuard>{children}</RootGuard>
+            {children}
             <Toaster position="bottom-right" />
           </TooltipProvider>
         </ThemeProvider>
@@ -137,6 +137,8 @@ function RootLayout() {
     return <Outlet />
   }
 
+  const isLandingPage = pathname === "/"
+
   return (
     <SidebarProvider
       onOpenChange={(open) => {
@@ -155,7 +157,7 @@ function RootLayout() {
         <SidebarInset className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <AppHeader />
           <main className="flex min-h-0 flex-1 overflow-hidden">
-            <Outlet />
+            {isLandingPage ? <Outlet /> : <AuthGate><Outlet /></AuthGate>}
           </main>
         </SidebarInset>
       </div>

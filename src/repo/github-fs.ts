@@ -1,4 +1,4 @@
-export { GitHubClient, GitHubFs, GitHubFsError } from "../../just-github/src/index"
+export { GitHubClient, GitHubFs, GitHubFsError } from "just-github"
 export type {
   CacheOptions,
   DirEntry,
@@ -6,4 +6,4 @@ export type {
   GitHubFsOptions,
   GitHubTreeEntry,
   GitHubTreeResponse,
-} from "../../just-github/src/types"
+} from "just-github"
