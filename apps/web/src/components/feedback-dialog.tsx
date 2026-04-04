@@ -242,9 +242,9 @@ function FeedbackForm(props: {
     <form className="flex min-h-0 flex-1 flex-col" onSubmit={props.onSubmit}>
       <div className="space-y-5 px-4 pb-4 md:px-0 md:pb-0">
         <div className="space-y-2">
-          <Label htmlFor="feedback-message">Feedback</Label>
           <Textarea
             aria-invalid={props.errors.message ? true : undefined}
+            aria-label="Feedback"
             autoFocus
             id="feedback-message"
             maxLength={2_000}
@@ -262,7 +262,6 @@ function FeedbackForm(props: {
         </div>
 
         <div className="space-y-2">
-          <Label>How did it feel?</Label>
           <div className="flex items-center gap-2">
             <SentimentButton
               currentSentiment={props.sentiment}
@@ -362,7 +361,7 @@ function FeedbackForm(props: {
 
 function FeedbackFormShell(props: {
   children: React.ReactNode;
-  description: string;
+  description?: string;
   onOpenChange: (open: boolean) => void;
   open: boolean;
   title: string;
@@ -375,7 +374,7 @@ function FeedbackFormShell(props: {
         <DrawerContent className="max-h-[85dvh]">
           <DrawerHeader className="text-left">
             <DrawerTitle>{props.title}</DrawerTitle>
-            <DrawerDescription>{props.description}</DrawerDescription>
+            {props.description ? <DrawerDescription>{props.description}</DrawerDescription> : null}
           </DrawerHeader>
           <div className="min-h-0 overflow-y-auto">{props.children}</div>
         </DrawerContent>
@@ -388,7 +387,7 @@ function FeedbackFormShell(props: {
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>{props.title}</DialogTitle>
-          <DialogDescription>{props.description}</DialogDescription>
+          {props.description ? <DialogDescription>{props.description}</DialogDescription> : null}
         </DialogHeader>
         {props.children}
       </DialogContent>
@@ -491,12 +490,7 @@ export function FeedbackDialog() {
   );
 
   return (
-    <FeedbackFormShell
-      description="Tell us what went well, what felt confusing, or what broke."
-      onOpenChange={setOpen}
-      open={open}
-      title="Send feedback"
-    >
+    <FeedbackFormShell onOpenChange={setOpen} open={open} title="Send Feedback">
       <div className={cn("min-h-0", open ? "" : "pointer-events-none")}>
         <FeedbackForm
           errors={errors}
