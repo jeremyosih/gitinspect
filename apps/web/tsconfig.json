@@ -25,7 +25,8 @@
       "@/*": ["./src/*"],
       "@gitinspect/ui/*": ["../../packages/ui/src/*"],
       "@gitinspect/pi/*": ["../../packages/pi/src/*"],
-      "@gitinspect/db/*": ["../../packages/db/src/*"]
+      "@gitinspect/db/*": ["../../packages/db/src/*"],
+      "@gitinspect/shared/*": ["../../packages/shared/src/*"]
     }
   }
 }

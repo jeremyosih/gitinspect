@@ -13,6 +13,7 @@
     "@gitinspect/db": "workspace:*",
     "@gitinspect/env": "workspace:*",
     "@gitinspect/pi": "workspace:*",
+    "@gitinspect/shared": "workspace:*",
     "@gitinspect/ui": "workspace:*",
     "@tailwindcss/vite": "^4.2.1",
     "@tanstack/react-router": "^1.167.4",

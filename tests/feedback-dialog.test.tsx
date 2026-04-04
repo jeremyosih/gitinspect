@@ -108,7 +108,7 @@ describe("FeedbackDialog", () => {
   });
 
   it("renders feedback first, then emotions, then diagnostics and autofocuses the textarea", async () => {
-    const { FeedbackDialog } = await import("@gitinspect/ui/components/feedback-dialog");
+    const { FeedbackDialog } = await import("@/components/feedback-dialog");
 
     render(<FeedbackDialog />);
 
@@ -129,7 +129,7 @@ describe("FeedbackDialog", () => {
   });
 
   it("shows inline validation before submitting", async () => {
-    const { FeedbackDialog } = await import("@gitinspect/ui/components/feedback-dialog");
+    const { FeedbackDialog } = await import("@/components/feedback-dialog");
 
     render(<FeedbackDialog />);
 
@@ -156,7 +156,7 @@ describe("FeedbackDialog", () => {
         },
       ),
     );
-    const { FeedbackDialog } = await import("@gitinspect/ui/components/feedback-dialog");
+    const { FeedbackDialog } = await import("@/components/feedback-dialog");
 
     render(<FeedbackDialog />);
 
@@ -195,7 +195,7 @@ describe("FeedbackDialog", () => {
         },
       ),
     );
-    const { FeedbackDialog } = await import("@gitinspect/ui/components/feedback-dialog");
+    const { FeedbackDialog } = await import("@/components/feedback-dialog");
 
     render(<FeedbackDialog />);
 

@@ -21,8 +21,24 @@ export default defineConfig({
         replacement: fromRoot("./apps/web/src/components/analytics.tsx"),
       },
       {
+        find: "@/components/feedback-dialog",
+        replacement: fromRoot("./apps/web/src/components/feedback-dialog.tsx"),
+      },
+      {
+        find: "@/components/chat-adapter",
+        replacement: fromRoot("./packages/pi/src/lib/chat-adapter.ts"),
+      },
+      {
+        find: "@/components/ui",
+        replacement: fromRoot("./packages/ui/src/components"),
+      },
+      {
         find: "@/hooks/use-mobile",
         replacement: fromRoot("./packages/ui/src/hooks/use-mobile.ts"),
+      },
+      {
+        find: "@/lib/feedback.server",
+        replacement: fromRoot("./apps/web/src/lib/feedback.server.ts"),
       },
       { find: "@/lib/github/cache", replacement: fromRoot("./packages/just-github/src/cache.ts") },
       {
@@ -41,6 +57,7 @@ export default defineConfig({
       { find: "@/hooks", replacement: fromRoot("./packages/pi/src/hooks") },
       { find: "@/lib", replacement: fromRoot("./packages/pi/src/lib") },
       { find: "@/models", replacement: fromRoot("./packages/pi/src/models") },
+      { find: "@/features", replacement: fromRoot("./apps/web/src/features") },
       { find: "@/navigation", replacement: fromRoot("./apps/web/src/navigation") },
       { find: "@/proxy", replacement: fromRoot("./packages/pi/src/proxy") },
       { find: "@/repo", replacement: fromRoot("./packages/pi/src/repo") },
@@ -50,6 +67,10 @@ export default defineConfig({
       { find: "@/types", replacement: fromRoot("./packages/pi/src/types") },
       { find: "@/test", replacement: fromRoot("./tests/lib") },
       { find: "@/just-github", replacement: fromRoot("./packages/just-github/src") },
+      {
+        find: "@gitinspect/shared/feedback",
+        replacement: fromRoot("./packages/shared/src/feedback.ts"),
+      },
     ],
   },
   test: {

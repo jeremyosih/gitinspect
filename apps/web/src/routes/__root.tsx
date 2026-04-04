@@ -14,7 +14,10 @@ import appCss from "../styles.css?url";
 import { AppSettingsDialog } from "@gitinspect/ui/components/settings-dialog";
 import { AppHeader } from "@gitinspect/ui/components/app-header";
 import { AppSidebar } from "@gitinspect/ui/components/app-sidebar";
+import { FeedbackDialog } from "@/components/feedback-dialog";
 import { RootGuard } from "@/components/root-guard";
+import { AuthDialogWrapper } from "@/components/auth-dialog-wrapper";
+import { AppAuthProvider } from "@/components/app-auth-provider";
 import { parseSettingsSection } from "@/navigation/search-state";
 import { SidebarInset, SidebarProvider } from "@gitinspect/ui/components/sidebar";
 import { TooltipProvider } from "@gitinspect/ui/components/tooltip";
@@ -22,17 +25,25 @@ import { Toaster } from "@gitinspect/ui/components/sonner";
 import { ThemeProvider } from "@gitinspect/ui/components/theme-provider";
 
 type RootSearchInput = {
+  feedback?: string;
   settings?: string;
   sidebar?: string;
 };
 
+type RootSearch = {
+  feedback?: "open";
+  settings?: ReturnType<typeof parseSettingsSection>;
+  sidebar?: "open";
+};
+
 export const Route = createRootRoute({
-  validateSearch: (search: RootSearchInput) => ({
+  validateSearch: (search: RootSearchInput): RootSearch => ({
+    feedback: search.feedback === "open" ? "open" : undefined,
     settings: parseSettingsSection(search.settings),
     sidebar: search.sidebar === "open" ? "open" : undefined,
   }),
   search: {
-    middlewares: [retainSearchParams(["settings", "sidebar"])],
+    middlewares: [retainSearchParams(["settings", "sidebar", "feedback"])],
   },
   head: () => ({
     meta: [
@@ -106,8 +117,11 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           disableTransitionOnChange
         >
           <TooltipProvider>
-            <RootGuard>{children}</RootGuard>
-            <Toaster position="bottom-right" />
+            <AppAuthProvider>
+              <RootGuard>{children}</RootGuard>
+              <AuthDialogWrapper />
+              <Toaster position="bottom-right" />
+            </AppAuthProvider>
           </TooltipProvider>
         </ThemeProvider>
         <Scripts />
@@ -144,6 +158,7 @@ function RootLayout() {
         </SidebarInset>
       </div>
       <AppSettingsDialog />
+      <FeedbackDialog />
     </SidebarProvider>
   );
 }
@@ -159,6 +174,7 @@ function NotFoundPage() {
         className="text-xs underline underline-offset-4 hover:text-foreground"
         search={{
           tab: undefined,
+          feedback: undefined,
           settings: undefined,
           sidebar: undefined,
         }}

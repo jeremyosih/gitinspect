@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import type { ResolvedRepoSource } from "@gitinspect/db/storage-types";
 import { useSelectedSessionSummary } from "@gitinspect/pi/hooks/use-selected-session-summary";
 import { githubOwnerAvatarUrl } from "@gitinspect/pi/repo/url";
@@ -17,6 +17,7 @@ import { Icons } from "@gitinspect/ui/components/icons";
 import { Separator } from "@gitinspect/ui/components/separator";
 import { SidebarTrigger } from "@gitinspect/ui/components/sidebar";
 import { ThemeToggle } from "@gitinspect/ui/components/theme-toggle";
+import { rememberFeedbackTrigger } from "@gitinspect/ui/lib/feedback-trigger";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitinspect/ui/components/tooltip";
 import { cn } from "@gitinspect/ui/lib/utils";
 
@@ -108,6 +109,7 @@ const repoLinkClass =
   "whitespace-nowrap font-geist-pixel-square text-sm font-semibold leading-none tracking-tight text-foreground underline-offset-4 hover:underline sm:text-base";
 
 export function AppHeader() {
+  const navigate = useNavigate();
   const currentMatch = useRouterState({
     select: (state) => state.matches[state.matches.length - 1],
   });
@@ -168,6 +170,27 @@ export function AppHeader() {
         </Breadcrumb>
       </div>
       <div className="hidden items-center gap-2 px-3 md:flex">
+        <Separator className="!h-6 !self-center" orientation="vertical" />
+        <HeaderTooltip label="Send feedback">
+          <Button
+            className="h-8 gap-1.5 shadow-none"
+            onClick={(event) => {
+              rememberFeedbackTrigger(event.currentTarget);
+              void navigate({
+                search: (prev) => ({
+                  ...prev,
+                  feedback: "open",
+                }),
+                to: ".",
+              });
+            }}
+            size="sm"
+            variant="ghost"
+          >
+            <Icons.comment className="text-foreground" />
+            <span>Feedback</span>
+          </Button>
+        </HeaderTooltip>
         <Separator className="!h-6 !self-center" orientation="vertical" />
         <HeaderTooltip label="Open X">
           <Button asChild className="h-8 shadow-none" size="sm" variant="ghost">

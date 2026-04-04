@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import type { ResolvedRepoSource, SessionData } from "@gitinspect/db/storage-types";
 import { useSelectedSessionSummary } from "@gitinspect/pi/hooks/use-selected-session-summary";
 import { parseRepoRoutePath } from "@gitinspect/pi/repo/path-parser";
+import { type FeedbackPayload, type FeedbackSentiment } from "@gitinspect/shared/feedback";
 import { Button } from "@gitinspect/ui/components/button";
 import { Checkbox } from "@gitinspect/ui/components/checkbox";
 import {
@@ -27,36 +28,10 @@ import { Label } from "@gitinspect/ui/components/label";
 import { Textarea } from "@gitinspect/ui/components/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitinspect/ui/components/tooltip";
 import { useIsMobile } from "@gitinspect/ui/hooks/use-mobile";
+import { focusLastFeedbackTrigger } from "@gitinspect/ui/lib/feedback-trigger";
 import { cn } from "@gitinspect/ui/lib/utils";
 
-type FeedbackSentiment = "happy" | "neutral" | "sad";
 type FeedbackTheme = "light" | "dark" | "system";
-
-type FeedbackPayload = {
-  diagnostics?: {
-    language?: string;
-    model?: string;
-    pathname?: string;
-    provider?: string;
-    repo?: {
-      owner: string;
-      path?: string;
-      ref?: string;
-      repo: string;
-    };
-    theme?: FeedbackTheme;
-    timezone?: string;
-    viewport?: {
-      dpr?: number;
-      height: number;
-      width: number;
-    };
-  };
-  includeDiagnostics: boolean;
-  message: string;
-  sentiment: FeedbackSentiment;
-  website?: string;
-};
 
 type FeedbackResponse = {
   issueNumber: number;
@@ -74,8 +49,6 @@ type FeedbackErrors = {
   message?: string;
   sentiment?: string;
 };
-
-let lastFeedbackTrigger: HTMLElement | null = null;
 
 function isFeedbackTheme(value: string | undefined): value is FeedbackTheme {
   return value === "light" || value === "dark" || value === "system";
@@ -192,10 +165,6 @@ async function submitFeedback(payload: FeedbackPayload): Promise<FeedbackRespons
   return candidate as FeedbackResponse;
 }
 
-function focusLastFeedbackTrigger() {
-  lastFeedbackTrigger?.focus();
-}
-
 function useFeedbackOpenState() {
   const navigate = useNavigate();
   const search = useSearch({ strict: false });
@@ -227,18 +196,14 @@ function useFeedbackOpenState() {
   return { open, setOpen };
 }
 
-export function rememberFeedbackTrigger(element: HTMLElement | null) {
-  lastFeedbackTrigger = element;
-}
-
 function SentimentButton(props: {
   currentSentiment: FeedbackSentiment | null;
   icon: React.ComponentType<{ className?: string }>;
   label: string;
+  onSelect: (sentiment: FeedbackSentiment) => void;
   selectedClassName?: string;
   sentiment: FeedbackSentiment;
   variant: "default" | "destructive" | "secondary";
-  onSelect: (sentiment: FeedbackSentiment) => void;
 }) {
   const selected = props.currentSentiment === props.sentiment;
 
@@ -264,6 +229,7 @@ function FeedbackForm(props: {
   includeDiagnostics: boolean;
   isSubmitting: boolean;
   message: string;
+  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
   sentiment: FeedbackSentiment | null;
   setErrors: React.Dispatch<React.SetStateAction<FeedbackErrors>>;
   setIncludeDiagnostics: React.Dispatch<React.SetStateAction<boolean>>;
@@ -271,7 +237,6 @@ function FeedbackForm(props: {
   setSentiment: React.Dispatch<React.SetStateAction<FeedbackSentiment | null>>;
   setWebsite: React.Dispatch<React.SetStateAction<string>>;
   website: string;
-  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
 }) {
   return (
     <form className="flex min-h-0 flex-1 flex-col" onSubmit={props.onSubmit}>
@@ -398,8 +363,8 @@ function FeedbackForm(props: {
 function FeedbackFormShell(props: {
   children: React.ReactNode;
   description: string;
-  open: boolean;
   onOpenChange: (open: boolean) => void;
+  open: boolean;
   title: string;
 }) {
   const isMobile = useIsMobile();

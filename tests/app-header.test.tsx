@@ -25,6 +25,7 @@ vi.mock("@tanstack/react-router", () => ({
     to: _to,
     ...props
   }: React.PropsWithChildren<Record<string, unknown>>) => React.createElement("a", props, children),
+  useNavigate: () => vi.fn(),
   useRouterState: ({ select }: { select: (state: { matches: MatchState[] }) => unknown }) =>
     select({
       matches: [state.match],
@@ -66,9 +67,14 @@ vi.mock("@gitinspect/ui/components/theme-toggle", () => ({
   ThemeToggle: () => React.createElement("button", { type: "button" }, "Theme"),
 }));
 
+vi.mock("@gitinspect/ui/lib/feedback-trigger", () => ({
+  rememberFeedbackTrigger: vi.fn(),
+}));
+
 vi.mock("@gitinspect/ui/components/icons", () => ({
   Icons: {
     cog: () => React.createElement("span", undefined, "Cog"),
+    comment: () => React.createElement("span", undefined, "Comment"),
     x: () => React.createElement("span", undefined, "X"),
   },
 }));
@@ -115,6 +121,7 @@ describe("AppHeader", () => {
     expect(screen.getByText("acme")).toBeTruthy();
     expect(screen.getByText("demo")).toBeTruthy();
     expect(screen.getByText("[main]")).toBeTruthy();
+    expect(screen.getByText("Feedback")).toBeTruthy();
   });
 
   it("uses loader data so splat routes show the resolved ref", async () => {

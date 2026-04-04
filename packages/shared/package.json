@@ -1,0 +1,16 @@
+{
+  "name": "@gitinspect/shared",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./feedback": "./src/feedback.ts"
+  },
+  "dependencies": {
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@gitinspect/config": "workspace:*",
+    "typescript": "^5"
+  }
+}
