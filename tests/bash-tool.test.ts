@@ -27,11 +27,35 @@ describe("bash tool", () => {
     expect(firstPart?.type === "text" ? firstPart.text.trim() : "").toBe("/src");
   });
 
+  it("allows safe redirects like /dev/null in the read-only repository shell", async () => {
+    const runtime = createRepoRuntime(TEST_REPO_SOURCE);
+    const tool = createBashTool(runtime);
+
+    const result = await tool.execute("call-3", {
+      command: "cat missing.txt 2>/dev/null || echo fallback",
+    });
+    const firstPart = result.content[0];
+
+    expect(firstPart?.type).toBe("text");
+    expect(firstPart?.type === "text" ? firstPart.text.trim() : "").toBe("fallback");
+  });
+
+  it("does not reject harmless commands that only mention write-like words", async () => {
+    const runtime = createRepoRuntime(TEST_REPO_SOURCE);
+    const tool = createBashTool(runtime);
+
+    const result = await tool.execute("call-4", { command: "echo rm" });
+    const firstPart = result.content[0];
+
+    expect(firstPart?.type).toBe("text");
+    expect(firstPart?.type === "text" ? firstPart.text.trim() : "").toBe("rm");
+  });
+
   it("fails on writes to the read-only repository fs", async () => {
     const runtime = createRepoRuntime(TEST_REPO_SOURCE);
     const tool = createBashTool(runtime);
 
-    await expect(tool.execute("call-3", { command: "echo hi > note.txt" })).rejects.toThrow(
+    await expect(tool.execute("call-5", { command: "echo hi > note.txt" })).rejects.toThrow(
       "Read-only filesystem",
     );
   });
@@ -70,7 +94,7 @@ describe("bash tool", () => {
     });
     const tool = createBashTool(runtime, onRepoError);
 
-    await expect(tool.execute("call-4", { command: "ls" })).rejects.toBe(error);
+    await expect(tool.execute("call-7", { command: "ls" })).rejects.toBe(error);
     expect(execSpy).toHaveBeenCalled();
     expect(runtime.fs.clearLastError).toHaveBeenCalled();
     expect(runtime.fs.consumeLastError).toHaveBeenCalled();

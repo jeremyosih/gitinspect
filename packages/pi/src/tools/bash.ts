@@ -27,6 +27,77 @@ function takeActionableGithubError(runtime: RepoRuntime): GitHubFsError | undefi
   return error ?? undefined;
 }
 
+function stripQuotedSegments(command: string): string {
+  let quote: '"' | "'" | "`" | undefined;
+  let result = "";
+
+  for (let index = 0; index < command.length; index += 1) {
+    const character = command[index];
+
+    if (quote) {
+      if (character === quote) {
+        quote = undefined;
+      }
+      result += " ";
+      continue;
+    }
+
+    if (character === '"' || character === "'" || character === "`") {
+      quote = character;
+      result += " ";
+      continue;
+    }
+
+    result += character;
+  }
+
+  return result;
+}
+
+function isSafeRedirectTarget(target: string): boolean {
+  return (
+    target === "/dev/null" ||
+    target === "/dev/stderr" ||
+    target === "/dev/stdout" ||
+    target === "-" ||
+    target === "&-" ||
+    /^&\d+$/.test(target)
+  );
+}
+
+function hasDangerousOutputRedirect(command: string): boolean {
+  const stripped = stripQuotedSegments(command);
+  const redirects = stripped.matchAll(/(?:\d+)?(>>?)\s*([^\s;|&()]+)/g);
+
+  for (const match of redirects) {
+    const target = match[2];
+
+    if (!target || isSafeRedirectTarget(target)) {
+      continue;
+    }
+
+    return true;
+  }
+
+  return false;
+}
+
+function detectWriteAttempt(command: string): GitHubFsError | undefined {
+  const normalized = command.trim();
+
+  if (!normalized || !hasDangerousOutputRedirect(normalized)) {
+    return undefined;
+  }
+
+  return new GitHubFsError({
+    code: "EROFS",
+    isRetryable: false,
+    kind: "unsupported",
+    message: "Read-only filesystem",
+    path: "/",
+  });
+}
+
 export function createBashTool(
   runtime: RepoRuntime,
   onRepoError?: (error: unknown) => void | Promise<void>,
@@ -42,6 +113,16 @@ export function createBashTool(
       }
 
       runtime.fs.clearLastError();
+
+      const writeAttempt = detectWriteAttempt(params.command);
+
+      if (writeAttempt) {
+        if (onRepoError) {
+          await onRepoError(writeAttempt);
+        }
+
+        throw writeAttempt;
+      }
 
       let result: Awaited<ReturnType<typeof execInRepoShell>>;
 
