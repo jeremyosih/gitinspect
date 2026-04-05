@@ -18,6 +18,7 @@ import { Route as ApiFeedbackRouteImport } from "./routes/api/feedback";
 import { Route as ApiERouteImport } from "./routes/api/e";
 import { Route as OwnerRepoIndexRouteImport } from "./routes/$owner.$repo.index";
 import { Route as ApiGithubPublicRouteImport } from "./routes/api/github/public";
+import { Route as ApiAutumnSplatRouteImport } from "./routes/api/autumn/$";
 import { Route as ApiAuthSplatRouteImport } from "./routes/api/auth/$";
 import { Route as OwnerRepoSplatRouteImport } from "./routes/$owner.$repo.$";
 
@@ -66,6 +67,11 @@ const ApiGithubPublicRoute = ApiGithubPublicRouteImport.update({
   path: "/api/github/public",
   getParentRoute: () => rootRouteImport,
 } as any);
+const ApiAutumnSplatRoute = ApiAutumnSplatRouteImport.update({
+  id: "/api/autumn/$",
+  path: "/api/autumn/$",
+  getParentRoute: () => rootRouteImport,
+} as any);
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: "/api/auth/$",
   path: "/api/auth/$",
@@ -87,6 +93,7 @@ export interface FileRoutesByFullPath {
   "/chat/": typeof ChatIndexRoute;
   "/$owner/$repo/$": typeof OwnerRepoSplatRoute;
   "/api/auth/$": typeof ApiAuthSplatRoute;
+  "/api/autumn/$": typeof ApiAutumnSplatRoute;
   "/api/github/public": typeof ApiGithubPublicRoute;
   "/$owner/$repo/": typeof OwnerRepoIndexRoute;
 }
@@ -99,6 +106,7 @@ export interface FileRoutesByTo {
   "/chat": typeof ChatIndexRoute;
   "/$owner/$repo/$": typeof OwnerRepoSplatRoute;
   "/api/auth/$": typeof ApiAuthSplatRoute;
+  "/api/autumn/$": typeof ApiAutumnSplatRoute;
   "/api/github/public": typeof ApiGithubPublicRoute;
   "/$owner/$repo": typeof OwnerRepoIndexRoute;
 }
@@ -113,6 +121,7 @@ export interface FileRoutesById {
   "/chat/": typeof ChatIndexRoute;
   "/$owner/$repo/$": typeof OwnerRepoSplatRoute;
   "/api/auth/$": typeof ApiAuthSplatRoute;
+  "/api/autumn/$": typeof ApiAutumnSplatRoute;
   "/api/github/public": typeof ApiGithubPublicRoute;
   "/$owner/$repo/": typeof OwnerRepoIndexRoute;
 }
@@ -128,6 +137,7 @@ export interface FileRouteTypes {
     | "/chat/"
     | "/$owner/$repo/$"
     | "/api/auth/$"
+    | "/api/autumn/$"
     | "/api/github/public"
     | "/$owner/$repo/";
   fileRoutesByTo: FileRoutesByTo;
@@ -140,6 +150,7 @@ export interface FileRouteTypes {
     | "/chat"
     | "/$owner/$repo/$"
     | "/api/auth/$"
+    | "/api/autumn/$"
     | "/api/github/public"
     | "/$owner/$repo";
   id:
@@ -153,6 +164,7 @@ export interface FileRouteTypes {
     | "/chat/"
     | "/$owner/$repo/$"
     | "/api/auth/$"
+    | "/api/autumn/$"
     | "/api/github/public"
     | "/$owner/$repo/";
   fileRoutesById: FileRoutesById;
@@ -165,6 +177,7 @@ export interface RootRouteChildren {
   ApiProxyRoute: typeof ApiProxyRoute;
   OwnerRepoSplatRoute: typeof OwnerRepoSplatRoute;
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute;
+  ApiAutumnSplatRoute: typeof ApiAutumnSplatRoute;
   ApiGithubPublicRoute: typeof ApiGithubPublicRoute;
   OwnerRepoIndexRoute: typeof OwnerRepoIndexRoute;
 }
@@ -234,6 +247,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof ApiGithubPublicRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    "/api/autumn/$": {
+      id: "/api/autumn/$";
+      path: "/api/autumn/$";
+      fullPath: "/api/autumn/$";
+      preLoaderRoute: typeof ApiAutumnSplatRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     "/api/auth/$": {
       id: "/api/auth/$";
       path: "/api/auth/$";
@@ -271,6 +291,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiProxyRoute: ApiProxyRoute,
   OwnerRepoSplatRoute: OwnerRepoSplatRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ApiAutumnSplatRoute: ApiAutumnSplatRoute,
   ApiGithubPublicRoute: ApiGithubPublicRoute,
   OwnerRepoIndexRoute: OwnerRepoIndexRoute,
 };

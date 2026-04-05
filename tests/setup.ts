@@ -1,6 +1,17 @@
 import "fake-indexeddb/auto";
-import { afterAll } from "vitest";
+import { afterAll, vi } from "vitest";
 import { db } from "@/db/schema";
+
+vi.mock("autumn-js/react", () => ({
+  AutumnProvider: ({ children }: { children: unknown }) => children,
+  useCustomer: () => ({
+    check: () => ({ allowed: true }),
+    data: {},
+    error: null,
+    isLoading: false,
+    refetch: vi.fn(async () => undefined),
+  }),
+}));
 
 Object.defineProperty(window, "matchMedia", {
   configurable: true,

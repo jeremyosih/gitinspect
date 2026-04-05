@@ -6,7 +6,14 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { event as trackEvent } from "onedollarstats";
 import { toast } from "sonner";
 import { getAssistantText, getFoldedToolResultIds } from "@gitinspect/pi/lib/chat-adapter";
-import { useGitHubAuthContext } from "@gitinspect/ui/components/github-auth-context";
+import {
+  type PendingAuthAction,
+  useGitHubAuthContext,
+} from "@gitinspect/ui/components/github-auth-context";
+import {
+  useMessageEntitlementGuard,
+  useModelAccessGuard,
+} from "@gitinspect/ui/hooks/use-chat-send-guards";
 import { ChatComposer } from "./chat-composer";
 import { ChatEmptyState } from "./chat-empty-state";
 import { ChatMessage as ChatMessageBlock } from "./chat-message";
@@ -83,6 +90,29 @@ function LoadingState({ label }: { label: string }) {
       {label}
     </div>
   );
+}
+
+function getCurrentRoute(): string {
+  if (typeof window === "undefined") {
+    return "/";
+  }
+
+  return `${window.location.pathname}${window.location.search}`;
+}
+
+async function trackMessageUsage(): Promise<void> {
+  const response = await fetch("/api/autumn/track-message", {
+    body: JSON.stringify({}),
+    headers: {
+      "content-type": "application/json",
+    },
+    keepalive: true,
+    method: "POST",
+  });
+
+  if (!response.ok) {
+    throw new Error("Could not track message usage.");
+  }
 }
 
 function getChatPanelMode(input: {
@@ -188,6 +218,8 @@ export function Chat(props: ChatProps) {
   const [isStartingSession, setIsStartingSession] = React.useState(false);
   const runtime = useRuntimeSession(props.sessionId);
   const auth = useGitHubAuthContext();
+  const { ensureMessageEntitlement, refreshMessageEntitlement } = useMessageEntitlementGuard();
+  const { requireModelAccess } = useModelAccessGuard();
   const ownership = useSessionOwnership(
     loadedSessionState?.kind === "active" ? loadedSessionState.session.id : undefined,
   );
@@ -468,6 +500,7 @@ export function Chat(props: ChatProps) {
     },
     [activeSession?.id],
   );
+  const [readyAuthAction, setReadyAuthAction] = React.useState<PendingAuthAction | null>(null);
 
   const handleFirstSend = React.useCallback(
     async (content: string) => {
@@ -476,22 +509,20 @@ export function Chat(props: ChatProps) {
       }
 
       if (
-        auth &&
-        auth.authState.session === "signed-out" &&
-        draft.providerGroup === "fireworks-free"
-      ) {
-        auth.openAuthDialog({
-          mode: "github-only",
+        !requireModelAccess({
           postAuthAction: {
             content,
-            route:
-              typeof window === "undefined"
-                ? "/"
-                : `${window.location.pathname}${window.location.search}`,
+            route: getCurrentRoute(),
             type: "send-first-message",
           },
+          providerGroup: draft.providerGroup,
           variant: "first-message",
-        });
+        })
+      ) {
+        return;
+      }
+
+      if (!(await ensureMessageEntitlement())) {
         return;
       }
 
@@ -511,6 +542,11 @@ export function Chat(props: ChatProps) {
             })
           : await createSessionForChat(base);
         await runtimeClient.startInitialTurn(session, content);
+        if (auth?.authState.session === "signed-in") {
+          await trackMessageUsage().catch((error) => {
+            console.error("[gitinspect:billing] track_message_failed", error);
+          });
+        }
         void trackEvent("Message sent").catch(() => {
           // Analytics must never interfere with chat sends.
         });
@@ -526,6 +562,7 @@ export function Chat(props: ChatProps) {
           to: "/chat/$sessionId",
         });
 
+        await refreshMessageEntitlement();
         void persistLastUsedSessionSettings(session);
       } catch (error) {
         reportRuntimeFailure(error instanceof Error ? error : new Error(String(error)));
@@ -534,12 +571,15 @@ export function Chat(props: ChatProps) {
       }
     },
     [
-      auth,
+      auth?.authState.session,
       draft,
+      ensureMessageEntitlement,
       isStartingSession,
       navigate,
       props.repoSource,
+      refreshMessageEntitlement,
       reportRuntimeFailure,
+      requireModelAccess,
       settings,
       sidebar,
     ],
@@ -550,27 +590,35 @@ export function Chat(props: ChatProps) {
       return;
     }
 
-    const readyAction = auth.consumeReadyAuthAction();
+    const readyAction = auth.consumeReadyAuthAction(getCurrentRoute());
 
-    if (!readyAction || readyAction.type !== "send-first-message") {
+    if (!readyAction || readyAction.action.type !== "send-first-message") {
       return;
     }
 
-    void handleFirstSend(readyAction.content);
+    if (readyAction.requiresConfirmation) {
+      setReadyAuthAction(readyAction.action);
+      return;
+    }
+
+    void handleFirstSend(readyAction.action.content);
   }, [activeSession, auth, draft, handleFirstSend, isStartingSession]);
+
+  React.useEffect(() => {
+    if (activeSession && readyAuthAction) {
+      setReadyAuthAction(null);
+    }
+  }, [activeSession, readyAuthAction]);
 
   const handleSend = React.useCallback(
     async (content: string) => {
       if (activeSession) {
         if (
-          auth &&
-          auth.authState.session === "signed-out" &&
-          (activeSession.providerGroup ?? getDefaultProviderGroup(activeSession.provider)) ===
-            "fireworks-free"
+          !requireModelAccess({
+            providerGroup:
+              activeSession.providerGroup ?? getDefaultProviderGroup(activeSession.provider),
+          })
         ) {
-          auth.openAuthDialog({
-            mode: "github-only",
-          });
           return;
         }
 
@@ -581,8 +629,18 @@ export function Chat(props: ChatProps) {
           return;
         }
 
+        if (!(await ensureMessageEntitlement())) {
+          return;
+        }
+
         try {
           await runtime.send(content);
+          if (auth?.authState.session === "signed-in") {
+            await trackMessageUsage().catch((error) => {
+              console.error("[gitinspect:billing] track_message_failed", error);
+            });
+          }
+          await refreshMessageEntitlement();
           void trackEvent("Message sent", "/chat").catch(() => {
             // Analytics must never interfere with chat sends.
           });
@@ -594,7 +652,17 @@ export function Chat(props: ChatProps) {
 
       await handleFirstSend(content);
     },
-    [auth, activeComposerState, activeSession, handleFirstSend, reportRuntimeFailure, runtime],
+    [
+      activeComposerState,
+      activeSession,
+      auth?.authState.session,
+      ensureMessageEntitlement,
+      handleFirstSend,
+      refreshMessageEntitlement,
+      reportRuntimeFailure,
+      requireModelAccess,
+      runtime,
+    ],
   );
 
   const handleResumeInterrupted = React.useCallback(async () => {
@@ -743,6 +811,43 @@ export function Chat(props: ChatProps) {
 
         <div className="pointer-events-auto bg-background">
           <div className="mx-auto w-full max-w-4xl px-4 pb-4">
+            {readyAuthAction ? (
+              <div className="mb-3 rounded-md border border-border bg-muted px-3 py-3 text-sm text-foreground">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <div className="font-medium">Resume your draft message?</div>
+                    <div className="text-muted-foreground">
+                      Your draft is still here. Send it now or dismiss it.
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      className="inline-flex items-center justify-center rounded-sm border border-border bg-background px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                      onClick={() => {
+                        const nextAction = readyAuthAction;
+                        setReadyAuthAction(null);
+                        if (!nextAction) {
+                          return;
+                        }
+                        void handleFirstSend(nextAction.content);
+                      }}
+                      type="button"
+                    >
+                      Send draft
+                    </button>
+                    <button
+                      className="inline-flex items-center justify-center rounded-sm border border-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                      onClick={() => {
+                        setReadyAuthAction(null);
+                      }}
+                      type="button"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
             {bannerState?.kind === "interrupted" && resumeAction && activeSession ? (
               <div className="mb-3 rounded-md border border-border bg-muted px-3 py-3 text-sm text-foreground">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

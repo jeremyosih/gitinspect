@@ -5,7 +5,7 @@ import { Icons } from "@gitinspect/ui/components/icons";
 import { SidebarMobileActions } from "@gitinspect/ui/components/sidebar-mobile-actions";
 import { parseSettingsSection } from "@gitinspect/ui/lib/search-state";
 
-export function ChatFooter() {
+export function ChatFooter({ showGetPro = true }: { showGetPro?: boolean } = {}) {
   const navigate = useNavigate();
   const search = useSearch({ strict: false });
   return (
@@ -22,6 +22,19 @@ export function ChatFooter() {
         <Icons.home className="h-4 w-4 text-sidebar-foreground" />
         <span>Home</span>
       </Link>
+      {showGetPro ? (
+        <Link
+          className="flex items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-sidebar-accent hover:underline"
+          search={(prev) => ({
+            ...prev,
+            settings: "pricing",
+          })}
+          to="."
+        >
+          <Icons.crown className="h-4 w-4 text-sidebar-foreground" />
+          <span>Get Pro</span>
+        </Link>
+      ) : null}
       <Button
         className="h-auto w-full justify-start px-3 py-2 text-sm font-normal text-sidebar-foreground shadow-none hover:bg-sidebar-accent"
         onClick={(event) => {

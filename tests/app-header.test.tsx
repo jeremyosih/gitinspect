@@ -42,6 +42,14 @@ vi.mock("@gitinspect/pi/hooks/use-selected-session-summary", () => ({
   }),
 }));
 
+vi.mock("@/hooks/use-subscription", () => ({
+  useSubscription: () => ({
+    subscriptionState: {
+      isSubscribed: false,
+    },
+  }),
+}));
+
 vi.mock("@gitinspect/ui/components/button", () => ({
   Button: ({ children, asChild }: { children: React.ReactNode; asChild?: boolean }) =>
     asChild ? children : React.createElement("button", undefined, children),
@@ -75,6 +83,7 @@ vi.mock("@gitinspect/ui/components/icons", () => ({
   Icons: {
     cog: () => React.createElement("span", undefined, "Cog"),
     comment: () => React.createElement("span", undefined, "Comment"),
+    crown: () => React.createElement("span", undefined, "Crown"),
     x: () => React.createElement("span", undefined, "X"),
   },
 }));

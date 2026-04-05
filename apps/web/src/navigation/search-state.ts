@@ -1,6 +1,13 @@
 export type LandingTab = "recent" | "suggested";
 
-export type SettingsSection = "providers" | "github" | "costs" | "proxy" | "data" | "about";
+export type SettingsSection =
+  | "providers"
+  | "github"
+  | "costs"
+  | "pricing"
+  | "proxy"
+  | "data"
+  | "about";
 
 export function parseLandingTab(value: unknown): LandingTab | undefined {
   return value === "recent" || value === "suggested" ? value : undefined;
@@ -11,6 +18,7 @@ export function isSettingsSection(value: string): value is SettingsSection {
     value === "providers" ||
     value === "github" ||
     value === "costs" ||
+    value === "pricing" ||
     value === "proxy" ||
     value === "data" ||
     value === "about"

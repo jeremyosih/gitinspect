@@ -29,6 +29,11 @@ export const Icons = {
       <path d="m21,10v-1h-1v-2h1v-2h-1v-1h-1v-1h-2v1h-2v-1h-1V1h-4v2h-1v1h-2v-1h-2v1h-1v1h-1v2h1v2h-1v1H1v4h2v1h1v2h-1v2h1v1h1v1h2v-1h2v1h1v2h4v-2h1v-1h2v1h2v-1h1v-1h1v-2h-1v-2h1v-1h2v-4h-2Zm-11,0v-1h4v1h1v4h-1v1h-4v-1h-1v-4h1Z" />
     </IconBase>
   ),
+  crown: (props: IconProps) => (
+    <IconBase aria-label="Get Pro" id="crown-solid" viewBox="0 0 24 24" {...props}>
+      <polygon points="23 7 23 9 22 9 22 10 21 10 21 14 20 14 20 17 19 17 19 19 18 19 18 21 6 21 6 19 5 19 5 17 4 17 4 14 3 14 3 10 2 10 2 9 1 9 1 7 2 7 2 6 4 6 4 7 5 7 5 9 4 9 4 10 5 10 5 11 6 11 6 12 8 12 8 11 9 11 9 9 10 9 10 7 11 7 11 6 10 6 10 4 11 4 11 3 13 3 13 4 14 4 14 6 13 6 13 7 14 7 14 9 15 9 15 11 16 11 16 12 18 12 18 11 19 11 19 10 20 10 20 9 19 9 19 7 20 7 20 6 22 6 22 7 23 7" />
+    </IconBase>
+  ),
   x: (props: IconProps) => (
     <IconBase id="x" viewBox="0 0 24 24" {...props}>
       <path d="m15.5,10v-1h1v-1h1v-1h1v-1h1v-1h1v-1h1v-1h1v-1h-3v1h-1v1h-1v1h-1v1h-1v1h-1v1h-2v-1h-1v-1h-1v-2h-1v-1h-1v-1H1.5v1h1v1h1v1h1v2h1v1h1v2h1v1h1v2h1v1h-1v1h-1v1h-1v1h-1v1h-1v1h-1v1h-1v1h-1v1h3v-1h1v-1h1v-1h1v-1h1v-1h1v-1h2v1h1v1h1v2h1v1h1v1h7v-1h-1v-1h-1v-1h-1v-2h-1v-1h-1v-2h-1v-1h-1v-2h-1v-1h1Zm0,4v1h1v2h1v1h1v2h-3v-2h-1v-1h-1v-1h-1v-2h-1v-1h-1v-1h-1v-2h-1v-1h-1v-2h-1v-1h-1v-2h3v1h1v2h1v1h1v2h1v1h1v1h1v2h1Z" />
@@ -95,14 +100,9 @@ export const Icons = {
     </IconBase>
   ),
   faceThinking: (props: IconProps) => (
-    <IconBase aria-label="About" id="face-thinking" viewBox="0 0 24 24" {...props}>
-      <polygon points="12 7 13 7 13 8 11 8 11 7 10 7 10 6 8 6 8 7 6 7 6 6 7 6 7 5 11 5 11 6 12 6 12 7" />
-      <polygon points="13 13 13 14 10 14 10 13 8 13 8 12 11 12 11 13 13 13" />
-      <rect height="2" width="2" x="8" y="8" />
-      <rect height="2" width="2" x="14" y="9" />
-      <polygon points="19 8 19 10 18 10 18 9 17 9 17 8 15 8 15 7 18 7 18 8 19 8" />
-      <polygon points="14 15 14 17 13 17 13 18 11 18 11 20 10 20 10 22 9 22 9 23 5 23 5 22 4 22 4 16 5 16 5 15 6 15 6 18 8 18 8 17 10 17 10 16 12 16 12 15 14 15" />
-      <polygon points="23 9 23 15 22 15 22 17 21 17 21 19 20 19 20 20 19 20 19 21 17 21 17 22 15 22 15 23 11 23 11 21 15 21 15 20 17 20 17 19 18 19 18 18 19 18 19 17 20 17 20 15 21 15 21 9 20 9 20 7 19 7 19 6 18 6 18 5 17 5 17 4 15 4 15 3 9 3 9 4 7 4 7 5 6 5 6 6 5 6 5 7 4 7 4 9 3 9 3 14 4 14 4 15 3 15 3 16 2 16 2 15 1 15 1 9 2 9 2 7 3 7 3 5 4 5 4 4 5 4 5 3 7 3 7 2 9 2 9 1 15 1 15 2 17 2 17 3 19 3 19 4 20 4 20 5 21 5 21 7 22 7 22 9 23 9" />
+    <IconBase aria-label="Thinking" id="face-thinking-solid" viewBox="0 0 24 24" {...props}>
+      <polygon points="11 20 10 20 10 22 9 22 9 23 5 23 5 22 4 22 4 16 5 16 5 15 6 15 6 18 8 18 8 17 10 17 10 16 12 16 12 15 14 15 14 17 13 17 13 18 11 18 11 20" />
+      <path d="m22,9v-2h-1v-2h-1v-1h-1v-1h-2v-1h-2v-1h-6v1h-2v1h-2v1h-1v1h-1v2h-1v2h-1v6h1v1h1v-1h1v-1h3v2h2v-1h2v-1h-1v-1h-2v-1h3v1h2v1h2v4h-1v1h-2v2h-1v2h4v-1h2v-1h2v-1h1v-1h1v-2h1v-2h1v-6h-1Zm-7-2h3v1h1v2h-1v-1h-1v-1h-2v-1Zm-1,2h2v2h-2v-2Zm-4,1h-2v-2h2v2Zm1-2v-1h-1v-1h-2v1h-2v-1h1v-1h4v1h1v1h1v1h-2Z" />
     </IconBase>
   ),
   moon: (props: IconProps) => (
@@ -144,6 +144,23 @@ export const Icons = {
       <polygon points="16 20 16 22 15 22 15 23 3 23 3 22 2 22 2 6 3 6 3 5 6 5 6 20 16 20" />
       <path d="m16,7V1h-8v1h-1v16h1v1h13v-1h1V7h-6Zm4,10h-11V3h5v6h6v8Z" />
       <polygon points="22 5 22 6 17 6 17 1 18 1 18 2 19 2 19 3 20 3 20 4 21 4 21 5 22 5" />
+    </IconBase>
+  ),
+  comment: (props: IconProps) => (
+    <IconBase aria-label="Comment" id="comment-dots-solid" viewBox="0 0 24 24" {...props}>
+      <path d="m22,8v-2h-1v-1h-1v-1h-2v-1h-3v-1h-6v1h-3v1h-2v1h-1v1h-1v2h-1v6h1v2h1v2h-1v1h-1v2h5v-1h1v-1h2v1h6v-1h3v-1h2v-1h1v-1h1v-2h1v-6h-1Zm-6,5v-1h-1v-2h1v-1h2v1h1v2h-1v1h-2Zm-6-1v-2h1v-1h2v1h1v2h-1v1h-2v-1h-1Zm-2-3v1h1v2h-1v1h-2v-1h-1v-2h1v-1h2Z" />
+    </IconBase>
+  ),
+  thumbsDown: (props: IconProps) => (
+    <IconBase aria-label="Thumbs down" id="thumbsdown-solid" viewBox="0 0 24 24" {...props}>
+      <polygon points="6 2 6 15 2 15 2 14 1 14 1 3 2 3 2 2 6 2" />
+      <polygon points="23 12 23 14 22 14 22 15 15 15 15 17 16 17 16 21 15 21 15 22 13 22 13 21 12 21 12 18 11 18 11 16 10 16 10 15 9 15 9 14 8 14 8 5 9 5 9 4 10 4 10 3 12 3 12 2 19 2 19 3 20 3 20 6 21 6 21 9 22 9 22 12 23 12" />
+    </IconBase>
+  ),
+  thumbsUp: (props: IconProps) => (
+    <IconBase aria-label="Thumbs up" id="thumbsup-solid" viewBox="0 0 24 24" {...props}>
+      <polygon points="23 10 23 12 22 12 22 15 21 15 21 18 20 18 20 21 19 21 19 22 12 22 12 21 10 21 10 20 9 20 9 19 8 19 8 10 9 10 9 9 10 9 10 8 11 8 11 6 12 6 12 3 13 3 13 2 15 2 15 3 16 3 16 7 15 7 15 9 22 9 22 10 23 10" />
+      <polygon points="6 9 6 22 2 22 2 21 1 21 1 10 2 10 2 9 6 9" />
     </IconBase>
   ),
   writing: (props: IconProps) => (

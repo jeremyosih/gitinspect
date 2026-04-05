@@ -32,12 +32,14 @@ import {
 import { isSettingsSection } from "@gitinspect/ui/lib/search-state";
 import { useSelectedSessionSummary } from "@gitinspect/pi/hooks/use-selected-session-summary";
 
-const SETTINGS_SECTIONS: Array<{
+type SettingsSectionItem = {
   description: string;
   icon: React.ComponentType<{ className?: string }>;
   id: SettingsSection;
   label: string;
-}> = [
+};
+
+const BASE_SETTINGS_SECTIONS: Array<SettingsSectionItem> = [
   {
     description: "Local provider credentials and OAuth",
     icon: Icons.badgeCheck,
@@ -76,7 +78,10 @@ const SETTINGS_SECTIONS: Array<{
   },
 ];
 
-export function AppSettingsDialog() {
+export function AppSettingsDialog(props: {
+  pricingLabel?: string;
+  pricingPanel?: React.ReactNode;
+}) {
   const navigate = useNavigate();
   const router = useRouter();
   const search = useSearch({ strict: false });
@@ -86,13 +91,34 @@ export function AppSettingsDialog() {
   const sessionId =
     currentMatch.routeId === "/chat/$sessionId" ? currentMatch.params.sessionId : undefined;
   const session = useSelectedSessionSummary(sessionId);
-  const section =
+  const settingsSections = React.useMemo<Array<SettingsSectionItem>>(() => {
+    if (!props.pricingPanel) {
+      return BASE_SETTINGS_SECTIONS;
+    }
+
+    return [
+      BASE_SETTINGS_SECTIONS[0],
+      BASE_SETTINGS_SECTIONS[1],
+      BASE_SETTINGS_SECTIONS[2],
+      {
+        description: "Plans, checkout, and billing management",
+        icon: Icons.crown,
+        id: "pricing",
+        label: props.pricingLabel ?? "Pricing",
+      },
+      ...BASE_SETTINGS_SECTIONS.slice(3),
+    ];
+  }, [props.pricingLabel, props.pricingPanel]);
+  const requestedSection =
     typeof search.settings === "string" && isSettingsSection(search.settings)
       ? search.settings
+      : undefined;
+  const section =
+    requestedSection && settingsSections.some((item) => item.id === requestedSection)
+      ? requestedSection
       : "providers";
-  const open = typeof search.settings === "string" && isSettingsSection(search.settings);
-  const activeSection =
-    SETTINGS_SECTIONS.find((item) => item.id === section) ?? SETTINGS_SECTIONS[0];
+  const open = Boolean(requestedSection) && settingsSections.some((item) => item.id === section);
+  const activeSection = settingsSections.find((item) => item.id === section) ?? settingsSections[0];
 
   const navigateWithSettings = (nextSection: SettingsSection | undefined) => {
     void navigate({
@@ -124,7 +150,7 @@ export function AppSettingsDialog() {
               <SidebarGroup>
                 <SidebarGroupContent>
                   <SidebarMenu>
-                    {SETTINGS_SECTIONS.map((item) => (
+                    {settingsSections.map((item) => (
                       <SidebarMenuItem key={item.id}>
                         <SidebarMenuButton asChild isActive={section === item.id}>
                           <Link
@@ -166,7 +192,7 @@ export function AppSettingsDialog() {
                     className="inline-flex h-auto w-max flex-nowrap justify-start gap-4 bg-transparent p-0 px-1 data-[variant=line]:gap-4"
                     variant="line"
                   >
-                    {SETTINGS_SECTIONS.map((item) => (
+                    {settingsSections.map((item) => (
                       <TabsTrigger
                         asChild
                         className="flex-none gap-1.5 px-1.5 pb-2"
@@ -216,6 +242,7 @@ export function AppSettingsDialog() {
                 ) : null}
                 {section === "proxy" ? <ProxySettings /> : null}
                 {section === "costs" ? <CostsPanel session={session} /> : null}
+                {section === "pricing" ? (props.pricingPanel ?? null) : null}
                 {section === "data" ? <DataSettings /> : null}
                 {section === "about" ? <AboutPanel /> : null}
               </div>
@@ -345,9 +372,10 @@ function AboutPanel() {
             </li>
             <li>
               <span className="font-medium text-foreground">Private by design</span> — Chats,
-              settings, provider keys, and usage stay local-first in Dexie / IndexedDB. Product auth
-              session data and linked GitHub account state can live in secure cookies, while repo
-              and chat fetches remain client-side.
+              settings, provider keys, and usage stay local-first in Dexie / IndexedDB. If you sign
+              in, gitinspect stores a secure session cookie for your account. Private repo access
+              uses GitHub OAuth or an optional local access token, while repo and chat fetches stay
+              client-side.
             </li>
             <li>
               <span className="font-medium text-foreground">Local first</span> — Agent execution

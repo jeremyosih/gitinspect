@@ -20,7 +20,7 @@ import {
   persistLastUsedSessionSettings,
 } from "@gitinspect/pi/sessions/session-actions";
 
-export function AppSidebar() {
+export function AppSidebar({ showGetPro = true }: { showGetPro?: boolean } = {}) {
   const navigate = useNavigate();
   const currentMatch = useRouterState({
     select: (state) => state.matches[state.matches.length - 1],
@@ -182,7 +182,7 @@ export function AppSidebar() {
         sessions={sessionList}
       />
       <SidebarFooter className="border-t border-sidebar-border">
-        <ChatFooter />
+        <ChatFooter showGetPro={showGetPro} />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

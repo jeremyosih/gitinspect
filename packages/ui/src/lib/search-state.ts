@@ -1,10 +1,18 @@
-export type SettingsSection = "providers" | "github" | "costs" | "proxy" | "data" | "about";
+export type SettingsSection =
+  | "providers"
+  | "github"
+  | "costs"
+  | "pricing"
+  | "proxy"
+  | "data"
+  | "about";
 
 export function isSettingsSection(value: string): value is SettingsSection {
   return (
     value === "providers" ||
     value === "github" ||
     value === "costs" ||
+    value === "pricing" ||
     value === "proxy" ||
     value === "data" ||
     value === "about"

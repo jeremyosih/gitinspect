@@ -12,17 +12,20 @@ import { Analytics as VercelAnalytics } from "@vercel/analytics/react";
 import { Analytics as OneDollarStats } from "@/components/analytics";
 import appCss from "../styles.css?url";
 import { AppSettingsDialog } from "@gitinspect/ui/components/settings-dialog";
-import { AppHeader } from "@gitinspect/ui/components/app-header";
-import { AppSidebar } from "@gitinspect/ui/components/app-sidebar";
+import { AppHeader } from "@/components/app-header";
+import { AppSidebar } from "@/components/app-sidebar";
 import { FeedbackDialog } from "@/components/feedback-dialog";
 import { RootGuard } from "@/components/root-guard";
 import { AuthDialogWrapper } from "@/components/auth-dialog-wrapper";
 import { AppAuthProvider } from "@/components/app-auth-provider";
+import { PricingSettingsPanel } from "@/components/pricing-settings-panel";
+import { useSubscription } from "@/hooks/use-subscription";
 import { parseSettingsSection } from "@/navigation/search-state";
 import { SidebarInset, SidebarProvider } from "@gitinspect/ui/components/sidebar";
 import { TooltipProvider } from "@gitinspect/ui/components/tooltip";
 import { Toaster } from "@gitinspect/ui/components/sonner";
 import { ThemeProvider } from "@gitinspect/ui/components/theme-provider";
+import { AutumnProvider } from "autumn-js/react";
 
 type RootSearchInput = {
   feedback?: string;
@@ -118,9 +121,11 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         >
           <TooltipProvider>
             <AppAuthProvider>
-              <RootGuard>{children}</RootGuard>
-              <AuthDialogWrapper />
-              <Toaster position="bottom-right" />
+              <AutumnProvider includeCredentials pathPrefix="/api/autumn">
+                <RootGuard>{children}</RootGuard>
+                <AuthDialogWrapper />
+                <Toaster position="bottom-right" />
+              </AutumnProvider>
             </AppAuthProvider>
           </TooltipProvider>
         </ThemeProvider>
@@ -135,6 +140,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 function RootLayout() {
   const navigate = useNavigate();
   const search = Route.useSearch();
+  const { isSignedIn } = useSubscription();
   return (
     <SidebarProvider
       onOpenChange={(open) => {
@@ -157,7 +163,10 @@ function RootLayout() {
           </main>
         </SidebarInset>
       </div>
-      <AppSettingsDialog />
+      <AppSettingsDialog
+        pricingLabel={isSignedIn ? "Subscription" : "Get Pro"}
+        pricingPanel={<PricingSettingsPanel />}
+      />
       <FeedbackDialog />
     </SidebarProvider>
   );
