@@ -1,15 +1,10 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-const proxyMock = vi.fn(<T>(value: T): T => value);
-
-vi.mock("comlink", () => ({
-  proxy: proxyMock,
-}));
 
 describe("runtime worker client", () => {
   beforeEach(() => {
     vi.resetModules();
-    proxyMock.mockClear();
     Reflect.deleteProperty(globalThis, "ComlinkWorker");
   });
 
@@ -42,7 +37,7 @@ describe("runtime worker client", () => {
     );
   });
 
-  it("wraps event sinks with Comlink.proxy", async () => {
+  it("reports worker availability without constructing the singleton", async () => {
     const constructorMock = vi.fn(function (
       this: unknown,
       _url: URL,
@@ -51,16 +46,27 @@ describe("runtime worker client", () => {
       return {};
     });
 
+    const { getRuntimeWorkerIfAvailable } = await import("@/agent/runtime-worker-client");
+    expect(getRuntimeWorkerIfAvailable()).toBeUndefined();
+
     Reflect.set(globalThis, "ComlinkWorker", constructorMock);
+    expect(getRuntimeWorkerIfAvailable()).toEqual({});
+    expect(constructorMock).toHaveBeenCalledTimes(1);
+  });
 
-    const { createRuntimeWorkerEvents } = await import("@/agent/runtime-worker-client");
-    const sink = {
-      pushSnapshot: vi.fn(async () => {}),
-    };
+  it("preserves direct ComlinkWorker syntax for vite-plugin-comlink", () => {
+    const packageSource = readFileSync(
+      join(process.cwd(), "packages/pi/src/agent/runtime-worker-client.ts"),
+      "utf8",
+    );
+    const webSource = readFileSync(
+      join(process.cwd(), "apps/web/src/agent/runtime-worker-client.ts"),
+      "utf8",
+    );
 
-    const proxied = createRuntimeWorkerEvents(sink);
-
-    expect(proxied).toBe(sink);
-    expect(proxyMock).toHaveBeenCalledWith(sink);
+    expect(packageSource).toContain('new ComlinkWorker<typeof import("./runtime-worker")>(');
+    expect(webSource).toContain('new ComlinkWorker<typeof import("./runtime-worker")>(');
+    expect(packageSource).not.toContain('typeof ComlinkWorker !== "undefined"');
+    expect(webSource).not.toContain('typeof ComlinkWorker !== "undefined"');
   });
 });

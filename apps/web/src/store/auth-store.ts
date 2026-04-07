@@ -200,7 +200,7 @@ export function consumeReadyAuthAction(input: {
   updateSnapshot({ pendingAction: null });
   return {
     action: pendingAction.action,
-    requiresConfirmation: true,
+    requiresConfirmation: pendingAction.status === "guest-approved",
   };
 }
 

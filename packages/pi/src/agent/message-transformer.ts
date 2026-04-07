@@ -1,5 +1,6 @@
 import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import type { Message } from "@mariozechner/pi-ai";
+import { linkToolResults } from "@gitinspect/pi/agent/tool-result-linker";
 import type { AssistantMessage, ToolResultMessage } from "@gitinspect/pi/types/chat";
 import type { JsonValue } from "@gitinspect/pi/types/common";
 import type { MessageRow } from "@gitinspect/db/storage-types";
@@ -60,42 +61,10 @@ function isToolResultFor(message: Message, toolCallIds: Set<string>): message is
 
 type ReplayMessage = Message | MessageRow;
 
-function getAssistantToolCallIds(message: ReplayMessage): Set<string> {
-  if (message.role !== "assistant") {
-    return new Set();
-  }
-
-  return new Set(message.content.flatMap((block) => (block.type === "toolCall" ? [block.id] : [])));
-}
-
 export function pruneOrphanToolResults<TMessage extends ReplayMessage>(
   messages: readonly TMessage[],
 ): TMessage[] {
-  const seenToolCallIds = new Set<string>();
-  const result: TMessage[] = [];
-
-  for (const message of messages) {
-    if (message.role === "assistant") {
-      for (const toolCallId of getAssistantToolCallIds(message)) {
-        seenToolCallIds.add(toolCallId);
-      }
-
-      result.push(message);
-      continue;
-    }
-
-    if (message.role === "toolResult") {
-      if (seenToolCallIds.has(message.toolCallId)) {
-        result.push(message);
-      }
-
-      continue;
-    }
-
-    result.push(message);
-  }
-
-  return result;
+  return linkToolResults(messages).messages;
 }
 
 function reorderMessages(messages: Message[]): Message[] {
@@ -139,11 +108,11 @@ function reorderMessages(messages: Message[]): Message[] {
 }
 
 export function webMessageTransformer(messages: AgentMessage[]): Message[] {
-  return reorderMessages(pruneOrphanToolResults(messages.filter(isLlmMessage)));
+  return reorderMessages(linkToolResults(messages.filter(isLlmMessage)).messages);
 }
 
 export function toOpenAIResponsesInput(messages: Message[]) {
-  return pruneOrphanToolResults(messages).flatMap((message): Array<Record<string, JsonValue>> => {
+  return linkToolResults(messages).messages.flatMap((message): Array<Record<string, JsonValue>> => {
     if (message.role === "assistant") {
       const items: Array<Record<string, JsonValue>> = [];
       const text = getMessageText(message);

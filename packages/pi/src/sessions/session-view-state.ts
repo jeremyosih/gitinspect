@@ -1,5 +1,5 @@
 import type { SessionLeaseState } from "@gitinspect/db/session-leases";
-import type { SessionRuntimeStatus } from "@gitinspect/db/storage-types";
+import type { RuntimePhase, SessionRuntimeStatus } from "@gitinspect/db/storage-types";
 
 export type ActiveSessionViewState =
   | { kind: "ready" }
@@ -21,6 +21,7 @@ export type ActiveSessionViewInput = {
   hasPartialAssistantText: boolean;
   lastProgressAt?: string;
   leaseState: SessionLeaseState;
+  runtimePhase?: RuntimePhase;
   runtimeStatus?: SessionRuntimeStatus;
   sessionIsStreaming: boolean;
 };
@@ -47,7 +48,9 @@ export type ComposerState = {
 export function deriveActiveSessionViewState(
   input: ActiveSessionViewInput,
 ): ActiveSessionViewState {
-  if (input.sessionIsStreaming) {
+  const isRunning = input.runtimePhase === "running" || input.sessionIsStreaming;
+
+  if (isRunning) {
     if (input.hasLocalRunner) {
       return {
         kind: "running-local",
@@ -77,7 +80,7 @@ export function deriveActiveSessionViewState(
     };
   }
 
-  if (input.runtimeStatus === "interrupted") {
+  if (input.runtimePhase === "interrupted" || input.runtimeStatus === "interrupted") {
     return {
       kind: "interrupted",
       lastProgressAt: input.lastProgressAt,

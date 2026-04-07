@@ -153,7 +153,7 @@ describe("messagesToMarkdown", () => {
     expect(markdown).not.toContain("- Repository:");
   });
 
-  it("includes clean tool summaries without raw tool results", () => {
+  it("includes failed tool error messages without copying successful tool output", () => {
     const markdown = messagesToMarkdown(buildMessagesWithTools());
 
     expect(markdown).toContain("## Assistant\n\nI inspected the export path.");
@@ -168,9 +168,9 @@ describe("messagesToMarkdown", () => {
       '   command: rg -n "copySessionToClipboard|messagesToMarkdown" -S .',
     );
     expect(markdown).toContain("   cwd: /repo");
+    expect(markdown).toContain("   error: command failed loudly");
     expect(markdown).toContain("3. read — Running");
     expect(markdown).toContain("   path: packages/pi/src/lib/copy-session-markdown.ts");
     expect(markdown).not.toContain("file contents that should not be copied");
-    expect(markdown).not.toContain("command failed loudly");
   });
 });

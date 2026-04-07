@@ -25,13 +25,16 @@ describe("auth store", () => {
       variant: "first-message",
     });
 
-    expect(consumeReadyAuthAction(false)).toBeNull();
-    expect(consumeReadyAuthAction(true)).toEqual({
-      content: "hello",
-      route: "/chat",
-      type: "send-first-message",
+    expect(consumeReadyAuthAction({ isSignedIn: false, route: "/chat" })).toBeNull();
+    expect(consumeReadyAuthAction({ isSignedIn: true, route: "/chat" })).toEqual({
+      action: {
+        content: "hello",
+        route: "/chat",
+        type: "send-first-message",
+      },
+      requiresConfirmation: false,
     });
-    expect(consumeReadyAuthAction(true)).toBeNull();
+    expect(consumeReadyAuthAction({ isSignedIn: true, route: "/chat" })).toBeNull();
   });
 
   it("releases the drafted first message after guest approval and persists the acknowledgement", async () => {
@@ -47,10 +50,13 @@ describe("auth store", () => {
     await continueAsGuest();
 
     expect(await hasGuestChatAcknowledgement()).toBe(true);
-    expect(consumeReadyAuthAction(false)).toEqual({
-      content: "hello as guest",
-      route: "/chat",
-      type: "send-first-message",
+    expect(consumeReadyAuthAction({ isSignedIn: false, route: "/chat" })).toEqual({
+      action: {
+        content: "hello as guest",
+        route: "/chat",
+        type: "send-first-message",
+      },
+      requiresConfirmation: true,
     });
   });
 });

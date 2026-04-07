@@ -53,3 +53,11 @@ export interface SystemMessage {
 }
 
 export type ChatMessage = AssistantMessage | SystemMessage | ToolResultMessage | UserMessage;
+
+export type DisplayAssistantStatus = "interrupted" | "streaming";
+
+export type DisplayAssistantMessage = AssistantMessage & {
+  status: DisplayAssistantStatus;
+};
+
+export type DisplayChatMessage = ChatMessage | DisplayAssistantMessage;

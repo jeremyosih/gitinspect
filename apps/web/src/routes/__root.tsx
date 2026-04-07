@@ -1,4 +1,5 @@
 import * as React from "react";
+import { env } from "@gitinspect/env/web";
 import {
   HeadContent,
   Link,
@@ -121,7 +122,11 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         >
           <TooltipProvider>
             <AppAuthProvider>
-              <AutumnProvider includeCredentials pathPrefix="/api/autumn">
+              <AutumnProvider
+                backendUrl={env.VITE_BETTER_AUTH_URL}
+                includeCredentials
+                pathPrefix="/api/autumn"
+              >
                 <RootGuard>{children}</RootGuard>
                 <AuthDialogWrapper />
                 <Toaster position="bottom-right" />

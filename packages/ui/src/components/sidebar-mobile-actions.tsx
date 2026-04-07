@@ -4,12 +4,7 @@ import { Link } from "@tanstack/react-router";
 import { useTheme } from "next-themes";
 import { Icons } from "@gitinspect/ui/components/icons";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@gitinspect/ui/components/sidebar";
-import { Skeleton } from "@gitinspect/ui/components/skeleton";
-import {
-  GITHUB_APP_REPO,
-  useGitHubRepoStargazers,
-} from "@gitinspect/pi/hooks/use-github-repo-stargazers";
-import { formatGitHubStarCount } from "@gitinspect/pi/lib/format-github-stars";
+import { GITHUB_APP_REPO } from "@gitinspect/pi/hooks/use-github-repo-stargazers";
 
 /** Mobile sidebar only: links and actions that are hidden from the header on small screens. Renders under the Home link. */
 export function SidebarMobileActions() {
@@ -27,7 +22,16 @@ export function SidebarMobileActions() {
           </SidebarMenuButton>
         </SidebarMenuItem>
         <SidebarMenuItem>
-          <MobileGitHubRow />
+          <SidebarMenuButton asChild className="h-9 gap-1.5">
+            <a
+              href={`https://github.com/${GITHUB_APP_REPO.owner}/${GITHUB_APP_REPO.repo}`}
+              rel="noreferrer"
+              target="_blank"
+            >
+              <Icons.gitHub className="text-sidebar-foreground" />
+              <span>GitHub</span>
+            </a>
+          </SidebarMenuButton>
         </SidebarMenuItem>
         <SidebarMenuItem>
           <SidebarMenuButton
@@ -57,28 +61,5 @@ export function SidebarMobileActions() {
         </SidebarMenuItem>
       </SidebarMenu>
     </div>
-  );
-}
-
-function MobileGitHubRow() {
-  const { owner, repo } = GITHUB_APP_REPO;
-  const state = useGitHubRepoStargazers(owner, repo);
-
-  return (
-    <SidebarMenuButton asChild className="h-9 gap-1.5">
-      <a href={`https://github.com/${owner}/${repo}`} rel="noreferrer" target="_blank">
-        <Icons.gitHub className="text-sidebar-foreground" />
-        <span>GitHub</span>
-        {state.status === "loading" ? (
-          <Skeleton className="ml-auto h-4 w-8 shrink-0" />
-        ) : state.status === "error" ? (
-          <span className="ml-auto text-xs text-sidebar-foreground/70 tabular-nums">—</span>
-        ) : (
-          <span className="ml-auto text-xs text-sidebar-foreground/80 tabular-nums">
-            {formatGitHubStarCount(state.count)}
-          </span>
-        )}
-      </a>
-    </SidebarMenuButton>
   );
 }

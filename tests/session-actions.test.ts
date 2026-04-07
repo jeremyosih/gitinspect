@@ -8,7 +8,7 @@ const listProviderKeys = vi.fn();
 const setSetting = vi.fn(async () => {});
 const persistSessionSnapshot = vi.fn(async () => {});
 const createSession = vi.fn();
-const releaseSession = vi.fn(async () => {});
+const releaseSessionAndDrain = vi.fn(async () => {});
 
 vi.mock("@/db/schema", () => ({
   deleteSession,
@@ -24,7 +24,7 @@ vi.mock("@/sessions/session-service", () => ({
 
 vi.mock("@/agent/runtime-client", () => ({
   runtimeClient: {
-    releaseSession,
+    releaseSessionAndDrain,
   },
 }));
 
@@ -88,7 +88,7 @@ describe("session-actions", () => {
     getSetting.mockReset();
     listProviderKeys.mockReset();
     persistSessionSnapshot.mockReset();
-    releaseSession.mockReset();
+    releaseSessionAndDrain.mockReset();
     setSetting.mockReset();
   });
 
@@ -163,7 +163,7 @@ describe("session-actions", () => {
       siblingSessions: [buildSession("session-current"), sibling],
     });
 
-    expect(releaseSession).toHaveBeenCalledWith("session-current");
+    expect(releaseSessionAndDrain).toHaveBeenCalledWith("session-current");
     expect(deleteSession).toHaveBeenCalledWith("session-current");
     expect(result).toEqual({
       nextSessionId: "session-next",
@@ -181,5 +181,29 @@ describe("session-actions", () => {
     expect(result).toEqual({
       nextSessionId: undefined,
     });
+  });
+
+  it("waits for release to drain before deleting a running session", async () => {
+    let resolveRelease: (() => void) | undefined;
+    releaseSessionAndDrain.mockImplementationOnce(
+      async () =>
+        await new Promise<void>((resolve) => {
+          resolveRelease = resolve;
+        }),
+    );
+
+    const { deleteSessionAndResolveNext } = await import("@/sessions/session-actions");
+    const deletePromise = deleteSessionAndResolveNext({
+      sessionId: "session-current",
+      siblingSessions: [buildSession("session-current")],
+    });
+
+    await Promise.resolve();
+    expect(deleteSession).not.toHaveBeenCalled();
+
+    resolveRelease?.();
+    await deletePromise;
+
+    expect(deleteSession).toHaveBeenCalledWith("session-current");
   });
 });

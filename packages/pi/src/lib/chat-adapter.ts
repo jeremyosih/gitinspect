@@ -1,6 +1,8 @@
+import { linkToolResults } from "@gitinspect/pi/agent/tool-result-linker";
 import type {
   AssistantMessage,
   ChatMessage,
+  DisplayChatMessage,
   SystemMessage,
   ToolCall,
   ToolResultMessage,
@@ -40,28 +42,19 @@ function collectToolResultsForAssistant(
   message: AssistantMessage,
   followingMessages: readonly ChatMessage[],
 ): Map<string, ToolResultMessage> {
-  const toolCalls = getAssistantToolCalls(message);
+  const linkedMessages = linkToolResults([message, ...followingMessages]).messages;
   const toolResults = new Map<string, ToolResultMessage>();
 
-  if (toolCalls.length === 0) {
-    return toolResults;
-  }
-
-  for (const next of followingMessages) {
-    if (next.role === "assistant") {
-      break;
-    }
-
-    if (next.role === "system") {
+  for (const linkedMessage of linkedMessages) {
+    if (linkedMessage.role !== "toolResult") {
       continue;
     }
 
-    if (next.role !== "toolResult" || toolResults.has(next.toolCallId)) {
-      continue;
-    }
-
-    if (next.parentAssistantId === message.id) {
-      toolResults.set(next.toolCallId, next);
+    if (
+      linkedMessage.parentAssistantId === message.id &&
+      !toolResults.has(linkedMessage.toolCallId)
+    ) {
+      toolResults.set(linkedMessage.toolCallId, linkedMessage);
     }
   }
 
@@ -101,7 +94,7 @@ export interface DerivedAssistantView {
 
 export function deriveAssistantView(
   message: AssistantMessage,
-  followingMessages: readonly ChatMessage[] = [],
+  followingMessages: readonly DisplayChatMessage[] = [],
 ): DerivedAssistantView {
   const text = getAssistantText(message);
   const toolCalls = getAssistantToolCalls(message);
@@ -119,20 +112,17 @@ export function deriveAssistantView(
   };
 }
 
-export function getFoldedToolResultIds(messages: readonly ChatMessage[]): ReadonlySet<string> {
+export function getFoldedToolResultIds(
+  messages: readonly DisplayChatMessage[],
+): ReadonlySet<string> {
+  const linkedMessages = linkToolResults(messages).messages;
   const foldedIds = new Set<string>();
 
-  messages.forEach((message, index) => {
-    if (message.role !== "assistant") {
-      return;
+  for (const message of linkedMessages) {
+    if (message.role === "toolResult") {
+      foldedIds.add(message.id);
     }
-
-    const toolResults = collectToolResultsForAssistant(message, messages.slice(index + 1));
-
-    for (const toolResult of toolResults.values()) {
-      foldedIds.add(toolResult.id);
-    }
-  });
+  }
 
   return foldedIds;
 }

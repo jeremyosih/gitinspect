@@ -1,24 +1,21 @@
-import * as Comlink from "comlink";
-import type { RuntimeWorkerEvents } from "@gitinspect/pi/agent/runtime-worker-types";
+import type { Remote } from "comlink";
+import { createRuntimeWorkerClient } from "@gitinspect/pi/agent/runtime-worker-client-shared";
 
-declare const ComlinkWorker: new <T>(scriptURL: URL, options?: WorkerOptions) => Comlink.Remote<T>;
+declare const ComlinkWorker: new <TModule>(
+  scriptURL: URL,
+  options?: WorkerOptions,
+) => Remote<TModule>;
 
-let workerApi: Comlink.Remote<typeof import("./runtime-worker")> | undefined;
-
-export function getRuntimeWorker(): Comlink.Remote<typeof import("./runtime-worker")> {
-  if (!workerApi) {
-    workerApi = new ComlinkWorker<typeof import("./runtime-worker")>(
-      new URL("./runtime-worker", import.meta.url),
-      {
-        name: "gitinspect-runtime-worker",
-        type: "module",
-      },
-    );
-  }
-
-  return workerApi!;
+function createRuntimeWorker() {
+  return new ComlinkWorker<typeof import("./runtime-worker")>(
+    new URL("./runtime-worker", import.meta.url),
+    {
+      name: "gitinspect-runtime-worker",
+      type: "module",
+    },
+  );
 }
 
-export function createRuntimeWorkerEvents(sink: RuntimeWorkerEvents): RuntimeWorkerEvents {
-  return Comlink.proxy(sink);
-}
+const client = createRuntimeWorkerClient(createRuntimeWorker);
+
+export const { getRuntimeWorker, getRuntimeWorkerIfAvailable } = client;

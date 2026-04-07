@@ -10,7 +10,7 @@ import type { ProviderGroupId } from "@gitinspect/pi/types/models";
 
 const AUTUMN_MESSAGES_FEATURE_ID = "messages";
 
-function isGitinspectProviderGroup(providerGroup: ProviderGroupId): boolean {
+export function isGitinspectProviderGroup(providerGroup: ProviderGroupId): boolean {
   return providerGroup === "fireworks-free";
 }
 
@@ -60,42 +60,59 @@ export function useMessageEntitlementGuard() {
     },
   });
 
-  const ensureMessageEntitlement = React.useCallback(async () => {
-    if (auth?.authState.session !== "signed-in") {
+  const ensureMessageEntitlement = React.useCallback(
+    async (input: { providerGroup: ProviderGroupId }) => {
+      if (!isGitinspectProviderGroup(input.providerGroup)) {
+        return true;
+      }
+
+      if (auth?.authState.session !== "signed-in") {
+        return true;
+      }
+
+      if (autumnCustomer.error) {
+        toast.error(autumnCustomer.error.message);
+        return false;
+      }
+
+      if (autumnCustomer.isLoading || !autumnCustomer.data) {
+        toast.error("Checking your subscription...");
+        return false;
+      }
+
+      const { allowed } = autumnCustomer.check({
+        featureId: AUTUMN_MESSAGES_FEATURE_ID,
+      });
+
+      if (!allowed) {
+        toast.error("You're out of messages");
+        return false;
+      }
+
       return true;
-    }
+    },
+    [auth?.authState.session, autumnCustomer],
+  );
 
-    if (autumnCustomer.error) {
-      toast.error(autumnCustomer.error.message);
-      return false;
-    }
+  const refreshMessageEntitlement = React.useCallback(
+    async (input: { providerGroup: ProviderGroupId }) => {
+      if (!isGitinspectProviderGroup(input.providerGroup)) {
+        return;
+      }
 
-    if (autumnCustomer.isLoading || !autumnCustomer.data) {
-      toast.error("Checking your subscription...");
-      return false;
-    }
+      if (auth?.authState.session !== "signed-in") {
+        return;
+      }
 
-    const { allowed } = autumnCustomer.check({
-      featureId: AUTUMN_MESSAGES_FEATURE_ID,
-    });
-
-    if (!allowed) {
-      toast.error("You're out of messages");
-      return false;
-    }
-
-    return true;
-  }, [auth?.authState.session, autumnCustomer]);
-
-  const refreshMessageEntitlement = React.useCallback(async () => {
-    if (auth?.authState.session !== "signed-in") {
-      return;
-    }
-
-    await autumnCustomer.refetch();
-  }, [auth?.authState.session, autumnCustomer]);
+      await autumnCustomer.refetch();
+    },
+    [auth?.authState.session, autumnCustomer],
+  );
 
   return {
+    customer: autumnCustomer.data,
+    customerError: autumnCustomer.error,
+    customerLoading: autumnCustomer.isLoading,
     ensureMessageEntitlement,
     refreshMessageEntitlement,
   };

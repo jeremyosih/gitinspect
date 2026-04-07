@@ -169,7 +169,7 @@ export async function deleteSessionAndResolveNext(params: {
   siblingSessions: Array<SessionData>;
 }): Promise<{ nextSessionId?: string }> {
   try {
-    await runtimeClient.releaseSession(params.sessionId);
+    await runtimeClient.releaseSessionAndDrain(params.sessionId);
   } catch {
     // Ignore runtime release failures during local session deletion.
   }

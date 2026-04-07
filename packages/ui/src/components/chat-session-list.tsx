@@ -30,18 +30,15 @@ import { Trash2, X } from "lucide-react";
 import type { SettingsSection } from "@gitinspect/ui/lib/search-state";
 
 type SessionRouteSearch = {
+  feedback?: "open";
   q: string | undefined;
   settings: SettingsSection | undefined;
-  sidebar: string | undefined;
+  sidebar: "open" | undefined;
 };
 
 type SessionLinkTarget =
   | {
-      search: {
-        q: string | undefined;
-        settings: SettingsSection | undefined;
-        sidebar: string | undefined;
-      };
+      search: SessionRouteSearch;
       to: "/chat";
     }
   | {

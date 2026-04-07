@@ -1,4 +1,4 @@
-import { getCurrentTabId } from "@gitinspect/pi/agent/tab-id";
+import { getCurrentTabId, getCurrentTabIdIfAvailable } from "@gitinspect/pi/agent/tab-id";
 import { db, deleteSessionLease, getSessionLease } from "@gitinspect/db/schema";
 import { getIsoNow } from "@gitinspect/pi/lib/dates";
 import { createId } from "@gitinspect/pi/lib/ids";
@@ -33,7 +33,9 @@ export async function loadSessionLeaseState(sessionId: string): Promise<SessionL
     return { kind: "none" };
   }
 
-  if (lease.ownerTabId === getCurrentTabId()) {
+  const currentTabId = getCurrentTabIdIfAvailable();
+
+  if (currentTabId && lease.ownerTabId === currentTabId) {
     return { kind: "owned", lease };
   }
 

@@ -163,29 +163,43 @@ vi.mock("@/components/chat-adapter", () => ({
 
 function buildSession(overrides: Partial<SessionData> = {}): {
   kind: "active";
-  messages: Array<MessageRow>;
-  session: SessionData;
+  viewModel: {
+    displayMessages: Array<MessageRow>;
+    hasPartialAssistantText: boolean;
+    isStreaming: boolean;
+    runtime?: unknown;
+    session: SessionData;
+    transcriptMessages: Array<MessageRow>;
+  };
 } {
+  const session: SessionData = {
+    cost: 0,
+    createdAt: "2026-03-24T12:00:00.000Z",
+    error: undefined,
+    id: "session-1",
+    isStreaming: false,
+    messageCount: 0,
+    model: "gpt-5.1-codex-mini",
+    preview: "",
+    provider: "openai-codex",
+    providerGroup: "openai-codex",
+    repoSource: undefined,
+    thinkingLevel: "medium",
+    title: "New chat",
+    updatedAt: "2026-03-24T12:00:00.000Z",
+    usage: createEmptyUsage(),
+    ...overrides,
+  };
+
   return {
     kind: "active",
-    messages: [],
-    session: {
-      cost: 0,
-      createdAt: "2026-03-24T12:00:00.000Z",
-      error: undefined,
-      id: "session-1",
+    viewModel: {
+      displayMessages: [],
+      hasPartialAssistantText: false,
       isStreaming: false,
-      messageCount: 0,
-      model: "gpt-5.1-codex-mini",
-      preview: "",
-      provider: "openai-codex",
-      providerGroup: "openai-codex",
-      repoSource: undefined,
-      thinkingLevel: "medium",
-      title: "New chat",
-      updatedAt: "2026-03-24T12:00:00.000Z",
-      usage: createEmptyUsage(),
-      ...overrides,
+      runtime: undefined,
+      session,
+      transcriptMessages: [],
     },
   };
 }
@@ -199,21 +213,28 @@ function mockChatQueries(options: {
   guestChatAcknowledged?: boolean;
   loadedSessionState:
     | { kind: "none" | "missing" }
-    | { kind: "active"; messages: Array<MessageRow>; session: SessionData };
-  sessionRuntime?: unknown;
+    | {
+        kind: "active";
+        viewModel: {
+          displayMessages: Array<MessageRow>;
+          hasPartialAssistantText: boolean;
+          isStreaming: boolean;
+          runtime?: unknown;
+          session: SessionData;
+          transcriptMessages: Array<MessageRow>;
+        };
+      };
 }) {
   useLiveQueryMock.mockImplementation(() => {
     const callIndex = useLiveQueryMock.mock.calls.length;
 
-    switch ((callIndex - 1) % 4) {
+    switch ((callIndex - 1) % 3) {
       case 0:
         return options.loadedSessionState;
       case 1:
-        return options.sessionRuntime;
-      case 2:
         return options.defaults;
       default:
-        return options.guestChatAcknowledged ?? true;
+        return [];
     }
   });
 }
@@ -290,16 +311,26 @@ describe("Chat state", () => {
       isStreaming: true,
       messageCount: 1,
     });
-    session.messages = [
+    session.viewModel.displayMessages = [
       {
         content: [{ text: "hello", type: "text" }],
         id: "message-1",
+        order: 0,
         role: "user",
         sessionId: "session-1",
         status: "completed",
         timestamp: 1,
       } as MessageRow,
     ];
+    session.viewModel.transcriptMessages = session.viewModel.displayMessages;
+    session.viewModel.runtime = {
+      lastProgressAt: "2026-03-24T12:00:01.000Z",
+      phase: "running",
+      sessionId: "session-1",
+      status: "streaming",
+      updatedAt: "2026-03-24T12:00:01.000Z",
+    };
+    session.viewModel.isStreaming = true;
 
     const defaults = {
       model: "gpt-5.1-codex-mini",
@@ -338,20 +369,39 @@ describe("Chat state", () => {
 
     loadedSessionState = {
       ...loadedSessionState,
-      messages: [
-        {
-          fingerprint: "provider_rate_limit:429 Too Many Requests",
-          id: "system-1",
-          kind: "provider_rate_limit",
-          message: "429 Too Many Requests",
-          role: "system",
-          sessionId: "session-1",
-          severity: "error",
-          source: "provider",
-          status: "completed",
-          timestamp: 2,
-        } as MessageRow,
-      ],
+      viewModel: {
+        ...loadedSessionState.viewModel,
+        displayMessages: [
+          {
+            fingerprint: "provider_rate_limit:429 Too Many Requests",
+            id: "system-1",
+            kind: "provider_rate_limit",
+            message: "429 Too Many Requests",
+            order: 0,
+            role: "system",
+            sessionId: "session-1",
+            severity: "error",
+            source: "provider",
+            status: "completed",
+            timestamp: 2,
+          } as MessageRow,
+        ],
+        transcriptMessages: [
+          {
+            fingerprint: "provider_rate_limit:429 Too Many Requests",
+            id: "system-1",
+            kind: "provider_rate_limit",
+            message: "429 Too Many Requests",
+            order: 0,
+            role: "system",
+            sessionId: "session-1",
+            severity: "error",
+            source: "provider",
+            status: "completed",
+            timestamp: 2,
+          } as MessageRow,
+        ],
+      },
     };
 
     mockChatQueries({
@@ -392,22 +442,43 @@ describe("Chat state", () => {
 
     loadedSessionState = {
       ...loadedSessionState,
-      messages: [
-        {
-          action: "open-github-settings",
-          fingerprint:
-            "github_rate_limit:GitHub API rate limit exceeded (retry after 3:00:00 PM): /:/",
-          id: "system-github-1",
-          kind: "github_rate_limit",
-          message: "GitHub API rate limit exceeded (retry after 3:00:00 PM): /",
-          role: "system",
-          sessionId: "session-1",
-          severity: "error",
-          source: "github",
-          status: "completed",
-          timestamp: 2,
-        } as MessageRow,
-      ],
+      viewModel: {
+        ...loadedSessionState.viewModel,
+        displayMessages: [
+          {
+            action: "open-github-settings",
+            fingerprint:
+              "github_rate_limit:GitHub API rate limit exceeded (retry after 3:00:00 PM): /:/",
+            id: "system-github-1",
+            kind: "github_rate_limit",
+            message: "GitHub API rate limit exceeded (retry after 3:00:00 PM): /",
+            order: 0,
+            role: "system",
+            sessionId: "session-1",
+            severity: "error",
+            source: "github",
+            status: "completed",
+            timestamp: 2,
+          } as MessageRow,
+        ],
+        transcriptMessages: [
+          {
+            action: "open-github-settings",
+            fingerprint:
+              "github_rate_limit:GitHub API rate limit exceeded (retry after 3:00:00 PM): /:/",
+            id: "system-github-1",
+            kind: "github_rate_limit",
+            message: "GitHub API rate limit exceeded (retry after 3:00:00 PM): /",
+            order: 0,
+            role: "system",
+            sessionId: "session-1",
+            severity: "error",
+            source: "github",
+            status: "completed",
+            timestamp: 2,
+          } as MessageRow,
+        ],
+      },
     };
 
     mockChatQueries({

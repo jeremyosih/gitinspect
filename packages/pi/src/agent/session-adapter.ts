@@ -84,10 +84,12 @@ export function toMessageRow(
   message: ChatMessage,
   status = inferMessageStatus(message),
   id = message.id,
+  order = message.timestamp,
 ): MessageRow {
   return {
     ...message,
     id,
+    order,
     sessionId,
     status,
   };

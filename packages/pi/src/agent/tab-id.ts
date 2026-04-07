@@ -4,13 +4,13 @@ const TAB_ID_STORAGE_KEY = "gitinspect-tab-id";
 
 let cachedTabId: string | undefined;
 
-export function getCurrentTabId(): string {
+export function getCurrentTabIdIfAvailable(): string | undefined {
   if (cachedTabId) {
     return cachedTabId;
   }
 
   if (typeof window === "undefined") {
-    throw new Error("Tab identity requires a browser environment");
+    return undefined;
   }
 
   const existing = window.sessionStorage.getItem(TAB_ID_STORAGE_KEY);
@@ -24,4 +24,14 @@ export function getCurrentTabId(): string {
   window.sessionStorage.setItem(TAB_ID_STORAGE_KEY, next);
   cachedTabId = next;
   return next;
+}
+
+export function getCurrentTabId(): string {
+  const tabId = getCurrentTabIdIfAvailable();
+
+  if (!tabId) {
+    throw new Error("Tab identity requires a browser environment");
+  }
+
+  return tabId;
 }

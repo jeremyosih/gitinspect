@@ -8,7 +8,7 @@ import {
   isSystemMessage,
   isToolResultMessage,
 } from "@gitinspect/pi/lib/chat-adapter";
-import type { ChatMessage as ChatMessageType } from "@gitinspect/pi/types/chat";
+import type { DisplayChatMessage } from "@gitinspect/pi/types/chat";
 import {
   Message,
   MessageBranch,
@@ -51,9 +51,9 @@ import {
 import { cn } from "@gitinspect/ui/lib/utils";
 
 export function ChatMessage(props: {
-  followingMessages?: ReadonlyArray<ChatMessageType>;
+  followingMessages?: ReadonlyArray<DisplayChatMessage>;
   isStreamingReasoning: boolean;
-  message: ChatMessageType;
+  message: DisplayChatMessage;
 }) {
   const { message } = props;
   const auth = useGitHubAuthContext();

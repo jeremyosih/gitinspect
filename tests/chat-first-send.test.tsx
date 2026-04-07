@@ -172,21 +172,28 @@ function mockChatQueries(options: {
   guestChatAcknowledged?: boolean;
   loadedSessionState:
     | { kind: "none" | "missing" }
-    | { kind: "active"; messages: unknown[]; session: SessionData };
-  sessionRuntime?: unknown;
+    | {
+        kind: "active";
+        viewModel: {
+          displayMessages: unknown[];
+          hasPartialAssistantText: boolean;
+          isStreaming: boolean;
+          runtime?: unknown;
+          session: SessionData;
+          transcriptMessages: unknown[];
+        };
+      };
 }) {
   useLiveQueryMock.mockImplementation(() => {
     const callIndex = useLiveQueryMock.mock.calls.length;
 
-    switch ((callIndex - 1) % 4) {
+    switch ((callIndex - 1) % 3) {
       case 0:
         return options.loadedSessionState;
       case 1:
-        return options.sessionRuntime;
-      case 2:
         return options.defaults;
       default:
-        return options.guestChatAcknowledged ?? true;
+        return [];
     }
   });
 }
@@ -328,11 +335,19 @@ describe("Chat first send", () => {
         session: "signed-in",
       },
       consumeReadyAuthAction: vi
-        .fn<() => { content: string; route: string; type: "send-first-message" } | null>()
+        .fn<
+          () => {
+            action: { content: string; route: string; type: "send-first-message" };
+            requiresConfirmation: boolean;
+          } | null
+        >()
         .mockReturnValueOnce({
-          content: "hello after auth",
-          route: "/chat",
-          type: "send-first-message",
+          action: {
+            content: "hello after auth",
+            route: "/chat",
+            type: "send-first-message",
+          },
+          requiresConfirmation: false,
         })
         .mockReturnValue(null),
       openAuthDialog: vi.fn(),

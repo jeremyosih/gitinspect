@@ -2,10 +2,11 @@ import type { ResolvedRepoSource } from "@gitinspect/db/storage-types";
 import {
   deriveAssistantView,
   getAssistantText,
+  getToolResultText,
   getUserText,
 } from "@gitinspect/pi/lib/chat-adapter";
 import { repoSourceToGitHubUrl } from "@gitinspect/pi/repo/url";
-import type { ChatMessage, ToolCall, ToolResultMessage } from "@gitinspect/pi/types/chat";
+import type { DisplayChatMessage, ToolCall, ToolResultMessage } from "@gitinspect/pi/types/chat";
 
 type MarkdownExportOptions = {
   repoSource?: ResolvedRepoSource;
@@ -43,12 +44,25 @@ function getToolStatusLabel(toolResult?: ToolResultMessage): string {
   return toolResult.isError ? "Error" : "Completed";
 }
 
+function getToolErrorSummary(toolResult?: ToolResultMessage): string | undefined {
+  if (!toolResult?.isError) {
+    return undefined;
+  }
+
+  const text = getToolResultText(toolResult)
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join(" · ");
+
+  return text || undefined;
+}
+
 function formatToolArguments(toolCall: ToolCall, toolResult?: ToolResultMessage): string[] {
   const args = toolCall.arguments;
+  const lines: string[] = [];
 
   if (toolCall.name === "read") {
-    const lines: string[] = [];
-
     if (typeof args.path === "string") {
       lines.push(`   path: ${args.path}`);
     }
@@ -70,13 +84,7 @@ function formatToolArguments(toolCall: ToolCall, toolResult?: ToolResultMessage)
     ) {
       lines.push(`   resolved: ${details.resolvedPath}`);
     }
-
-    return lines;
-  }
-
-  if (toolCall.name === "bash") {
-    const lines: string[] = [];
-
+  } else if (toolCall.name === "bash") {
     if (typeof args.command === "string") {
       lines.push(`   command: ${args.command}`);
     }
@@ -90,11 +98,16 @@ function formatToolArguments(toolCall: ToolCall, toolResult?: ToolResultMessage)
     ) {
       lines.push(`   cwd: ${details.cwd}`);
     }
-
-    return lines;
+  } else {
+    lines.push(`   args: ${JSON.stringify(args)}`);
   }
 
-  return [`   args: ${JSON.stringify(args)}`];
+  const errorSummary = getToolErrorSummary(toolResult);
+  if (errorSummary) {
+    lines.push(`   error: ${errorSummary}`);
+  }
+
+  return lines;
 }
 
 function formatToolExecutions(
@@ -111,7 +124,7 @@ function formatToolExecutions(
 }
 
 export function messagesToMarkdown(
-  messages: readonly ChatMessage[],
+  messages: readonly DisplayChatMessage[],
   options: MarkdownExportOptions = {},
 ): string {
   const parts: string[] = [buildContextHeader(options).join("\n")];
@@ -152,7 +165,7 @@ export function messagesToMarkdown(
 }
 
 export async function copySessionToClipboard(
-  messages: readonly ChatMessage[],
+  messages: readonly DisplayChatMessage[],
   options: MarkdownExportOptions = {},
 ): Promise<void> {
   const markdown = messagesToMarkdown(messages, options);

@@ -1,7 +1,7 @@
-import type { ChatMessage } from "@gitinspect/pi/types/chat";
+import type { DisplayChatMessage } from "@gitinspect/pi/types/chat";
 import type { ResolvedRepoSource } from "@gitinspect/db/storage-types";
 
-function formatMessageContent(message: ChatMessage): string {
+function formatMessageContent(message: DisplayChatMessage): string {
   if (message.role === "user") {
     if (typeof message.content === "string") return message.content;
     return message.content
@@ -43,7 +43,7 @@ function formatMessageContent(message: ChatMessage): string {
 }
 
 export function conversationToMarkdown(
-  messages: ChatMessage[],
+  messages: DisplayChatMessage[],
   repoSource?: ResolvedRepoSource,
 ): string {
   const lines: string[] = [];

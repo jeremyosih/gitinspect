@@ -5,23 +5,25 @@ import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useLiveQuery } from "dexie-react-hooks";
 import { event as trackEvent } from "onedollarstats";
 import { toast } from "sonner";
-import { getAssistantText, getFoldedToolResultIds } from "@gitinspect/pi/lib/chat-adapter";
+import { getFoldedToolResultIds } from "@gitinspect/pi/lib/chat-adapter";
 import {
   type PendingAuthAction,
   useGitHubAuthContext,
 } from "@gitinspect/ui/components/github-auth-context";
 import {
+  isGitinspectProviderGroup,
   useMessageEntitlementGuard,
   useModelAccessGuard,
 } from "@gitinspect/ui/hooks/use-chat-send-guards";
 import { ChatComposer } from "./chat-composer";
+import { ChatUsageNotice } from "./chat-usage-notice";
 import { ChatEmptyState } from "./chat-empty-state";
 import { ChatMessage as ChatMessageBlock } from "./chat-message";
 import { RepoCombobox } from "./repo-combobox";
 import type { RepoComboboxHandle } from "./repo-combobox";
 import type { ProviderGroupId, ThinkingLevel } from "@gitinspect/pi/types/models";
-import type { AssistantMessage, ChatMessage } from "@gitinspect/pi/types/chat";
-import type { ResolvedRepoSource, SessionData } from "@gitinspect/db/storage-types";
+import type { AssistantMessage, DisplayChatMessage } from "@gitinspect/pi/types/chat";
+import type { ResolvedRepoSource } from "@gitinspect/db/storage-types";
 import {
   Conversation,
   ConversationContent,
@@ -31,7 +33,7 @@ import { StatusShimmer } from "@gitinspect/ui/components/ai-elements/shimmer";
 import { ProgressiveBlur } from "@gitinspect/ui/components/progressive-blur";
 import { Icons } from "@gitinspect/ui/components/icons";
 import { copySessionToClipboard } from "@gitinspect/pi/lib/copy-session-markdown";
-import { db, getSessionRuntime, touchRepository } from "@gitinspect/db/schema";
+import { db, touchRepository } from "@gitinspect/db/schema";
 import { runtimeClient } from "@gitinspect/pi/agent/runtime-client";
 import { getRuntimeCommandErrorMessage } from "@gitinspect/pi/agent/runtime-command-errors";
 import { useRuntimeSession } from "@gitinspect/pi/hooks/use-runtime-session";
@@ -51,7 +53,10 @@ import {
   resolveProviderDefaults,
 } from "@gitinspect/pi/sessions/session-actions";
 import { reconcileInterruptedSession } from "@gitinspect/pi/sessions/session-notices";
-import { loadSessionWithMessages } from "@gitinspect/pi/sessions/session-service";
+import {
+  loadSessionViewModel,
+  type SessionViewModel,
+} from "@gitinspect/pi/sessions/session-view-model";
 import {
   deriveActiveSessionViewState,
   deriveBannerState,
@@ -68,7 +73,7 @@ type EmptyChatDraft = {
 };
 
 type LoadedSessionState =
-  | { kind: "active"; messages: Array<ChatMessage>; session: SessionData }
+  | { kind: "active"; viewModel: SessionViewModel }
   | { kind: "missing" }
   | { kind: "none" };
 
@@ -80,7 +85,9 @@ export interface ChatProps {
   sourceUrl?: string;
 }
 
-function isSystemNotice(message: ChatMessage): message is Extract<ChatMessage, { role: "system" }> {
+function isSystemNotice(
+  message: DisplayChatMessage,
+): message is Extract<DisplayChatMessage, { role: "system" }> {
   return message.role === "system";
 }
 
@@ -98,21 +105,6 @@ function getCurrentRoute(): string {
   }
 
   return `${window.location.pathname}${window.location.search}`;
-}
-
-async function trackMessageUsage(): Promise<void> {
-  const response = await fetch("/api/autumn/track-message", {
-    body: JSON.stringify({}),
-    headers: {
-      "content-type": "application/json",
-    },
-    keepalive: true,
-    method: "POST",
-  });
-
-  if (!response.ok) {
-    throw new Error("Could not track message usage.");
-  }
 }
 
 function getChatPanelMode(input: {
@@ -169,7 +161,7 @@ function formatRelativeProgress(value: string | undefined): string | undefined {
 }
 
 function getLastAssistantMessage(
-  messages: ReadonlyArray<ChatMessage>,
+  messages: ReadonlyArray<DisplayChatMessage>,
 ): AssistantMessage | undefined {
   return [...messages]
     .reverse()
@@ -187,22 +179,17 @@ export function Chat(props: ChatProps) {
       return { kind: "none" };
     }
 
-    const loaded = await loadSessionWithMessages(props.sessionId);
+    const viewModel = await loadSessionViewModel(props.sessionId);
 
-    if (!loaded) {
+    if (!viewModel) {
       return { kind: "missing" };
     }
 
     return {
       kind: "active",
-      messages: loaded.messages,
-      session: loaded.session,
+      viewModel,
     };
   }, [props.sessionId]);
-  const sessionRuntime = useLiveQuery(
-    async () => (props.sessionId ? await getSessionRuntime(props.sessionId) : undefined),
-    [props.sessionId],
-  );
   const defaults = useLiveQuery(async () => {
     const resolved = await resolveProviderDefaults();
 
@@ -218,10 +205,16 @@ export function Chat(props: ChatProps) {
   const [isStartingSession, setIsStartingSession] = React.useState(false);
   const runtime = useRuntimeSession(props.sessionId);
   const auth = useGitHubAuthContext();
-  const { ensureMessageEntitlement, refreshMessageEntitlement } = useMessageEntitlementGuard();
+  const {
+    customer,
+    customerError,
+    customerLoading,
+    ensureMessageEntitlement,
+    refreshMessageEntitlement,
+  } = useMessageEntitlementGuard();
   const { requireModelAccess } = useModelAccessGuard();
   const ownership = useSessionOwnership(
-    loadedSessionState?.kind === "active" ? loadedSessionState.session.id : undefined,
+    loadedSessionState?.kind === "active" ? loadedSessionState.viewModel.session.id : undefined,
   );
   const observerRef = React.useRef<ResizeObserver | null>(null);
   const repoComboboxRef = React.useRef<RepoComboboxHandle>(null);
@@ -250,8 +243,10 @@ export function Chat(props: ChatProps) {
     observerRef.current.observe(node);
   }, []);
 
-  const activeSession =
-    loadedSessionState?.kind === "active" ? loadedSessionState.session : undefined;
+  const sessionViewModel =
+    loadedSessionState?.kind === "active" ? loadedSessionState.viewModel : undefined;
+  const activeSession = sessionViewModel?.session;
+  const sessionRuntime = sessionViewModel?.runtime;
   const displayRepoSource = activeSession?.repoSource ?? props.repoSource;
   const connectedProviders = React.useMemo(
     () => getConnectedProviders(providerKeys),
@@ -299,7 +294,7 @@ export function Chat(props: ChatProps) {
     });
   }, [activeSession, connectedProviders, draft]);
 
-  const messages = loadedSessionState?.kind === "active" ? loadedSessionState.messages : [];
+  const messages = sessionViewModel?.displayMessages ?? [];
   const hasAssistantMessage = React.useMemo(
     () => messages.some((message) => message.role === "assistant"),
     [messages],
@@ -310,12 +305,7 @@ export function Chat(props: ChatProps) {
     () => lastAssistantMessage?.id,
     [lastAssistantMessage],
   );
-  const hasPartialAssistantText = React.useMemo(
-    () =>
-      lastAssistantMessage !== undefined &&
-      getAssistantText(lastAssistantMessage).trim().length > 0,
-    [lastAssistantMessage, sessionRuntime],
-  );
+  const hasPartialAssistantText = sessionViewModel?.hasPartialAssistantText ?? false;
   const activeSessionViewState = React.useMemo(
     () =>
       activeSession
@@ -324,6 +314,7 @@ export function Chat(props: ChatProps) {
             hasPartialAssistantText,
             lastProgressAt: sessionRuntime?.lastProgressAt,
             leaseState: ownership,
+            runtimePhase: sessionRuntime?.phase,
             runtimeStatus: sessionRuntime?.status,
             sessionIsStreaming: activeSession.isStreaming,
           })
@@ -333,6 +324,7 @@ export function Chat(props: ChatProps) {
       hasPartialAssistantText,
       ownership,
       sessionRuntime?.lastProgressAt,
+      sessionRuntime?.phase,
       sessionRuntime?.status,
     ],
   );
@@ -359,7 +351,7 @@ export function Chat(props: ChatProps) {
 
     const seenFingerprints = surfacedSystemNoticeFingerprintsRef.current;
     const unseenErrors = messages.filter(
-      (message): message is Extract<ChatMessage, { role: "system" }> =>
+      (message): message is Extract<DisplayChatMessage, { role: "system" }> =>
         isSystemNotice(message) &&
         message.severity === "error" &&
         !seenFingerprints.has(message.fingerprint),
@@ -522,7 +514,7 @@ export function Chat(props: ChatProps) {
         return;
       }
 
-      if (!(await ensureMessageEntitlement())) {
+      if (!(await ensureMessageEntitlement({ providerGroup: draft.providerGroup }))) {
         return;
       }
 
@@ -542,11 +534,6 @@ export function Chat(props: ChatProps) {
             })
           : await createSessionForChat(base);
         await runtimeClient.startInitialTurn(session, content);
-        if (auth?.authState.session === "signed-in") {
-          await trackMessageUsage().catch((error) => {
-            console.error("[gitinspect:billing] track_message_failed", error);
-          });
-        }
         void trackEvent("Message sent").catch(() => {
           // Analytics must never interfere with chat sends.
         });
@@ -562,7 +549,7 @@ export function Chat(props: ChatProps) {
           to: "/chat/$sessionId",
         });
 
-        await refreshMessageEntitlement();
+        await refreshMessageEntitlement({ providerGroup: draft.providerGroup });
         void persistLastUsedSessionSettings(session);
       } catch (error) {
         reportRuntimeFailure(error instanceof Error ? error : new Error(String(error)));
@@ -571,7 +558,6 @@ export function Chat(props: ChatProps) {
       }
     },
     [
-      auth?.authState.session,
       draft,
       ensureMessageEntitlement,
       isStartingSession,
@@ -629,18 +615,21 @@ export function Chat(props: ChatProps) {
           return;
         }
 
-        if (!(await ensureMessageEntitlement())) {
+        if (
+          !(await ensureMessageEntitlement({
+            providerGroup:
+              activeSession.providerGroup ?? getDefaultProviderGroup(activeSession.provider),
+          }))
+        ) {
           return;
         }
 
         try {
           await runtime.send(content);
-          if (auth?.authState.session === "signed-in") {
-            await trackMessageUsage().catch((error) => {
-              console.error("[gitinspect:billing] track_message_failed", error);
-            });
-          }
-          await refreshMessageEntitlement();
+          await refreshMessageEntitlement({
+            providerGroup:
+              activeSession.providerGroup ?? getDefaultProviderGroup(activeSession.provider),
+          });
           void trackEvent("Message sent", "/chat").catch(() => {
             // Analytics must never interfere with chat sends.
           });
@@ -655,7 +644,6 @@ export function Chat(props: ChatProps) {
     [
       activeComposerState,
       activeSession,
-      auth?.authState.session,
       ensureMessageEntitlement,
       handleFirstSend,
       refreshMessageEntitlement,
@@ -696,6 +684,8 @@ export function Chat(props: ChatProps) {
     draft?.providerGroup ??
     "fireworks-free";
   const currentThinkingLevel = activeSession?.thinkingLevel ?? draft?.thinkingLevel ?? "medium";
+  const showUsageNotice = isGitinspectProviderGroup(currentProviderGroup);
+  const messageBalance = showUsageNotice ? customer?.balances?.messages : null;
   const isStreaming =
     activeSession !== undefined ? (activeComposerState?.isStreaming ?? false) : isStartingSession;
   const composerDisabled = !displayRepoSource || activeComposerState?.disabled === true;
@@ -905,6 +895,28 @@ export function Chat(props: ChatProps) {
                 }}
                 providerGroup={currentProviderGroup}
                 thinkingLevel={currentThinkingLevel}
+              />
+              <ChatUsageNotice
+                balance={messageBalance}
+                error={customerError}
+                isLoading={customerLoading}
+                isVisible={showUsageNotice}
+                onSignIn={() => {
+                  auth?.openAuthDialog({
+                    mode: "github-only",
+                    reason: "free-models",
+                  });
+                }}
+                onUpgrade={() => {
+                  void navigate({
+                    search: (prev) => ({
+                      ...prev,
+                      settings: "pricing",
+                    }),
+                    to: ".",
+                  });
+                }}
+                session={auth?.authState.session ?? "signed-out"}
               />
             </div>
           </div>

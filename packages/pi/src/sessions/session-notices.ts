@@ -1,27 +1,18 @@
-import { createId } from "@gitinspect/pi/lib/ids";
-import { getIsoNow } from "@gitinspect/pi/lib/dates";
-import { buildSystemMessage, classifyRuntimeError } from "@gitinspect/pi/agent/runtime-errors";
-import { pruneOrphanToolResults } from "@gitinspect/pi/agent/message-transformer";
-import { toMessageRow } from "@gitinspect/pi/agent/session-adapter";
-import { StreamInterruptedRuntimeError } from "@gitinspect/pi/agent/runtime-command-errors";
+import { deleteSessionLease } from "@gitinspect/db/schema";
 import { loadSessionLeaseState } from "@gitinspect/db/session-leases";
-import { markTurnInterrupted } from "@gitinspect/db/session-runtime";
 import {
-  buildPersistedSession,
-  loadSessionWithMessages,
-} from "@gitinspect/pi/sessions/session-service";
+  getRuntimeWorker,
+  getRuntimeWorkerIfAvailable,
+} from "@gitinspect/pi/agent/runtime-worker-client";
+import { StreamInterruptedRuntimeError } from "@gitinspect/pi/agent/runtime-command-errors";
+import { TurnEventStore } from "@gitinspect/pi/agent/turn-event-store";
+import { loadSessionWithMessages } from "@gitinspect/pi/sessions/session-service";
+import { loadSessionViewModel } from "@gitinspect/pi/sessions/session-view-model";
 import {
   deriveActiveSessionViewState,
   deriveRecoveryIntent,
   deriveRecoverySkipReason,
 } from "@gitinspect/pi/sessions/session-view-state";
-import {
-  deleteSessionLease,
-  getSessionRuntime,
-  putSessionAndMessages,
-  replaceSessionMessages,
-} from "@gitinspect/db/schema";
-import type { MessageRow, SessionData } from "@gitinspect/db/storage-types";
 
 export type InterruptedRecoveryResult =
   | {
@@ -31,82 +22,89 @@ export type InterruptedRecoveryResult =
     }
   | { kind: "reconciled"; lastProgressAt?: string };
 
-function isSystemFingerprintRow(message: MessageRow, fingerprint: string): boolean {
-  return message.role === "system" && message.fingerprint === fingerprint;
-}
-
-function rewriteStreamingAssistantRows(messages: MessageRow[], errorMessage: string): MessageRow[] {
-  return messages.map((message) => {
-    if (message.role !== "assistant" || message.status !== "streaming") {
-      return message;
-    }
-
-    return toMessageRow(
-      message.sessionId,
-      {
-        ...message,
-        errorMessage,
-        stopReason: "error",
-      },
-      "error",
-      message.id,
-    );
-  });
-}
-
-function mergeSessionRows(session: SessionData, messages: MessageRow[]): SessionData {
-  return buildPersistedSession(
-    {
-      ...session,
-      error: undefined,
-      updatedAt: getIsoNow(),
-    },
-    messages,
-  );
-}
-
-export async function appendSessionNotice(sessionId: string, error: Error | string): Promise<void> {
+async function appendSessionNoticeFallback(
+  sessionId: string,
+  error: Error | string,
+): Promise<void> {
   const loaded = await loadSessionWithMessages(sessionId);
 
   if (!loaded) {
     return;
   }
 
-  const classified = classifyRuntimeError(error);
+  const store = new TurnEventStore({
+    runtime: loaded.runtime,
+    session: loaded.session,
+    transcriptMessages: loaded.messages,
+  });
+  await store.applyEnvelope({
+    error: error instanceof Error ? error : new Error(error),
+    kind: "runtime-error",
+    sessionId,
+  });
+}
 
-  if (loaded.messages.some((message) => isSystemFingerprintRow(message, classified.fingerprint))) {
+async function reconcileInterruptedSessionFallback(sessionId: string): Promise<void> {
+  const loaded = await loadSessionWithMessages(sessionId);
+
+  if (!loaded || loaded.runtime?.phase !== "running") {
     return;
   }
 
-  const notice = toMessageRow(sessionId, buildSystemMessage(classified, createId(), Date.now()));
+  const interruption = new StreamInterruptedRuntimeError();
+  const store = new TurnEventStore({
+    runtime: loaded.runtime,
+    session: loaded.session,
+    transcriptMessages: loaded.messages,
+  });
+  await store.interruptRun({
+    lastError: interruption.message,
+    status: "interrupted",
+    turnId: loaded.runtime.turnId,
+  });
+  await store.applyEnvelope({
+    error: interruption,
+    kind: "runtime-error",
+    sessionId,
+  });
+}
 
-  await putSessionAndMessages(mergeSessionRows(loaded.session, [...loaded.messages, notice]), [
-    notice,
-  ]);
+export async function appendSessionNotice(sessionId: string, error: Error | string): Promise<void> {
+  const worker = getRuntimeWorkerIfAvailable();
+
+  if (!worker) {
+    await appendSessionNoticeFallback(sessionId, error);
+    return;
+  }
+
+  await getRuntimeWorker().appendSessionNotice({
+    error: error instanceof Error ? error.message : error,
+    sessionId,
+  });
 }
 
 export async function reconcileInterruptedSession(
   sessionId: string,
   options: { hasLocalRunner?: boolean } = {},
 ): Promise<InterruptedRecoveryResult> {
-  const [loaded, leaseState, runtime] = await Promise.all([
-    loadSessionWithMessages(sessionId),
+  const [viewModel, leaseState] = await Promise.all([
+    loadSessionViewModel(sessionId),
     loadSessionLeaseState(sessionId),
-    getSessionRuntime(sessionId),
   ]);
-  const lastProgressAt = runtime?.lastProgressAt;
+  const lastProgressAt = viewModel?.runtime?.lastProgressAt;
 
-  if (!loaded) {
+  if (!viewModel) {
     return { kind: "noop", lastProgressAt, reason: "missing-session" };
   }
 
   const state = deriveActiveSessionViewState({
     hasLocalRunner: options.hasLocalRunner === true,
-    hasPartialAssistantText: false,
+    hasPartialAssistantText: viewModel.hasPartialAssistantText,
     lastProgressAt,
     leaseState,
-    runtimeStatus: runtime?.status,
-    sessionIsStreaming: loaded.session.isStreaming,
+    runtimePhase: viewModel.runtime?.phase,
+    runtimeStatus: viewModel.runtime?.status,
+    sessionIsStreaming: viewModel.session.isStreaming,
   });
 
   if (deriveRecoveryIntent(state) !== "run-now") {
@@ -117,37 +115,13 @@ export async function reconcileInterruptedSession(
     };
   }
 
-  const interruption = new StreamInterruptedRuntimeError();
-  const classified = classifyRuntimeError(interruption);
-  const rewrittenMessages = pruneOrphanToolResults(
-    rewriteStreamingAssistantRows(loaded.messages, classified.message),
-  );
-  const hasNotice = rewrittenMessages.some((message) =>
-    isSystemFingerprintRow(message, classified.fingerprint),
-  );
-  const nextMessages = hasNotice
-    ? rewrittenMessages
-    : [
-        ...rewrittenMessages,
-        toMessageRow(sessionId, buildSystemMessage(classified, createId(), Date.now())),
-      ];
-  await replaceSessionMessages(
-    buildPersistedSession(
-      {
-        ...loaded.session,
-        error: undefined,
-        isStreaming: false,
-        updatedAt: getIsoNow(),
-      },
-      nextMessages,
-    ),
-    nextMessages,
-  );
+  const worker = getRuntimeWorkerIfAvailable();
 
-  await markTurnInterrupted({
-    lastError: classified.message,
-    sessionId,
-  });
+  if (worker) {
+    await worker.reconcileInterruptedSession({ sessionId });
+  } else {
+    await reconcileInterruptedSessionFallback(sessionId);
+  }
 
   if (leaseState.kind === "owned") {
     await deleteSessionLease(sessionId);
