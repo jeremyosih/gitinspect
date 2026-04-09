@@ -1,5 +1,5 @@
 import { getIsoNow } from "@gitinspect/pi/lib/dates";
-import { deleteProviderKey, getProviderKey, setProviderKey } from "@gitinspect/db/schema";
+import { deleteProviderKey, getProviderKey, setProviderKey } from "@gitinspect/db";
 import { loginAnthropic } from "@gitinspect/pi/auth/providers/anthropic";
 import { loginGitHubCopilot } from "@gitinspect/pi/auth/providers/github-copilot";
 import { loginGeminiCli } from "@gitinspect/pi/auth/providers/google-gemini-cli";

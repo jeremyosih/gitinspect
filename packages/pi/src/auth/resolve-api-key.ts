@@ -1,4 +1,4 @@
-import { db, getProviderKey, setProviderKey } from "@gitinspect/db/schema";
+import { db, getProviderKey, setProviderKey } from "@gitinspect/db";
 import { oauthRefresh } from "@gitinspect/pi/auth/oauth-refresh";
 import { getPublicApiKeyForProviderGroup } from "@gitinspect/pi/auth/public-provider-fallbacks";
 import {

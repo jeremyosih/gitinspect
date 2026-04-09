@@ -1,8 +1,9 @@
 import { getCurrentTabId, getCurrentTabIdIfAvailable } from "@gitinspect/pi/agent/tab-id";
-import { db, deleteSessionLease, getSessionLease } from "@gitinspect/db/schema";
 import { getIsoNow } from "@gitinspect/pi/lib/dates";
 import { createId } from "@gitinspect/pi/lib/ids";
-import type { SessionLeaseRow } from "@gitinspect/db/storage-types";
+import { db } from "./db";
+import { deleteSessionLease, getSessionLease } from "./sessions";
+import type { SessionLeaseRow } from "./types";
 
 export const LEASE_HEARTBEAT_MS = 5_000;
 export const LEASE_STALE_MS = 20_000;

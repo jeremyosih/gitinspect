@@ -1,4 +1,4 @@
-import { deleteSetting, getSetting, setSetting } from "@gitinspect/db/schema";
+import { deleteSetting, getSetting, setSetting } from "@gitinspect/db";
 
 export interface ProxyConfig {
   enabled: boolean;

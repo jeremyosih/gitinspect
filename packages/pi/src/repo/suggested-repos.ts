@@ -1,4 +1,4 @@
-import type { RepositoryRow } from "@gitinspect/db/storage-types";
+import type { RepositoryRow } from "@gitinspect/db";
 
 /** Curated repos for suggested pickers (landing, combobox when no recents). */
 export const SUGGESTED_REPOS: ReadonlyArray<

@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./*": "./src/*"
+    ".": "./src/index.ts",
+    "./session-leases": "./src/session-leases.ts",
+    "./session-runtime": "./src/session-runtime.ts"
   },
   "scripts": {
     "check-types": "tsc --noEmit"

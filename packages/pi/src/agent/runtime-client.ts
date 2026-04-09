@@ -1,5 +1,5 @@
 import type { ProviderGroupId, ThinkingLevel } from "@gitinspect/pi/types/models";
-import type { SessionData } from "@gitinspect/db/storage-types";
+import type { SessionData } from "@gitinspect/db";
 import {
   BusyRuntimeError,
   MissingSessionRuntimeError,

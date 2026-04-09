@@ -11,7 +11,7 @@ import {
 import { ChatFooter } from "@gitinspect/ui/components/chat-footer";
 import { ChatLogo } from "@gitinspect/ui/components/chat-logo";
 import { ChatSessionList } from "@gitinspect/ui/components/chat-session-list";
-import { listSessionLeases, listSessions } from "@gitinspect/db/schema";
+import { listSessionLeases, listSessions } from "@gitinspect/db";
 import { getCurrentTabId } from "@gitinspect/pi/agent/tab-id";
 import { isSessionLeaseStale } from "@gitinspect/db/session-leases";
 import {

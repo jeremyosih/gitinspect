@@ -1,4 +1,4 @@
-import type { ResolvedRepoSource } from "@gitinspect/db/storage-types";
+import type { ResolvedRepoSource } from "@gitinspect/db";
 import {
   deriveAssistantView,
   getAssistantText,

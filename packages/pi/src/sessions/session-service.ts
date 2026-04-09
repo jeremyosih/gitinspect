@@ -8,7 +8,7 @@ import {
   putSession,
   putSessionRuntime,
   runConversationTransaction,
-} from "@gitinspect/db/schema";
+} from "@gitinspect/db";
 import { loadSessionLeaseState } from "@gitinspect/db/session-leases";
 import { normalizeSessionRuntime } from "@gitinspect/db/session-runtime";
 import { linkToolResults } from "@gitinspect/pi/agent/tool-result-linker";
@@ -33,7 +33,7 @@ import type {
   ResolvedRepoSource,
   SessionData,
   SessionRuntimeRow,
-} from "@gitinspect/db/storage-types";
+} from "@gitinspect/db";
 
 function mergeUsage(left: Usage, right: Usage): Usage {
   return {

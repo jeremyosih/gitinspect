@@ -70,6 +70,16 @@ export type MessageRow = ChatMessage & {
   status: MessageStatus;
 };
 
+export type SyncedSessionRow = SessionData & {
+  owner?: string;
+  realmId?: string;
+};
+
+export type SyncedMessageRow = MessageRow & {
+  owner?: string;
+  realmId?: string;
+};
+
 export interface SessionLeaseRow {
   acquiredAt: string;
   heartbeatAt: string;

@@ -2,7 +2,7 @@ import * as React from "react";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useLiveQuery } from "dexie-react-hooks";
 import { ArrowRightIcon } from "@phosphor-icons/react";
-import { listRepositories } from "@gitinspect/db/schema";
+import { listRepositories } from "@gitinspect/db";
 import { handleGithubError } from "@gitinspect/pi/repo/github-fetch";
 import { parseRepoInput } from "@gitinspect/pi/repo/path-parser";
 import { resolveRepoIntent } from "@gitinspect/pi/repo/ref-resolver";

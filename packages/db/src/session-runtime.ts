@@ -1,10 +1,6 @@
-import { deleteSessionRuntime, getSessionRuntime, putSessionRuntime } from "@gitinspect/db/schema";
 import { getIsoNow } from "@gitinspect/pi/lib/dates";
-import type {
-  RuntimePhase,
-  SessionRuntimeRow,
-  SessionRuntimeStatus,
-} from "@gitinspect/db/storage-types";
+import { deleteSessionRuntime, getSessionRuntime, putSessionRuntime } from "./sessions";
+import type { RuntimePhase, SessionRuntimeRow, SessionRuntimeStatus } from "./types";
 
 export type SessionRuntimePatch = Partial<Omit<SessionRuntimeRow, "sessionId" | "updatedAt">>;
 

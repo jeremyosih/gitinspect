@@ -1,4 +1,4 @@
-import type { ResolvedRepoRef, ResolvedRepoSource } from "@gitinspect/db/storage-types";
+import type { ResolvedRepoRef, ResolvedRepoSource } from "@gitinspect/db";
 
 const FULL_COMMIT_SHA_PATTERN = /^[0-9a-f]{40}$/i;
 

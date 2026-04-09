@@ -1,4 +1,4 @@
-import { deleteSetting, getSetting, setSetting } from "@gitinspect/db/schema";
+import { deleteSetting, getSetting, setSetting } from "@gitinspect/db";
 
 const GITHUB_PAT_KEY = "github.pat";
 

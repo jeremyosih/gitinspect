@@ -2,7 +2,7 @@ import * as React from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useNavigate } from "@tanstack/react-router";
 import { CheckIcon, Lock, Plus } from "lucide-react";
-import { db } from "@gitinspect/db/schema";
+import { db } from "@gitinspect/db";
 import type { ProviderGroupId } from "@gitinspect/pi/types/models";
 import {
   ModelSelector,

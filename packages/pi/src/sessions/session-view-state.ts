@@ -1,5 +1,5 @@
 import type { SessionLeaseState } from "@gitinspect/db/session-leases";
-import type { RuntimePhase, SessionRuntimeStatus } from "@gitinspect/db/storage-types";
+import type { RuntimePhase, SessionRuntimeStatus } from "@gitinspect/db";
 
 export type ActiveSessionViewState =
   | { kind: "ready" }

@@ -10,7 +10,7 @@ import {
   type OAuthProviderId,
 } from "@gitinspect/pi/auth/auth-service";
 import { isOAuthCredentials } from "@gitinspect/pi/auth/oauth-types";
-import { db } from "@gitinspect/db/schema";
+import { db } from "@gitinspect/db";
 import {
   getProviderGroupMetadata,
   getSortedApiKeyProvidersForSettings,

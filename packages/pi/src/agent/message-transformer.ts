@@ -3,7 +3,7 @@ import type { Message } from "@mariozechner/pi-ai";
 import { linkToolResults } from "@gitinspect/pi/agent/tool-result-linker";
 import type { AssistantMessage, ToolResultMessage } from "@gitinspect/pi/types/chat";
 import type { JsonValue } from "@gitinspect/pi/types/common";
-import type { MessageRow } from "@gitinspect/db/storage-types";
+import type { MessageRow } from "@gitinspect/db";
 
 function isLlmMessage(message: AgentMessage): message is Message {
   return (

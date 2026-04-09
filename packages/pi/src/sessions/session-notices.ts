@@ -1,4 +1,4 @@
-import { deleteSessionLease } from "@gitinspect/db/schema";
+import { deleteSessionLease } from "@gitinspect/db";
 import { loadSessionLeaseState } from "@gitinspect/db/session-leases";
 import {
   getRuntimeWorker,

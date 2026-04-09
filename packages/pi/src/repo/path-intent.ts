@@ -1,8 +1,4 @@
-import type {
-  RepoRefOrigin,
-  ResolvedRepoRef,
-  ResolvedRepoSource,
-} from "@gitinspect/db/storage-types";
+import type { RepoRefOrigin, ResolvedRepoRef, ResolvedRepoSource } from "@gitinspect/db";
 
 export type RepoPathIntent =
   | {

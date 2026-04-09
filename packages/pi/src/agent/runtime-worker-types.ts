@@ -1,6 +1,6 @@
 import type { TurnEnvelope } from "@gitinspect/pi/agent/turn-event-store";
 import type { ProviderGroupId, ThinkingLevel } from "@gitinspect/pi/types/models";
-import type { SessionData } from "@gitinspect/db/storage-types";
+import type { SessionData } from "@gitinspect/db";
 
 export type TurnCompletionStatus = "aborted" | "completed" | "error" | "interrupted";
 

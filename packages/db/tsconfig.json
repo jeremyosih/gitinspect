@@ -5,7 +5,6 @@
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "types": ["vite/client"],
     "paths": {
-      "@gitinspect/db/*": ["./src/*"],
       "@gitinspect/pi/*": ["../pi/src/*"]
     }
   },

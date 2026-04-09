@@ -1,11 +1,11 @@
-import { db, putSessionRuntime, runConversationTransaction } from "@gitinspect/db/schema";
+import { db, putSessionRuntime, runConversationTransaction } from "@gitinspect/db";
 import { normalizeSessionRuntime } from "@gitinspect/db/session-runtime";
 import { toMessageRow } from "@gitinspect/pi/agent/session-adapter";
 import { buildSystemMessage, classifyRuntimeError } from "@gitinspect/pi/agent/runtime-errors";
 import { getIsoNow } from "@gitinspect/pi/lib/dates";
 import { createId } from "@gitinspect/pi/lib/ids";
 import { buildPersistedSession } from "@gitinspect/pi/sessions/session-service";
-import type { MessageRow, SessionData, SessionRuntimeRow } from "@gitinspect/db/storage-types";
+import type { MessageRow, SessionData, SessionRuntimeRow } from "@gitinspect/db";
 import type { AssistantMessage, ToolResultMessage, UserMessage } from "@gitinspect/pi/types/chat";
 
 export type TurnEnvelope = {

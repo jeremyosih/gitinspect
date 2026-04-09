@@ -1,5 +1,5 @@
 import type { Message } from "@mariozechner/pi-ai";
-import type { MessageRow } from "@gitinspect/db/storage-types";
+import type { MessageRow } from "@gitinspect/db";
 import type { ChatMessage, ToolCall, ToolResultMessage } from "@gitinspect/pi/types/chat";
 
 type LinkableAssistantMessage = Extract<

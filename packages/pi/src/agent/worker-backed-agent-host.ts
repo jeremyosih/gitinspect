@@ -5,7 +5,7 @@ import type { SessionRunner } from "@gitinspect/pi/agent/session-runner";
 import type { TurnEnvelope } from "@gitinspect/pi/agent/turn-event-store";
 import { createId } from "@gitinspect/pi/lib/ids";
 import { getCanonicalProvider } from "@gitinspect/pi/models/catalog";
-import type { SessionData } from "@gitinspect/db/storage-types";
+import type { SessionData } from "@gitinspect/db";
 import type { ProviderGroupId, ThinkingLevel } from "@gitinspect/pi/types/models";
 
 type HostState = "idle" | "starting" | "running" | "disposing" | "disposed";

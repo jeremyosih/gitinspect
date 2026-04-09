@@ -7,7 +7,9 @@
     "types": ["vite/client"],
     "paths": {
       "@gitinspect/pi/*": ["./src/*"],
-      "@gitinspect/db/*": ["../db/src/*"],
+      "@gitinspect/db": ["../db/src/index.ts"],
+      "@gitinspect/db/session-leases": ["../db/src/session-leases.ts"],
+      "@gitinspect/db/session-runtime": ["../db/src/session-runtime.ts"],
       "@gitinspect/ui/*": ["../ui/src/*"]
     }
   },

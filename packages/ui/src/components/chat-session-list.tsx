@@ -2,7 +2,7 @@ import type { MouseEvent } from "react";
 import { useMemo } from "react";
 import { Link } from "@tanstack/react-router";
 import { subDays, startOfDay } from "date-fns";
-import type { SessionData } from "@gitinspect/db/storage-types";
+import type { SessionData } from "@gitinspect/db";
 import { Icons } from "@gitinspect/ui/components/icons";
 import { Button } from "@gitinspect/ui/components/button";
 import {

@@ -8,7 +8,7 @@ import type {
   StartTurnInput,
   TurnCompletionResult,
 } from "@gitinspect/pi/agent/runtime-worker-types";
-import type { SessionData } from "@gitinspect/db/storage-types";
+import type { SessionData } from "@gitinspect/db";
 
 const coordinators = new Map<string, SessionWorkerCoordinator>();
 const coordinatorLoads = new Map<string, Promise<SessionWorkerCoordinator | undefined>>();

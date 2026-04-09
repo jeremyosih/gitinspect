@@ -1,6 +1,6 @@
 import type { ProviderGroupId, ProviderId } from "@gitinspect/pi/types/models";
-import type { ResolvedRepoSource, SessionData } from "@gitinspect/db/storage-types";
-import { deleteSession, getSetting, listProviderKeys, setSetting } from "@gitinspect/db/schema";
+import type { ResolvedRepoSource, SessionData } from "@gitinspect/db";
+import { deleteSession, getSetting, listProviderKeys, setSetting } from "@gitinspect/db";
 import { runtimeClient } from "@gitinspect/pi/agent/runtime-client";
 import {
   getCanonicalProvider,

@@ -7,7 +7,7 @@ import type {
   ToolResultMessage,
   UserMessage,
 } from "@gitinspect/pi/types/chat";
-import type { MessageRow, MessageStatus, SessionData } from "@gitinspect/db/storage-types";
+import type { MessageRow, MessageStatus, SessionData } from "@gitinspect/db";
 
 function isLlmMessage(message: AgentMessage): message is Message {
   return (

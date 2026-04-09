@@ -2,7 +2,7 @@ import { ArrowRightIcon } from "@phosphor-icons/react";
 import { GithubRepo } from "@gitinspect/ui/components/github-repo";
 import { CHAT_SUGGESTIONS } from "@gitinspect/ui/components/chat-suggestions";
 import { repoSourceToPath } from "@gitinspect/pi/repo/url";
-import type { ResolvedRepoSource } from "@gitinspect/db/storage-types";
+import type { ResolvedRepoSource } from "@gitinspect/db";
 
 function LetsInspectHeading() {
   return (

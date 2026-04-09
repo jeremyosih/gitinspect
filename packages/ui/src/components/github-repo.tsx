@@ -8,7 +8,7 @@ import { formatGitHubStarCount } from "@gitinspect/pi/lib/format-github-stars";
 import { githubApiFetch } from "@gitinspect/pi/repo/github-fetch";
 import { cn } from "@gitinspect/ui/lib/utils";
 import { githubOwnerAvatarUrl } from "@gitinspect/pi/repo/url";
-import type { RepoRefOrigin } from "@gitinspect/db/storage-types";
+import type { RepoRefOrigin } from "@gitinspect/db";
 
 export type GithubRepoProps = {
   owner: string;

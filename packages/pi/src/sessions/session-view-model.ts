@@ -1,7 +1,7 @@
 import { normalizeSessionRuntime } from "@gitinspect/db/session-runtime";
 import { linkToolResults } from "@gitinspect/pi/agent/tool-result-linker";
 import { loadSessionWithMessages } from "@gitinspect/pi/sessions/session-service";
-import type { MessageRow, SessionData, SessionRuntimeRow } from "@gitinspect/db/storage-types";
+import type { MessageRow, SessionData, SessionRuntimeRow } from "@gitinspect/db";
 import type {
   AssistantMessage,
   DisplayAssistantMessage,

@@ -1,4 +1,4 @@
-import type { ResolvedRepoRef } from "@gitinspect/db/storage-types";
+import type { ResolvedRepoRef } from "@gitinspect/db";
 
 export function createBranchRepoRef(name: string): ResolvedRepoRef {
   return {

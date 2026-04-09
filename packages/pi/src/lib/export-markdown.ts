@@ -1,5 +1,5 @@
 import type { DisplayChatMessage } from "@gitinspect/pi/types/chat";
-import type { ResolvedRepoSource } from "@gitinspect/db/storage-types";
+import type { ResolvedRepoSource } from "@gitinspect/db";
 
 function formatMessageContent(message: DisplayChatMessage): string {
   if (message.role === "user") {

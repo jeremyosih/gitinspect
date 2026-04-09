@@ -23,7 +23,7 @@ import { webMessageTransformer } from "@gitinspect/pi/agent/message-transformer"
 import { streamChatWithPiAgent } from "@gitinspect/pi/agent/provider-stream";
 import { isFreeTierProxyMarker } from "@gitinspect/pi/auth/public-provider-fallbacks";
 import { resolveApiKeyForProvider } from "@gitinspect/pi/auth/resolve-api-key";
-import { putSession } from "@gitinspect/db/schema";
+import { putSession } from "@gitinspect/db";
 import { getIsoNow } from "@gitinspect/pi/lib/dates";
 import { getCanonicalProvider, getModel } from "@gitinspect/pi/models/catalog";
 import { createOptionalRepoRuntime } from "@gitinspect/pi/repo/repo-runtime";
@@ -34,7 +34,7 @@ import {
 import { createRepoTools } from "@gitinspect/pi/tools/index";
 import type { ProviderId } from "@gitinspect/pi/types/models";
 import type { AssistantMessage, ToolResultMessage } from "@gitinspect/pi/types/chat";
-import type { MessageRow, SessionData, SessionRuntimeRow } from "@gitinspect/db/storage-types";
+import type { MessageRow, SessionData, SessionRuntimeRow } from "@gitinspect/db";
 
 const TURN_IDLE_TIMEOUT_MS = 15 * 60_000;
 const TURN_IDLE_POLL_MS = 30_000;

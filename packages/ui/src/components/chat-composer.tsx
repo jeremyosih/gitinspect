@@ -52,8 +52,10 @@ function ChatComposerInner(props: {
   onSelectModel: (providerGroup: ProviderGroupId, modelId: string) => Promise<void> | void;
   onSend: (value: string) => Promise<void> | void;
   onThinkingLevelChange: (level: ThinkingLevel) => Promise<void> | void;
+  placeholder?: string;
   providerGroup: ProviderGroupId;
   thinkingLevel: ThinkingLevel;
+  utilityActions?: React.ReactNode;
 }) {
   const { textInput } = usePromptInputController();
   const text = textInput.value;
@@ -96,7 +98,7 @@ function ChatComposerInner(props: {
             placeholder={
               locked
                 ? (props.disabledReason ?? "Select a repository to get started")
-                : "What would you like to know?"
+                : (props.placeholder ?? "What would you like to know?")
             }
           />
         </PromptInputBody>
@@ -147,6 +149,10 @@ function ChatComposerInner(props: {
             ) : null}
           </PromptInputTools>
 
+          {props.utilityActions ? (
+            <div className="ml-auto shrink-0">{props.utilityActions}</div>
+          ) : null}
+
           <PromptInputSubmit
             disabled={locked || (!text.trim() && !props.isStreaming)}
             onStop={props.onAbort}
@@ -187,8 +193,10 @@ export function ChatComposer(props: {
   onSelectModel: (providerGroup: ProviderGroupId, modelId: string) => Promise<void> | void;
   onSend: (value: string) => Promise<void> | void;
   onThinkingLevelChange: (level: ThinkingLevel) => Promise<void> | void;
+  placeholder?: string;
   providerGroup: ProviderGroupId;
   thinkingLevel: ThinkingLevel;
+  utilityActions?: React.ReactNode;
 }) {
   return (
     <PromptInputProvider initialInput={props.initialInput} key={props.initialInput ?? ""}>

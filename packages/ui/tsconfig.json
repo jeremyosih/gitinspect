@@ -10,7 +10,9 @@
     "paths": {
       "@gitinspect/ui/*": ["./src/*"],
       "@gitinspect/pi/*": ["../pi/src/*"],
-      "@gitinspect/db/*": ["../db/src/*"],
+      "@gitinspect/db": ["../db/src/index.ts"],
+      "@gitinspect/db/session-leases": ["../db/src/session-leases.ts"],
+      "@gitinspect/db/session-runtime": ["../db/src/session-runtime.ts"],
       "@/navigation/*": ["../../apps/web/src/navigation/*"]
     }
   },
