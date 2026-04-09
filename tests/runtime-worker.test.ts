@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentTool } from "@mariozechner/pi-agent-core";
 import type { Message } from "@mariozechner/pi-ai";
-import { deleteAllLocalData, getSession, getSessionMessages, getSessionRuntime } from "@/db/schema";
+import {
+  deleteAllLocalData,
+  getSession,
+  getSessionMessages,
+  getSessionRuntime,
+} from "@gitinspect/db";
 import type { AssistantMessage } from "@/types/chat";
 import type { SessionData } from "@/types/storage";
 import { createEmptyUsage } from "@/types/models";

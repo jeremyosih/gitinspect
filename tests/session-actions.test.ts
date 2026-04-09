@@ -10,7 +10,7 @@ const persistSessionSnapshot = vi.fn(async () => {});
 const createSession = vi.fn();
 const releaseSessionAndDrain = vi.fn(async () => {});
 
-vi.mock("@/db/schema", () => ({
+vi.mock("@gitinspect/db", () => ({
   deleteSession,
   getSetting,
   listProviderKeys,

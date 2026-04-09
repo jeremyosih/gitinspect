@@ -27,7 +27,7 @@ vi.mock("dexie-react-hooks", () => ({
   useLiveQuery: (query: () => unknown) => query(),
 }));
 
-vi.mock("@gitinspect/db/schema", () => ({
+vi.mock("@gitinspect/db", () => ({
   db: {
     providerKeys: {
       toArray: () => state.providerKeys,

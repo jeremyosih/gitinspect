@@ -74,7 +74,7 @@ vi.mock("@/sessions/session-actions", () => ({
   })),
 }));
 
-vi.mock("@/db/schema", () => ({
+vi.mock("@gitinspect/db", () => ({
   touchRepository: vi.fn(async () => {}),
 }));
 

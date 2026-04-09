@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { loadSessionViewModel } from "@/sessions/session-view-model";
-import { db, deleteAllLocalData, putSession, putSessionRuntime } from "@/db/schema";
+import { db, deleteAllLocalData, putSession, putSessionRuntime } from "@gitinspect/db";
 import type { AssistantMessage } from "@/types/chat";
 import type { MessageRow, SessionData, SessionRuntimeRow } from "@/types/storage";
 import { createEmptyUsage } from "@/types/models";

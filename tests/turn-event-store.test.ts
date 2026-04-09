@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { TurnEventStore } from "@/agent/turn-event-store";
-import { deleteAllLocalData, getSessionMessages, getSessionRuntime } from "@/db/schema";
+import { deleteAllLocalData, getSessionMessages, getSessionRuntime } from "@gitinspect/db";
 import type { AssistantMessage, ToolResultMessage } from "@/types/chat";
 import type { SessionData, SessionRuntimeRow } from "@/types/storage";
 import { createEmptyUsage } from "@/types/models";

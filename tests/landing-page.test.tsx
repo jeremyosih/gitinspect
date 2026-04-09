@@ -20,7 +20,7 @@ vi.mock("@tanstack/react-router", () => ({
   useSearch: () => useSearchMock(),
 }));
 
-vi.mock("@/db/schema", () => ({
+vi.mock("@gitinspect/db", () => ({
   listRepositories: () => listRepositoriesMock(),
 }));
 

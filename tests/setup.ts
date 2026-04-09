@@ -1,6 +1,6 @@
 import "fake-indexeddb/auto";
 import { afterAll, vi } from "vitest";
-import { db } from "@/db/schema";
+import { db } from "@gitinspect/db";
 
 vi.mock("autumn-js/react", () => ({
   AutumnProvider: ({ children }: { children: unknown }) => children,

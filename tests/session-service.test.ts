@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { db } from "@/db/schema";
+import { db } from "@gitinspect/db";
 import { createEmptyUsage } from "@/types/models";
 import type { SessionData } from "@/types/storage";
 

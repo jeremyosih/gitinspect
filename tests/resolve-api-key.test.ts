@@ -4,7 +4,7 @@ const setProviderKey = vi.fn();
 const oauthRefresh = vi.fn();
 const getProxyConfig = vi.fn();
 
-vi.mock("@/db/schema", () => ({
+vi.mock("@gitinspect/db", () => ({
   db: {
     providerKeys: {},
     transaction: async (
@@ -171,7 +171,7 @@ describe("resolveStoredApiKey", () => {
 
   it("falls back to the bundled public key for the Fireworks free group", async () => {
     const { resolveApiKeyForProvider } = await import("@/auth/resolve-api-key");
-    const { getProviderKey } = await import("@/db/schema");
+    const { getProviderKey } = await import("@gitinspect/db");
     const { FIREWORKS_FREE_PROXY_MARKER } = await import("@/auth/public-provider-fallbacks");
 
     vi.mocked(getProviderKey).mockResolvedValue(undefined);
@@ -183,7 +183,7 @@ describe("resolveStoredApiKey", () => {
 
   it("does not use the bundled public key for full OpenCode", async () => {
     const { resolveApiKeyForProvider } = await import("@/auth/resolve-api-key");
-    const { getProviderKey } = await import("@/db/schema");
+    const { getProviderKey } = await import("@gitinspect/db");
 
     vi.mocked(getProviderKey).mockResolvedValue(undefined);
 

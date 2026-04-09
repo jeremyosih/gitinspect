@@ -18,7 +18,7 @@ const deriveActiveSessionViewState = vi.fn(() => ({ kind: "ready" as const }));
 const deriveRecoveryIntent = vi.fn(() => "none" as const);
 const deriveRecoverySkipReason = vi.fn(() => "not-streaming" as const);
 
-vi.mock("@/db/schema", () => ({
+vi.mock("@gitinspect/db", () => ({
   deleteSessionLease,
 }));
 
