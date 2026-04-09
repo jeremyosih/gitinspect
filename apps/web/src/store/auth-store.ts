@@ -1,5 +1,5 @@
 import * as React from "react";
-import { deleteSetting, setSetting } from "@gitinspect/db/schema";
+import { deleteSetting, setSetting } from "@gitinspect/db";
 import type {
   AuthDialogMode,
   AuthDialogReason,
@@ -213,7 +213,7 @@ export async function hasGuestChatAcknowledgement(): Promise<boolean> {
     return false;
   }
 
-  const stored = await import("@gitinspect/db/schema").then(({ getSetting }) =>
+  const stored = await import("@gitinspect/db").then(({ getSetting }) =>
     getSetting(GUEST_ACKNOWLEDGED_SETTING_KEY),
   );
   return stored === true;

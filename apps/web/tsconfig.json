@@ -25,7 +25,9 @@
       "@/*": ["./src/*"],
       "@gitinspect/ui/*": ["../../packages/ui/src/*"],
       "@gitinspect/pi/*": ["../../packages/pi/src/*"],
-      "@gitinspect/db/*": ["../../packages/db/src/*"],
+      "@gitinspect/db": ["../../packages/db/src/index.ts"],
+      "@gitinspect/db/session-leases": ["../../packages/db/src/session-leases.ts"],
+      "@gitinspect/db/session-runtime": ["../../packages/db/src/session-runtime.ts"],
       "@gitinspect/shared/*": ["../../packages/shared/src/*"]
     }
   }

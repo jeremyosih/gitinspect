@@ -49,7 +49,7 @@ export default defineConfig({
       { find: "@/lib/github/types", replacement: fromRoot("./packages/just-github/src/types.ts") },
       { find: "@/lib/github", replacement: fromRoot("./packages/just-github/src/index.ts") },
       { find: "@/lib/utils", replacement: fromRoot("./packages/ui/src/lib/utils.ts") },
-      { find: "@/types/storage", replacement: fromRoot("./packages/db/src/storage-types.ts") },
+      { find: "@/types/storage", replacement: fromRoot("./packages/db/src/types.ts") },
       { find: "@/agent", replacement: fromRoot("./packages/pi/src/agent") },
       { find: "@/auth", replacement: fromRoot("./packages/pi/src/auth") },
       { find: "@/components", replacement: fromRoot("./packages/ui/src/components") },
@@ -67,6 +67,10 @@ export default defineConfig({
       { find: "@/types", replacement: fromRoot("./packages/pi/src/types") },
       { find: "@/test", replacement: fromRoot("./tests/lib") },
       { find: "@/just-github", replacement: fromRoot("./packages/just-github/src") },
+      {
+        find: /^@gitinspect\/db$/,
+        replacement: fromRoot("./packages/db/src/index.ts"),
+      },
       {
         find: "@gitinspect/shared/feedback",
         replacement: fromRoot("./packages/shared/src/feedback.ts"),

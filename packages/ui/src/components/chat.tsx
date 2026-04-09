@@ -808,19 +808,17 @@ export function Chat(props: ChatProps) {
               sessionId={props.sessionId}
             />
             {messages.length > 0 ? (
-              <div className="hidden md:block">
-                <SessionUtilityActions
-                  canUnshare={false}
-                  isPro={isPro}
-                  isShared={false}
-                  isSharing={false}
-                  onCopy={handleCopySession}
-                  onShareToggle={() => {
-                    void handleShareToggle();
-                  }}
-                  onUpgradeClick={handleUpgradeToPro}
-                />
-              </div>
+              <SessionUtilityActions
+                canUnshare={false}
+                isPro={isPro}
+                isShared={false}
+                isSharing={false}
+                onCopy={handleCopySession}
+                onShareToggle={() => {
+                  void handleShareToggle();
+                }}
+                onUpgradeClick={handleUpgradeToPro}
+              />
             ) : null}
           </div>
         </div>
@@ -921,21 +919,6 @@ export function Chat(props: ChatProps) {
                 }}
                 providerGroup={currentProviderGroup}
                 thinkingLevel={currentThinkingLevel}
-                utilityActions={
-                  messages.length > 0 ? (
-                    <SessionUtilityActions
-                      canUnshare={false}
-                      isPro={isPro}
-                      isShared={false}
-                      isSharing={false}
-                      onCopy={handleCopySession}
-                      onShareToggle={() => {
-                        void handleShareToggle();
-                      }}
-                      onUpgradeClick={handleUpgradeToPro}
-                    />
-                  ) : null
-                }
               />
               <ChatUsageNotice
                 balance={messageBalance}

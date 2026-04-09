@@ -23,15 +23,16 @@ export function useGithubAuth() {
     setIsPending(true);
 
     try {
-      setAuthState(await deriveGitHubAuthState());
+      const session = sessionState.isPending ? undefined : (sessionState.data ?? null);
+      setAuthState(await deriveGitHubAuthState({ session }));
     } finally {
       setIsPending(false);
     }
-  }, []);
+  }, [sessionState.data, sessionState.isPending]);
 
   React.useEffect(() => {
     void refresh();
-  }, [pat, refresh, sessionState.data]);
+  }, [pat, refresh]);
 
   return {
     authState,
