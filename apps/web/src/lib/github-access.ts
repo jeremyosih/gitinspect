@@ -1,5 +1,10 @@
 import { authClient } from "@/lib/auth-client";
 import {
+  clearCachedGitHubOAuthAccessToken,
+  getCachedGitHubOAuthAccessToken,
+  invalidateCachedGitHubOAuthAccessToken,
+} from "@/lib/github-access-cache";
+import {
   type GitHubAccess,
   type GitHubAccessFailureReason,
   type GitHubAuthState,
@@ -10,10 +15,10 @@ import { getGithubPersonalAccessToken } from "@gitinspect/pi/repo/github-token";
 
 const GITHUB_REPO_SCOPE = "repo";
 const PENDING_REPO_ACCESS_KEY = "gitinspect.pending-github-repo-access";
-const ACCOUNT_CACHE_TTL_MS = 30_000;
-const ACCESS_TOKEN_EXPIRY_SKEW_MS = 30_000;
 
 type BetterAuthSessionResult = Awaited<ReturnType<typeof authClient.getSession>>;
+type BetterAuthAccessTokenResult = Awaited<ReturnType<typeof authClient.getAccessToken>>;
+
 type ProductSession = ExtractSessionResult<BetterAuthSessionResult>;
 
 type ExtractSessionResult<T> = T extends { data: infer Data } ? Data : T;
@@ -28,40 +33,7 @@ type PendingRepoAccessState = {
   createdAt: number;
 };
 
-type SessionStoreSnapshot = {
-  data: ProductSession | null;
-  isPending: boolean;
-};
-
-type GitHubLinkedAccount = {
-  providerId: string;
-  scopes?: string[];
-};
-
-type GitHubAccessToken = {
-  accessToken?: string;
-  accessTokenExpiresAt?: Date | string;
-  scopes?: string[];
-};
-
-type CachedValue<T> = {
-  expiresAt: number;
-  value: T;
-};
-
-type CachedToken = {
-  expiresAt: number | null;
-  value: GitHubAccessToken | null;
-};
-
 export type RepoAccessContinuationStatus = "none" | "ready" | "requested-grant";
-
-let productSessionPromise: Promise<ProductSession | null> | undefined;
-let githubAccountCache: CachedValue<GitHubLinkedAccount | null | undefined> | undefined;
-let githubAccountPromise: Promise<GitHubLinkedAccount | null | undefined> | undefined;
-let githubAccessTokenCache: CachedToken | undefined;
-let githubAccessTokenPromise: Promise<GitHubAccessToken | null> | undefined;
-let hasRegisteredSessionInvalidation = false;
 
 function getCallbackUrl(): string {
   if (typeof window === "undefined") {
@@ -129,33 +101,8 @@ function getSessionPayload(result: BetterAuthSessionResult): ProductSession | nu
   return result ?? null;
 }
 
-function unwrapAuthFetchData<T>(result: unknown): T | null {
-  if (result && typeof result === "object" && "data" in result) {
-    return ((result as { data?: T | null }).data ?? null) as T | null;
-  }
-
-  return (result as T | null) ?? null;
-}
-
-function readSessionStoreSnapshot(): ProductSession | null | undefined {
-  const sessionAtom = authClient.$store.atoms.session as {
-    get?: () => SessionStoreSnapshot | undefined;
-  };
-  const snapshot = sessionAtom?.get?.();
-
-  if (!snapshot) {
-    return undefined;
-  }
-
-  if (snapshot.data) {
-    return snapshot.data;
-  }
-
-  if (!snapshot.isPending) {
-    return null;
-  }
-
-  return undefined;
+function getAccessTokenPayload(result: BetterAuthAccessTokenResult | null) {
+  return result;
 }
 
 function isRepoScopeGranted(scopes: ReadonlyArray<string> | undefined): boolean {
@@ -166,161 +113,20 @@ function isRepoScopeGranted(scopes: ReadonlyArray<string> | undefined): boolean 
   return scopes.includes(GITHUB_REPO_SCOPE);
 }
 
-function getAccessTokenExpiresAtMs(token: GitHubAccessToken | null): number | null {
-  const raw = token?.accessTokenExpiresAt;
-
-  if (!raw) {
-    return null;
-  }
-
-  const expiresAt = raw instanceof Date ? raw.getTime() : new Date(raw).getTime();
-  return Number.isFinite(expiresAt) ? expiresAt : null;
-}
-
-function hasValidCachedAccessToken(): boolean {
-  const cached = githubAccessTokenCache;
-
-  if (!cached?.value?.accessToken) {
-    return false;
-  }
-
-  return cached.expiresAt === null || cached.expiresAt - ACCESS_TOKEN_EXPIRY_SKEW_MS > Date.now();
-}
-
-function hasFreshAccountCache(): boolean {
-  return Boolean(githubAccountCache && githubAccountCache.expiresAt > Date.now());
-}
-
-export function invalidateGitHubAuthCache(): void {
-  productSessionPromise = undefined;
-  githubAccountCache = undefined;
-  githubAccountPromise = undefined;
-  githubAccessTokenCache = undefined;
-  githubAccessTokenPromise = undefined;
-}
-
-function ensureSessionInvalidationBridge(): void {
-  if (hasRegisteredSessionInvalidation) {
-    return;
-  }
-
-  hasRegisteredSessionInvalidation = true;
-  authClient.$store.listen("$sessionSignal", () => {
-    invalidateGitHubAuthCache();
-  });
-}
-
 async function getProductSession(): Promise<ProductSession | null> {
-  const cached = readSessionStoreSnapshot();
-
-  if (cached !== undefined) {
-    return cached;
-  }
-
-  if (productSessionPromise) {
-    return await productSessionPromise;
-  }
-
-  productSessionPromise = authClient
-    .getSession()
-    .then(getSessionPayload)
-    .catch(() => null)
-    .finally(() => {
-      productSessionPromise = undefined;
-    });
-
-  return await productSessionPromise;
-}
-
-async function getGithubLinkedAccount(input?: {
-  force?: boolean;
-  session?: ProductSession | null;
-}): Promise<GitHubLinkedAccount | null | undefined> {
-  const session = input?.session !== undefined ? input.session : await getProductSession();
-
-  if (!session) {
+  try {
+    return getSessionPayload(await authClient.getSession());
+  } catch {
     return null;
   }
-
-  if (!input?.force && hasFreshAccountCache()) {
-    return githubAccountCache?.value;
-  }
-
-  if (githubAccountPromise) {
-    return await githubAccountPromise;
-  }
-
-  githubAccountPromise = authClient
-    .$fetch("/list-accounts", {
-      method: "GET",
-    })
-    .then((result) => {
-      const accounts = unwrapAuthFetchData<GitHubLinkedAccount[]>(result) ?? [];
-      const githubAccount = accounts.find((account) => account.providerId === "github") ?? null;
-
-      githubAccountCache = {
-        expiresAt: Date.now() + ACCOUNT_CACHE_TTL_MS,
-        value: githubAccount,
-      };
-
-      return githubAccount;
-    })
-    .catch(() => {
-      githubAccountCache = {
-        expiresAt: Date.now() + ACCOUNT_CACHE_TTL_MS,
-        value: undefined,
-      };
-
-      return undefined;
-    })
-    .finally(() => {
-      githubAccountPromise = undefined;
-    });
-
-  return await githubAccountPromise;
 }
 
-async function getGithubOAuthAccessToken(input?: {
-  force?: boolean;
-  session?: ProductSession | null;
-}): Promise<GitHubAccessToken | null> {
-  const session = input?.session !== undefined ? input.session : await getProductSession();
-
-  if (!session) {
+async function getGithubOAuthAccessToken(): Promise<BetterAuthAccessTokenResult | null> {
+  try {
+    return getAccessTokenPayload(await getCachedGitHubOAuthAccessToken());
+  } catch {
     return null;
   }
-
-  if (!input?.force && hasValidCachedAccessToken()) {
-    return githubAccessTokenCache?.value ?? null;
-  }
-
-  if (githubAccessTokenPromise) {
-    return await githubAccessTokenPromise;
-  }
-
-  githubAccessTokenPromise = authClient
-    .$fetch("/get-access-token", {
-      body: {
-        providerId: "github",
-      },
-      method: "POST",
-    })
-    .then((result) => {
-      const token = unwrapAuthFetchData<GitHubAccessToken>(result);
-
-      githubAccessTokenCache = {
-        expiresAt: getAccessTokenExpiresAtMs(token),
-        value: token,
-      };
-
-      return token;
-    })
-    .catch(() => null)
-    .finally(() => {
-      githubAccessTokenPromise = undefined;
-    });
-
-  return await githubAccessTokenPromise;
 }
 
 function failure(reason: GitHubAccessFailureReason): GitHubAccess {
@@ -334,52 +140,14 @@ export async function resolveGitHubAccess(
   options?: ResolveGitHubAccessOptions,
 ): Promise<GitHubAccess> {
   const requireRepoScope = options?.requireRepoScope === true;
-  const [session, fallbackPat, githubAccount] = await Promise.all([
+  const [session, fallbackPat] = await Promise.all([
     getProductSession(),
     getGithubPersonalAccessToken(),
-    getGithubLinkedAccount(),
   ]);
-
-  if (!session) {
-    if (fallbackPat) {
-      return {
-        ok: true,
-        source: "pat",
-        token: fallbackPat,
-      };
-    }
-
-    return failure("signed-out");
-  }
-
-  if (githubAccount === null) {
-    if (fallbackPat) {
-      return {
-        ok: true,
-        source: "pat",
-        token: fallbackPat,
-      };
-    }
-
-    return failure("oauth-not-linked");
-  }
-
-  if (githubAccount && requireRepoScope && !isRepoScopeGranted(githubAccount.scopes)) {
-    if (fallbackPat) {
-      return {
-        ok: true,
-        source: "pat",
-        token: fallbackPat,
-      };
-    }
-
-    return failure("oauth-missing-scope");
-  }
-
-  const oauthToken = await getGithubOAuthAccessToken({ session });
+  const oauthToken = session ? await getGithubOAuthAccessToken() : null;
 
   if (oauthToken?.accessToken) {
-    const scopes = oauthToken.scopes ?? githubAccount?.scopes;
+    const scopes = oauthToken.scopes;
 
     if (!requireRepoScope || isRepoScopeGranted(scopes)) {
       return {
@@ -409,11 +177,15 @@ export async function resolveGitHubAccess(
     };
   }
 
+  if (!session) {
+    return failure("signed-out");
+  }
+
   return failure("oauth-failed");
 }
 
 export async function signInWithGithub(): Promise<void> {
-  invalidateGitHubAuthCache();
+  await invalidateCachedGitHubOAuthAccessToken();
   await authClient.signIn.social({
     callbackURL: getCallbackUrl(),
     provider: "github",
@@ -430,7 +202,7 @@ export async function requestGithubRepoAccess(): Promise<void> {
     return;
   }
 
-  invalidateGitHubAuthCache();
+  await invalidateCachedGitHubOAuthAccessToken();
   await authClient.linkSocial({
     callbackURL: getCallbackUrl(),
     provider: "github",
@@ -473,7 +245,7 @@ export async function continuePendingGithubRepoAccessGrant(): Promise<RepoAccess
   }
 
   clearPendingRepoAccessGrant();
-  invalidateGitHubAuthCache();
+  await invalidateCachedGitHubOAuthAccessToken();
   await authClient.linkSocial({
     callbackURL: getCallbackUrl(),
     provider: "github",
@@ -484,7 +256,7 @@ export async function continuePendingGithubRepoAccessGrant(): Promise<RepoAccess
 
 export async function signOutGithubProductSession(): Promise<void> {
   clearPendingRepoAccessGrant();
-  invalidateGitHubAuthCache();
+  await clearCachedGitHubOAuthAccessToken();
   await authClient.signOut();
 
   if (typeof window !== "undefined") {
@@ -510,33 +282,25 @@ export async function deriveGitHubAuthState(input?: {
     };
   }
 
-  const githubAccount = await getGithubLinkedAccount({ session });
+  const oauthToken = await getGithubOAuthAccessToken();
 
-  if (githubAccount === undefined) {
+  if (oauthToken?.accessToken) {
+    const repoGranted = isRepoScopeGranted(oauthToken.scopes);
+
     return {
       fallbackPat: Boolean(fallbackPat),
-      githubLink: "unknown",
-      preferredSource: fallbackPat ? "pat" : "none",
-      repoAccess: "unknown",
-      session: "signed-in",
-    };
-  }
-
-  if (!githubAccount) {
-    return {
-      fallbackPat: Boolean(fallbackPat),
-      githubLink: "unlinked",
-      preferredSource: fallbackPat ? "pat" : "none",
-      repoAccess: "missing",
+      githubLink: "linked",
+      preferredSource: "oauth",
+      repoAccess: repoGranted ? "granted" : "missing",
       session: "signed-in",
     };
   }
 
   return {
     fallbackPat: Boolean(fallbackPat),
-    githubLink: "linked",
-    preferredSource: "oauth",
-    repoAccess: isRepoScopeGranted(githubAccount.scopes) ? "granted" : "missing",
+    githubLink: "unknown",
+    preferredSource: fallbackPat ? "pat" : "none",
+    repoAccess: "unknown",
     session: "signed-in",
   };
 }
@@ -551,5 +315,4 @@ export async function getRepoScopeStatus(): Promise<RepoScopeStatus> {
   };
 }
 
-ensureSessionInvalidationBridge();
 registerGitHubAccessResolver(resolveGitHubAccess);
