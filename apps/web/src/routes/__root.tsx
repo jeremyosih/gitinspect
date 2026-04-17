@@ -9,7 +9,6 @@ import {
   createRootRoute,
   retainSearchParams,
   useNavigate,
-  useRouterState,
 } from "@tanstack/react-router";
 import { Analytics as VercelAnalytics } from "@vercel/analytics/react";
 import { Analytics as OneDollarStats } from "@/components/analytics";
@@ -190,48 +189,40 @@ function RootAppChrome(props: {
 }) {
   const navigate = useNavigate();
   const search = Route.useSearch();
-  const currentMatch = useRouterState({
-    select: (state) => state.matches[state.matches.length - 1],
-  });
-  const isSharedTranscriptRoute = currentMatch.routeId === "/share/$sessionId";
 
   return (
     <>
       <RootGuard>
-        {isSharedTranscriptRoute ? (
-          <Outlet />
-        ) : (
-          <SidebarProvider
-            onOpenChange={(open) => {
-              void navigate({
-                search: (prev) => ({
-                  ...prev,
-                  sidebar: open ? "open" : undefined,
-                }),
-                to: ".",
-              });
-            }}
-            open={search.sidebar === "open"}
-          >
-            <div className="relative flex h-svh w-full overflow-hidden overscroll-none">
-              <AppSidebar showGetPro={!props.isSubscribed} />
-              <SidebarInset className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-                <AppHeader />
-                <main className="flex min-h-0 flex-1 overflow-hidden">
-                  <Outlet />
-                </main>
-              </SidebarInset>
-            </div>
-            <AppSettingsDialog
-              dataPanel={
-                <DataSettings canRequestSync={props.isSubscribed} syncEnabled={props.syncEnabled} />
-              }
-              pricingLabel={props.isSignedIn ? "Subscription" : "Get Pro"}
-              pricingPanel={<PricingSettingsPanel />}
-            />
-            <FeedbackDialog />
-          </SidebarProvider>
-        )}
+        <SidebarProvider
+          onOpenChange={(open) => {
+            void navigate({
+              search: (prev) => ({
+                ...prev,
+                sidebar: open ? "open" : undefined,
+              }),
+              to: ".",
+            });
+          }}
+          open={search.sidebar === "open"}
+        >
+          <div className="relative flex h-svh w-full overflow-hidden overscroll-none">
+            <AppSidebar showGetPro={!props.isSubscribed} />
+            <SidebarInset className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+              <AppHeader />
+              <main className="flex min-h-0 flex-1 overflow-hidden">
+                <Outlet />
+              </main>
+            </SidebarInset>
+          </div>
+          <AppSettingsDialog
+            dataPanel={
+              <DataSettings canRequestSync={props.isSubscribed} syncEnabled={props.syncEnabled} />
+            }
+            pricingLabel={props.isSignedIn ? "Subscription" : "Get Pro"}
+            pricingPanel={<PricingSettingsPanel />}
+          />
+          <FeedbackDialog />
+        </SidebarProvider>
       </RootGuard>
       <AuthDialogWrapper />
       <Toaster position="bottom-right" />

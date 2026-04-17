@@ -87,13 +87,6 @@ export const Route = createFileRoute("/api/shares/$sessionId")({
           return Response.json({ error: "Session id mismatch" }, { status: 400 });
         }
 
-        if (payload.session.isStreaming) {
-          return Response.json(
-            { error: "Cannot share while the session is streaming" },
-            { status: 409 },
-          );
-        }
-
         if (payload.messages.some((message) => message.sessionId !== params.sessionId)) {
           return Response.json({ error: "Message session mismatch" }, { status: 400 });
         }

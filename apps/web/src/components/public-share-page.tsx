@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { useLiveQuery } from "dexie-react-hooks";
 import { toast } from "sonner";
 import { buildForkPromptFromSharedSession } from "@gitinspect/pi/lib/public-share";
@@ -19,6 +20,7 @@ import {
 } from "@gitinspect/ui/components/ai-elements/conversation";
 import { StatusShimmer } from "@gitinspect/ui/components/ai-elements/shimmer";
 import { Button } from "@gitinspect/ui/components/button";
+import { Icons } from "@gitinspect/ui/components/icons";
 import { ProgressiveBlur } from "@gitinspect/ui/components/progressive-blur";
 import { useConversationStarter } from "@gitinspect/ui/hooks/use-conversation-starter";
 import { getFoldedToolResultIds } from "@gitinspect/pi/lib/chat-adapter";
@@ -26,18 +28,13 @@ import {
   loadPublicSessionSnapshot,
   type PublicSessionSnapshot,
 } from "@gitinspect/pi/lib/public-share-client";
+import { setPublicShareHeaderRepo } from "@gitinspect/ui/lib/public-share-header-bridge";
 
 type Draft = {
   model: string;
   providerGroup: ProviderGroupId;
   thinkingLevel: ThinkingLevel;
 };
-
-type SnapshotState =
-  | { kind: "error"; message: string }
-  | { kind: "loading" }
-  | { kind: "not-found" }
-  | { kind: "ready"; snapshot: PublicSessionSnapshot };
 
 function SharedTranscriptLoading() {
   return (
@@ -87,8 +84,50 @@ function SharedTranscriptError(props: { message: string }) {
   );
 }
 
-export function PublicSharePage(props: { sessionId: string }) {
-  const [snapshotState, setSnapshotState] = React.useState<SnapshotState>({ kind: "loading" });
+export function PublicSharePage(props: {
+  initialSnapshot?: PublicSessionSnapshot | null;
+  sessionId: string;
+}) {
+  const {
+    data: snapshot,
+    error: queryError,
+    isError,
+    isPending,
+    isSuccess,
+  } = useQuery({
+    initialData: props.initialSnapshot ?? undefined,
+    queryFn: () => loadPublicSessionSnapshot(props.sessionId),
+    queryKey: ["public-session", props.sessionId],
+    refetchInterval: 3_000,
+    retry: false,
+    staleTime: 2_000,
+  });
+
+  React.useEffect(() => {
+    setPublicShareHeaderRepo(undefined);
+  }, [props.sessionId]);
+
+  React.useEffect(() => {
+    const repoSource = snapshot?.session.repoSource;
+
+    if (!repoSource) {
+      setPublicShareHeaderRepo(undefined);
+      return () => {
+        setPublicShareHeaderRepo(undefined);
+      };
+    }
+
+    setPublicShareHeaderRepo({
+      owner: repoSource.owner,
+      ref: repoSource.ref,
+      repo: repoSource.repo,
+    });
+
+    return () => {
+      setPublicShareHeaderRepo(undefined);
+    };
+  }, [snapshot]);
+
   const defaults = useLiveQuery(async () => {
     const resolved = await resolveProviderDefaults();
 
@@ -100,36 +139,28 @@ export function PublicSharePage(props: { sessionId: string }) {
   }, []);
   const [draft, setDraft] = React.useState<Draft | undefined>(undefined);
   const { isStartingSession, startNewConversation } = useConversationStarter();
+  const observerRef = React.useRef<ResizeObserver | null>(null);
+  const [promptHeight, setPromptHeight] = React.useState(0);
 
-  React.useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      try {
-        const snapshot = await loadPublicSessionSnapshot(props.sessionId);
-
-        if (cancelled) {
-          return;
-        }
-
-        setSnapshotState(snapshot ? { kind: "ready", snapshot } : { kind: "not-found" });
-      } catch (error) {
-        if (cancelled) {
-          return;
-        }
-
-        const message = error instanceof Error ? error.message : "Unknown error";
-        setSnapshotState({ kind: "error", message });
-      }
+  const promptRef = React.useCallback((node: HTMLDivElement | null) => {
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+      observerRef.current = null;
     }
 
-    setSnapshotState({ kind: "loading" });
-    void load();
+    if (!node || typeof ResizeObserver === "undefined") {
+      return;
+    }
 
-    return () => {
-      cancelled = true;
+    const updateHeight = () => {
+      setPromptHeight(node.offsetHeight);
     };
-  }, [props.sessionId]);
+
+    updateHeight();
+
+    observerRef.current = new ResizeObserver(updateHeight);
+    observerRef.current.observe(node);
+  }, []);
 
   React.useEffect(() => {
     if (!defaults) {
@@ -150,22 +181,22 @@ export function PublicSharePage(props: { sessionId: string }) {
 
   const handleSend = React.useCallback(
     async (prompt: string) => {
-      if (snapshotState.kind !== "ready" || !draft) {
+      if (!snapshot || !draft) {
         return;
       }
 
       const forkPrompt = buildForkPromptFromSharedSession({
-        messages: snapshotState.snapshot.messages,
+        messages: snapshot.messages,
         prompt,
-        repoSource: snapshotState.snapshot.session.repoSource,
-        sourceUrl: snapshotState.snapshot.session.sourceUrl,
+        repoSource: snapshot.session.repoSource,
+        sourceUrl: snapshot.session.sourceUrl,
       });
       const session = await startNewConversation({
         initialPrompt: forkPrompt,
         model: draft.model,
         providerGroup: draft.providerGroup,
-        repoSource: snapshotState.snapshot.session.repoSource,
-        sourceUrl: snapshotState.snapshot.session.sourceUrl,
+        repoSource: snapshot.session.repoSource,
+        sourceUrl: snapshot.session.sourceUrl,
         thinkingLevel: draft.thinkingLevel,
       });
 
@@ -173,79 +204,49 @@ export function PublicSharePage(props: { sessionId: string }) {
         toast.success("Started a new private conversation");
       }
     },
-    [draft, snapshotState, startNewConversation],
+    [draft, snapshot, startNewConversation],
   );
 
-  if (snapshotState.kind === "loading") {
+  if (isPending && snapshot === undefined) {
     return <SharedTranscriptLoading />;
   }
 
-  if (snapshotState.kind === "not-found") {
+  if (isError && snapshot === undefined) {
+    const message = queryError instanceof Error ? queryError.message : "Unknown error";
+    return <SharedTranscriptError message={message} />;
+  }
+
+  if (isSuccess && snapshot === undefined) {
     return <SharedTranscriptNotFound />;
   }
 
-  if (snapshotState.kind === "error") {
-    return <SharedTranscriptError message={snapshotState.message} />;
+  if (!snapshot) {
+    return <SharedTranscriptLoading />;
   }
 
   if (!draft) {
     return <SharedTranscriptLoading />;
   }
 
-  const { snapshot } = snapshotState;
   const foldedToolResultIds = getFoldedToolResultIds(snapshot.messages);
   const repoUrl = snapshot.session.repoSource
     ? repoSourceToGitHubUrl(snapshot.session.repoSource)
     : snapshot.session.sourceUrl;
+  const repoLabel = snapshot.session.repoSource
+    ? `${snapshot.session.repoSource.owner}/${snapshot.session.repoSource.repo} · ${snapshot.session.repoSource.ref}`
+    : repoUrl;
 
   return (
-    <div className="relative flex min-h-svh flex-col overflow-hidden bg-background">
-      <div className="border-b border-border/60 bg-background/95 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-4xl flex-col gap-3 px-4 py-6">
-          <div className="flex items-center justify-between gap-3">
-            <div className="space-y-1">
-              <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
-                Shared transcript
-              </p>
-              <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-                {snapshot.session.title}
-              </h1>
-            </div>
-            <Button asChild variant="outline">
-              <Link
-                search={{
-                  feedback: undefined,
-                  settings: undefined,
-                  sidebar: undefined,
-                  tab: undefined,
-                }}
-                to="/"
-              >
-                Open gitinspect
-              </Link>
-            </Button>
-          </div>
-          {repoUrl ? (
-            <a
-              className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
-              href={repoUrl}
-              rel="noreferrer"
-              target="_blank"
-            >
-              {snapshot.session.repoSource
-                ? `${snapshot.session.repoSource.owner}/${snapshot.session.repoSource.repo} · ${snapshot.session.repoSource.ref}`
-                : repoUrl}
-            </a>
-          ) : null}
-          <p className="text-sm text-muted-foreground">
-            This page is read-only. Sending a message below starts a new private conversation in
-            your own workspace.
-          </p>
-        </div>
-      </div>
-
+    <div
+      className="relative flex size-full min-h-0 flex-col overflow-hidden bg-background"
+      style={{ "--chat-input-height": `${promptHeight}px` } as React.CSSProperties}
+    >
       <Conversation className="min-h-0 flex-1">
-        <ConversationContent className="mx-auto w-full max-w-4xl px-4 py-6">
+        <ConversationContent
+          className={`mx-auto w-full max-w-4xl px-4 py-6 ${
+            snapshot.messages.length === 0 ? "min-h-full" : ""
+          }`}
+        >
           {snapshot.messages.map((message, index) => {
             if (message.role === "toolResult" && foldedToolResultIds.has(message.id)) {
               return null;
@@ -265,41 +266,81 @@ export function PublicSharePage(props: { sessionId: string }) {
         {snapshot.messages.length > 0 ? (
           <>
             <ProgressiveBlur className="z-[5]" height="32px" position="top" />
-            <ProgressiveBlur className="z-[5]" position="bottom" />
+            <ProgressiveBlur
+              className="z-[5]"
+              position="bottom"
+              style={{ bottom: "var(--chat-input-height, 0px)" }}
+            />
           </>
         ) : null}
       </Conversation>
 
-      <div className="border-t border-border/60 bg-background/95 px-4 py-4 backdrop-blur">
-        <div className="mx-auto w-full max-w-4xl space-y-3">
-          <div className="rounded-md border border-border/60 bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-            New messages stay private to you and won&apos;t modify this shared transcript.
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10">
+        <div className="mx-auto w-full max-w-4xl px-4">
+          <div className="pointer-events-auto flex items-center justify-between pb-2">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+              <Icons.Globe className="size-3.5 shrink-0" />
+              <span className="shrink-0">Shared session</span>
+              {snapshot.session.title.trim().length > 0 ? (
+                <>
+                  <span className="shrink-0">·</span>
+                  <span className="min-w-0 truncate font-medium text-foreground/80">
+                    {snapshot.session.title}
+                  </span>
+                </>
+              ) : null}
+              {repoUrl ? (
+                <>
+                  <span className="shrink-0">·</span>
+                  <a
+                    className="min-w-0 truncate underline underline-offset-4 hover:text-foreground"
+                    href={repoUrl}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    {repoLabel}
+                  </a>
+                </>
+              ) : null}
+            </div>
           </div>
-          <ChatComposer
-            composerDisabled={isStartingSession}
-            disabledReason={isStartingSession ? "Starting your private conversation..." : undefined}
-            isStreaming={isStartingSession}
-            model={draft.model}
-            onAbort={() => {}}
-            onSelectModel={(providerGroup, model) => {
-              persistDraft({
-                model,
-                providerGroup,
-                thinkingLevel: draft.thinkingLevel,
-              });
-            }}
-            onSend={handleSend}
-            onThinkingLevelChange={(thinkingLevel) => {
-              persistDraft({
-                model: draft.model,
-                providerGroup: draft.providerGroup,
-                thinkingLevel,
-              });
-            }}
-            placeholder="Ask a follow-up privately"
-            providerGroup={draft.providerGroup}
-            thinkingLevel={draft.thinkingLevel}
-          />
+        </div>
+
+        <div className="pointer-events-auto bg-background">
+          <div className="mx-auto w-full max-w-4xl px-4 pb-4">
+            <p className="mb-2 text-xs text-muted-foreground">
+              Sending a message starts your own private conversation.
+            </p>
+            <div ref={promptRef}>
+              <ChatComposer
+                composerDisabled={isStartingSession}
+                disabledReason={
+                  isStartingSession ? "Starting your private conversation..." : undefined
+                }
+                isStreaming={isStartingSession}
+                model={draft.model}
+                onAbort={() => {}}
+                onSelectModel={(providerGroup, model) => {
+                  persistDraft({
+                    model,
+                    providerGroup,
+                    thinkingLevel: draft.thinkingLevel,
+                  });
+                }}
+                onSend={handleSend}
+                onThinkingLevelChange={(thinkingLevel) => {
+                  persistDraft({
+                    model: draft.model,
+                    providerGroup: draft.providerGroup,
+                    thinkingLevel,
+                  });
+                }}
+                placeholder="Ask a follow-up privately"
+                providerGroup={draft.providerGroup}
+                thinkingLevel={draft.thinkingLevel}
+              />
+            </div>
+          </div>
         </div>
       </div>
     </div>

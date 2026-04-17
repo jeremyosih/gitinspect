@@ -70,6 +70,7 @@ import {
   deriveResumeAction,
   shouldDisplayConversationStreaming,
 } from "@gitinspect/pi/sessions/session-view-state";
+import { useAutoRepublish } from "@gitinspect/ui/hooks/use-auto-republish";
 import { useConversationStarter } from "@gitinspect/ui/hooks/use-conversation-starter";
 
 type EmptyChatDraft = {
@@ -292,6 +293,8 @@ export function Chat(props: ChatProps) {
   const sessionViewModel =
     loadedSessionState?.kind === "active" ? loadedSessionState.viewModel : undefined;
   const activeSession = sessionViewModel?.session;
+
+  useAutoRepublish(shareState.isShared, activeSession, sessionViewModel?.transcriptMessages);
   const sessionRuntime = sessionViewModel?.runtime;
   const displayRepoSource = activeSession?.repoSource ?? props.repoSource;
   const connectedProviders = React.useMemo(

@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import type { ResolvedRepoSource } from "@gitinspect/db";
+import type { PublicSessionSnapshot } from "@gitinspect/pi/lib/public-share-client";
 import { useSelectedSessionSummary } from "@gitinspect/pi/hooks/use-selected-session-summary";
 import { githubOwnerAvatarUrl } from "@gitinspect/pi/repo/url";
 import {
@@ -19,6 +20,10 @@ import { Separator } from "@gitinspect/ui/components/separator";
 import { SidebarTrigger } from "@gitinspect/ui/components/sidebar";
 import { ThemeToggle } from "@gitinspect/ui/components/theme-toggle";
 import { rememberFeedbackTrigger } from "@gitinspect/ui/lib/feedback-trigger";
+import {
+  getPublicShareHeaderRepo,
+  subscribePublicShareHeaderRepo,
+} from "@gitinspect/ui/lib/public-share-header-bridge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitinspect/ui/components/tooltip";
 import { cn } from "@gitinspect/ui/lib/utils";
 
@@ -41,12 +46,35 @@ function isHeaderRepoSource(value: unknown): value is HeaderRepoSource {
   return typeof candidate.owner === "string" && typeof candidate.repo === "string";
 }
 
+function shareSnapshotToHeaderRepo(data: unknown): HeaderRepoSource | undefined {
+  if (typeof data !== "object" || data === null || !("session" in data)) {
+    return undefined;
+  }
+
+  const snapshot = data as PublicSessionSnapshot;
+  const repoSource = snapshot.session.repoSource;
+
+  if (!repoSource) {
+    return undefined;
+  }
+
+  return {
+    owner: repoSource.owner,
+    ref: repoSource.ref,
+    repo: repoSource.repo,
+  };
+}
+
 function getHeaderRepoSource(
   currentMatch: RouteMatchLike,
   selectedSession: { repoSource?: ResolvedRepoSource } | undefined,
 ): HeaderRepoSource | undefined {
   if (currentMatch.routeId === "/chat/$sessionId") {
     return selectedSession?.repoSource;
+  }
+
+  if (currentMatch.routeId === "/share/$sessionId") {
+    return shareSnapshotToHeaderRepo(currentMatch.loaderData);
   }
 
   if (isHeaderRepoSource(currentMatch.loaderData)) {
@@ -122,7 +150,15 @@ export function AppHeader({ showGetPro = true }: { showGetPro?: boolean } = {}) 
   const sessionId =
     currentMatch.routeId === "/chat/$sessionId" ? currentMatch.params.sessionId : undefined;
   const selectedSession = useSelectedSessionSummary(sessionId);
-  const repoSource = getHeaderRepoSource(currentMatch as RouteMatchLike, selectedSession);
+  const isShareRoute = currentMatch.routeId === "/share/$sessionId";
+  const bridgedShareRepo = React.useSyncExternalStore(
+    subscribePublicShareHeaderRepo,
+    getPublicShareHeaderRepo,
+    getPublicShareHeaderRepo,
+  );
+  const repoSource = isShareRoute
+    ? (bridgedShareRepo ?? getHeaderRepoSource(currentMatch as RouteMatchLike, selectedSession))
+    : getHeaderRepoSource(currentMatch as RouteMatchLike, selectedSession);
 
   return (
     <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b bg-background">
