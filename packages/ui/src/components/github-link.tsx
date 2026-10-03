@@ -5,8 +5,8 @@ import { Skeleton } from "@gitinspect/ui/components/skeleton";
 import {
   GITHUB_APP_REPO,
   useGitHubRepoStargazers,
-} from "@gitinspect/pi/hooks/use-github-repo-stargazers";
-import { formatGitHubStarCount } from "@gitinspect/pi/lib/format-github-stars";
+} from "@gitinspect/runtime/hooks/use-github-repo-stargazers";
+import { formatGitHubStarCount } from "@gitinspect/runtime/lib/format-github-stars";
 
 export function GitHubLink() {
   return (

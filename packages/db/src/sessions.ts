@@ -89,15 +89,13 @@ export async function deleteMessagesBySession(sessionId: string): Promise<void> 
 export async function deleteSession(id: string): Promise<void> {
   await db.transaction(
     "rw",
-    db.sessions,
-    db.messages,
-    db.sessionLeases,
-    db.sessionRuntime,
+    [db.sessions, db.messages, db.sessionLeases, db.sessionRuntime, db.fxCheckpoints],
     async () => {
       await db.sessions.delete(id);
       await deleteMessagesBySession(id);
       await db.sessionLeases.delete(id);
       await db.sessionRuntime.delete(id);
+      await db.fxCheckpoints.delete(id);
     },
   );
 }
@@ -131,5 +129,12 @@ export async function deleteSessionRuntime(sessionId: string): Promise<void> {
 }
 
 export async function runConversationTransaction<T>(callback: () => Promise<T>): Promise<T> {
-  return await db.transaction("rw", db.sessions, db.messages, db.sessionRuntime, callback);
+  return await db.transaction(
+    "rw",
+    db.sessions,
+    db.messages,
+    db.sessionRuntime,
+    db.fxCheckpoints,
+    callback,
+  );
 }

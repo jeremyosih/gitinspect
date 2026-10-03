@@ -1,31 +1,21 @@
 import "fake-indexeddb/auto";
-import { afterAll, vi } from "vitest";
+import { afterAll } from "vitest";
 import { db } from "@gitinspect/db";
 
-vi.mock("autumn-js/react", () => ({
-  AutumnProvider: ({ children }: { children: unknown }) => children,
-  useCustomer: () => ({
-    check: () => ({ allowed: true }),
-    data: {},
-    error: null,
-    isLoading: false,
-    refetch: vi.fn(async () => undefined),
-  }),
-}));
-
-Object.defineProperty(window, "matchMedia", {
-  configurable: true,
-  value: (query: string) => ({
-    addEventListener: () => {},
-    addListener: () => {},
-    dispatchEvent: () => false,
-    matches: false,
-    media: query,
-    onchange: null,
-    removeEventListener: () => {},
-    removeListener: () => {},
-  }),
-});
+if (typeof window !== "undefined")
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    value: (query: string) => ({
+      addEventListener: () => {},
+      addListener: () => {},
+      dispatchEvent: () => false,
+      matches: false,
+      media: query,
+      onchange: null,
+      removeEventListener: () => {},
+      removeListener: () => {},
+    }),
+  });
 
 class MockResizeObserver {
   observe() {}

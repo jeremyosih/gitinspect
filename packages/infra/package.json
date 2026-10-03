@@ -1,0 +1,19 @@
+{
+  "name": "@gitinspect/infra",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "dev": "alchemy dev",
+    "plan": "alchemy plan",
+    "deploy": "alchemy deploy"
+  },
+  "devDependencies": {
+    "@effect/platform-bun": "^4.0.0",
+    "@gitinspect/config": "workspace:*",
+    "alchemy": "2.0.0-beta.80",
+    "dotenv": "catalog:",
+    "effect": "^4.0.0",
+    "typescript": "^5"
+  }
+}

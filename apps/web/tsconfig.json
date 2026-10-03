@@ -1,5 +1,5 @@
 {
-  "include": ["**/*.ts", "**/*.tsx"],
+  "include": ["**/*.ts", "**/*.tsx", "../../packages/runtime/src/libfx.d.ts"],
   "compilerOptions": {
     "target": "ES2022",
     "jsx": "react-jsx",
@@ -24,7 +24,7 @@
     "paths": {
       "@/*": ["./src/*"],
       "@gitinspect/ui/*": ["../../packages/ui/src/*"],
-      "@gitinspect/pi/*": ["../../packages/pi/src/*"],
+      "@gitinspect/runtime/*": ["../../packages/runtime/src/*"],
       "@gitinspect/db": ["../../packages/db/src/index.ts"],
       "@gitinspect/db/session-leases": ["../../packages/db/src/session-leases.ts"],
       "@gitinspect/db/session-runtime": ["../../packages/db/src/session-runtime.ts"],

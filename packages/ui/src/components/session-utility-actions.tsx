@@ -7,17 +7,14 @@ import {
   DropdownMenuTrigger,
 } from "@gitinspect/ui/components/dropdown-menu";
 import { Icons } from "@gitinspect/ui/components/icons";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@gitinspect/ui/components/tooltip";
 
 type SessionUtilityActionProps = {
   canUnshare: boolean;
   disabled?: boolean;
-  isPro: boolean;
   isShared: boolean;
   isSharing?: boolean;
   onCopy: () => void;
   onShareToggle: () => void;
-  onUpgradeClick: () => void;
 };
 
 function ShareButtonLabel(
@@ -40,24 +37,12 @@ function ShareButtonIcon(props: Pick<SessionUtilityActionProps, "canUnshare" | "
   );
 }
 
-function canToggleShare(props: SessionUtilityActionProps): boolean {
-  return props.isPro || (props.isShared && props.canUnshare);
-}
-
 function ShareActionButton(props: SessionUtilityActionProps) {
-  const canShare = canToggleShare(props);
-  const button = (
+  return (
     <Button
       className="h-7 gap-1.5 rounded-sm border border-border/50 bg-muted px-2 py-1 text-xs font-medium text-muted-foreground shadow-none transition-colors hover:bg-muted hover:text-foreground"
       disabled={props.disabled || props.isSharing}
-      onClick={() => {
-        if (!canShare) {
-          props.onUpgradeClick();
-          return;
-        }
-
-        props.onShareToggle();
-      }}
+      onClick={props.onShareToggle}
       size="sm"
       type="button"
       variant="ghost"
@@ -71,17 +56,6 @@ function ShareActionButton(props: SessionUtilityActionProps) {
         />
       </span>
     </Button>
-  );
-
-  if (canShare) {
-    return button;
-  }
-
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>{button}</TooltipTrigger>
-      <TooltipContent sideOffset={6}>Pro users only</TooltipContent>
-    </Tooltip>
   );
 }
 
@@ -132,14 +106,7 @@ export function SessionUtilityActions(props: SessionUtilityActionProps) {
             </DropdownMenuItem>
             <DropdownMenuItem
               disabled={props.isSharing || props.disabled}
-              onClick={() => {
-                if (!canToggleShare(props)) {
-                  props.onUpgradeClick();
-                  return;
-                }
-
-                props.onShareToggle();
-              }}
+              onClick={props.onShareToggle}
             >
               <ShareButtonIcon canUnshare={props.canUnshare} isShared={props.isShared} />
               <span>{shareLabel}</span>

@@ -4,10 +4,10 @@ import { ArrowRightIcon, KeyIcon, StarIcon } from "@phosphor-icons/react";
 
 import { Icons } from "@gitinspect/ui/components/icons";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitinspect/ui/components/tooltip";
-import { formatGitHubStarCount } from "@gitinspect/pi/lib/format-github-stars";
-import { githubApiFetch } from "@gitinspect/pi/repo/github-fetch";
+import { formatGitHubStarCount } from "@gitinspect/runtime/lib/format-github-stars";
+import { githubApiFetch } from "@gitinspect/runtime/repo/github-fetch";
 import { cn } from "@gitinspect/ui/lib/utils";
-import { githubOwnerAvatarUrl } from "@gitinspect/pi/repo/url";
+import { githubOwnerAvatarUrl } from "@gitinspect/runtime/repo/url";
 import type { RepoRefOrigin } from "@gitinspect/db";
 
 export type GithubRepoProps = {

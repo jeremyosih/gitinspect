@@ -1,5 +1,4 @@
 import Dexie, { type EntityTable, type Table } from "dexie";
-import dexieCloud, { type DexieCloudTable } from "dexie-cloud-addon";
 import { DB_NAME, registerAppDbSchema } from "./schema";
 import type {
   DailyCostAggregate,
@@ -8,25 +7,29 @@ import type {
   SessionLeaseRow,
   SessionRuntimeRow,
   SettingsRow,
-  SyncedMessageRow,
-  SyncedSessionRow,
+  MessageRow,
+  SessionData,
 } from "./types";
 
+import type { FxCheckpointRow } from "./fx-checkpoints";
+
 export class AppDb extends Dexie {
+  fxCheckpoints!: EntityTable<FxCheckpointRow, "sessionId">;
   dailyCosts!: EntityTable<DailyCostAggregate, "date">;
-  messages!: DexieCloudTable<SyncedMessageRow, "id">;
+  messages!: EntityTable<MessageRow, "id">;
   providerKeys!: EntityTable<ProviderKeyRecord, "provider">;
   repositories!: Table<RepositoryRow, [string, string, string]>;
   sessionLeases!: EntityTable<SessionLeaseRow, "sessionId">;
   sessionRuntime!: EntityTable<SessionRuntimeRow, "sessionId">;
-  sessions!: DexieCloudTable<SyncedSessionRow, "id">;
+  sessions!: EntityTable<SessionData, "id">;
   settings!: EntityTable<SettingsRow, "key">;
 
   constructor(name = DB_NAME) {
-    super(name, { addons: [dexieCloud] });
+    super(name);
 
     registerAppDbSchema(this);
 
+    this.fxCheckpoints = this.table("fx_checkpoints");
     this.dailyCosts = this.table("daily_costs");
     this.messages = this.table("messages");
     this.providerKeys = this.table("provider-keys");

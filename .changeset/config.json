@@ -14,8 +14,8 @@
     "@gitinspect/config",
     "@gitinspect/db",
     "@gitinspect/env",
-    "@gitinspect/just-github",
-    "@gitinspect/pi",
+    "@gitinspect/vfs",
+    "@gitinspect/runtime",
     "@gitinspect/shared",
     "@gitinspect/ui"
   ]

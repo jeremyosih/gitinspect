@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import type { MessageRow, SessionData } from "@gitinspect/db";
-import { publishSessionShare } from "@gitinspect/pi/lib/public-share-client";
+import { publishSessionShare } from "@gitinspect/runtime/lib/public-share-client";
 
 const DEBOUNCE_MS = 3_000;
 

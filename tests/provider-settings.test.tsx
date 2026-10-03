@@ -42,7 +42,7 @@ vi.mock("@gitinspect/db", () => ({
   },
 }));
 
-vi.mock("@gitinspect/pi/models/provider-registry", () => ({
+vi.mock("@gitinspect/runtime/models/provider-registry", () => ({
   getProviderGroupMetadata: (provider: string) => ({
     label:
       provider === "anthropic"
@@ -58,7 +58,7 @@ vi.mock("@gitinspect/pi/models/provider-registry", () => ({
   getSortedApiKeyProvidersForSettings: () => [] as string[],
 }));
 
-vi.mock("@gitinspect/pi/proxy/settings", () => ({
+vi.mock("@gitinspect/runtime/proxy/settings", () => ({
   DEFAULT_PROXY_URL: "https://proxy.example/proxy",
   PROXY_ENABLED_KEY: "proxy-enabled",
   PROXY_URL_KEY: "proxy-url",
@@ -68,11 +68,11 @@ vi.mock("@gitinspect/pi/proxy/settings", () => ({
   }),
 }));
 
-vi.mock("@gitinspect/pi/auth/oauth-types", () => ({
+vi.mock("@gitinspect/runtime/auth/oauth-types", () => ({
   isOAuthCredentials: (value: string) => value.trim().startsWith("{"),
 }));
 
-vi.mock("@gitinspect/pi/auth/auth-service", () => ({
+vi.mock("@gitinspect/runtime/auth/auth-service", () => ({
   disconnectProvider: async (provider: string) => {
     state.providerKeys = state.providerKeys.filter((record) => record.provider !== provider);
   },

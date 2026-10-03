@@ -36,7 +36,7 @@ vi.mock("@/repo/github-fetch", () => ({
   handleGithubError: vi.fn(async () => false),
 }));
 
-vi.mock("@gitinspect/pi/repo/suggested-repos", () => ({
+vi.mock("@gitinspect/runtime/repo/suggested-repos", () => ({
   SUGGESTED_REPOS: [
     { owner: "anomalyco", ref: "dev", refOrigin: "explicit", repo: "opencode" },
     { owner: "acme", ref: "main", refOrigin: "default", repo: "demo" },

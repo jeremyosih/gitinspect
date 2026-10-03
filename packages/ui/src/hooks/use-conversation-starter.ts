@@ -3,20 +3,17 @@ import { useNavigate, useSearch } from "@tanstack/react-router";
 import { event as trackEvent } from "onedollarstats";
 import { toast } from "sonner";
 import type { ResolvedRepoSource } from "@gitinspect/db";
-import { runtimeClient } from "@gitinspect/pi/agent/runtime-client";
-import { getRuntimeCommandErrorMessage } from "@gitinspect/pi/agent/runtime-command-errors";
+import { runtimeClient } from "@gitinspect/runtime/agent/runtime-client";
+import { getRuntimeCommandErrorMessage } from "@gitinspect/runtime/agent/runtime-command-errors";
 import {
   createSessionForChat,
   createSessionForRepo,
   persistLastUsedSessionSettings,
-} from "@gitinspect/pi/sessions/session-actions";
-import { getCanonicalProvider } from "@gitinspect/pi/models/catalog";
-import type { ProviderGroupId, ThinkingLevel } from "@gitinspect/pi/types/models";
+} from "@gitinspect/runtime/sessions/session-actions";
+import { getCanonicalProvider } from "@gitinspect/runtime/models/catalog";
+import type { ProviderGroupId, ThinkingLevel } from "@gitinspect/runtime/types/models";
 import type { PendingAuthAction } from "@gitinspect/ui/components/github-auth-context";
-import {
-  useMessageEntitlementGuard,
-  useModelAccessGuard,
-} from "@gitinspect/ui/hooks/use-chat-send-guards";
+import { useModelAccessGuard } from "@gitinspect/ui/hooks/use-chat-send-guards";
 
 function getCurrentRoute(): string {
   if (typeof window === "undefined") {
@@ -31,7 +28,6 @@ export function useConversationStarter() {
   const search = useSearch({ strict: false });
   const settings = typeof search.settings === "string" ? search.settings : undefined;
   const sidebar = search.sidebar === "open" ? "open" : undefined;
-  const { ensureMessageEntitlement, refreshMessageEntitlement } = useMessageEntitlementGuard();
   const { requireModelAccess } = useModelAccessGuard();
   const [isStartingSession, setIsStartingSession] = React.useState(false);
 
@@ -50,7 +46,7 @@ export function useConversationStarter() {
       }
 
       if (
-        !requireModelAccess({
+        !(await requireModelAccess({
           postAuthAction: input.postAuthAction ?? {
             content: input.initialPrompt,
             route: getCurrentRoute(),
@@ -58,12 +54,8 @@ export function useConversationStarter() {
           },
           providerGroup: input.providerGroup,
           variant: "first-message",
-        })
+        }))
       ) {
-        return undefined;
-      }
-
-      if (!(await ensureMessageEntitlement({ providerGroup: input.providerGroup }))) {
         return undefined;
       }
 
@@ -100,7 +92,6 @@ export function useConversationStarter() {
           to: "/chat/$sessionId",
         });
 
-        await refreshMessageEntitlement({ providerGroup: input.providerGroup });
         void persistLastUsedSessionSettings(session);
         return session;
       } catch (error) {
@@ -114,15 +105,7 @@ export function useConversationStarter() {
         setIsStartingSession(false);
       }
     },
-    [
-      ensureMessageEntitlement,
-      isStartingSession,
-      navigate,
-      refreshMessageEntitlement,
-      requireModelAccess,
-      settings,
-      sidebar,
-    ],
+    [isStartingSession, navigate, requireModelAccess, settings, sidebar],
   );
 
   return {

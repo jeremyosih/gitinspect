@@ -1,5 +1,5 @@
-import { getIsoNow } from "@gitinspect/pi/lib/dates";
-import type { ProviderId } from "@gitinspect/pi/types/models";
+import { getIsoNow } from "@gitinspect/shared/lib/dates";
+import type { ProviderId } from "@gitinspect/shared/types/models";
 import { db } from "./db";
 import type { ProviderKeyRecord } from "./types";
 

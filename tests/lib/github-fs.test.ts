@@ -159,9 +159,10 @@ describe("GitHubFs", () => {
       "commits/commit-sha": mockCommitResponse,
       "contents/nonexistent": null,
       "contents/src/index.ts": mockFileContent,
+      "git/blobs/abc123": mockFileContent,
       "contents/src?ref=commit-sha": mockDirContent,
-      "contents/?ref=commit-sha": mockRootDirContent,
       "git/trees/tree-sha?recursive=1": mockTreeResponse,
+      "contents/?ref=commit-sha": mockRootDirContent,
     });
     vi.stubGlobal("fetch", fetchSpy);
 
@@ -178,7 +179,7 @@ describe("GitHubFs", () => {
   });
 
   describe("readFile", () => {
-    it("reads a file via Contents API", async () => {
+    it("reads a file by immutable blob SHA", async () => {
       const content = await fs.readFile("src/index.ts");
       expect(content).toBe("export const hello = 'world';");
     });
@@ -195,6 +196,7 @@ describe("GitHubFs", () => {
         "git/ref/heads/main": { object: { sha: "commit-sha", type: "commit" } },
         "commits/commit-sha": mockCommitResponse,
         "contents/src?ref=commit-sha": mockDirContent,
+        "git/trees/tree-sha?recursive=1": mockTreeResponse,
       });
       vi.stubGlobal("fetch", fetchSpy);
       fs = new GitHubFs({ owner: "o", ref: MAIN_REF, repo: "r" });
@@ -221,7 +223,7 @@ describe("GitHubFs", () => {
   describe("readdir", () => {
     it("treats dot as the repository root", async () => {
       const entries = await fs.readdir(".");
-      expect(entries).toEqual(["src", "README.md", "link"]);
+      expect(entries).toEqual(["link", "README.md", "src"]);
     });
 
     it("lists directory entries", async () => {
@@ -239,7 +241,7 @@ describe("GitHubFs", () => {
   });
 
   describe("stat", () => {
-    it("returns file stat from Contents API", async () => {
+    it("returns file stat from the snapshot index", async () => {
       const info = await fs.stat("src/index.ts");
       expect(info.isFile).toBe(true);
       expect(info.isDirectory).toBe(false);
@@ -292,7 +294,7 @@ describe("GitHubFs", () => {
 
     it("correctly identifies symlinks in tree", async () => {
       await fs.tree();
-      const info = await fs.stat("link");
+      const info = await fs.lstat("link");
       expect(info.isSymbolicLink).toBe(true);
     });
 

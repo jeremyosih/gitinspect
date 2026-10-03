@@ -654,7 +654,7 @@ describe("db schema helpers", () => {
     }
   });
 
-  it("recreates public share tables after schema v9", async () => {
+  it("removes obsolete cloud share tables while retaining local checkpoints", async () => {
     const name = `gitinspect-restored-share-schema-${Date.now()}`;
     const legacyDb = new Dexie(name);
 
@@ -666,8 +666,10 @@ describe("db schema helpers", () => {
     await migratedDb.open();
 
     const tableNames = migratedDb.tables.map((table) => table.name);
-    expect(tableNames).toEqual(expect.arrayContaining(["publicMessages", "publicSessions"]));
+    expect(tableNames).toEqual(expect.arrayContaining(["fx_checkpoints"]));
     expect(tableNames).not.toContain("shareOwners");
+    expect(tableNames).not.toContain("publicMessages");
+    expect(tableNames).not.toContain("publicSessions");
 
     migratedDb.close();
     await Dexie.delete(name);

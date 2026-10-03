@@ -1,6 +1,6 @@
-import { getCurrentTabId, getCurrentTabIdIfAvailable } from "@gitinspect/pi/agent/tab-id";
-import { getIsoNow } from "@gitinspect/pi/lib/dates";
-import { createId } from "@gitinspect/pi/lib/ids";
+import { getCurrentTabId, getCurrentTabIdIfAvailable } from "@gitinspect/shared/lib/tab-id";
+import { getIsoNow } from "@gitinspect/shared/lib/dates";
+import { createId } from "@gitinspect/shared/lib/ids";
 import { db } from "./db";
 import { deleteSessionLease, getSessionLease } from "./sessions";
 import type { SessionLeaseRow } from "./types";

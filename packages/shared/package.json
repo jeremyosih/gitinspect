@@ -4,7 +4,10 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./feedback": "./src/feedback.ts"
+    "./*": {
+      "types": "./src/*.ts",
+      "default": "./src/*.ts"
+    }
   },
   "dependencies": {
     "zod": "catalog:"

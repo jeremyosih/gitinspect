@@ -12,9 +12,9 @@ You can replace `hub` with `inspect` in any GitHub URL to open the corresponding
 
 ## Privacy
 
-**We don’t run a backend that stores your chats or credentials.** Session history, model choice, app settings, optional GitHub token, provider keys / OAuth, and usage totals live **only in this browser** (IndexedDB via [Dexie](https://github.com/dexie/Dexie.js)).
+**Chats and credentials stay in this browser by default**, in IndexedDB via [Dexie](https://github.com/dexie/Dexie.js). There is no account sync. Publishing a share uploads a public transcript snapshot to a Cloudflare Durable Object; unpublishing removes that public snapshot. Provider credentials and fx checkpoints stay local.
 
-**The app still uses the network:** Your browser calls **GitHub’s API** directly to load repository data. When you use **your own** provider keys, chat goes to those providers (you can route via **Settings → Proxy**). The **bundled free tier** is different: chat goes through **gitinspect’s server proxy** (`/api/proxy`) so we can rate-limit, rotate a shared host key, and reduce abuse—see the next section.
+Your browser calls GitHub and the model provider you connect. Provider requests can use the proxy configured in Settings. There is no bundled model key, paid plan, or billing service.
 
 ---
 
@@ -25,7 +25,7 @@ You can replace `hub` with `inspect` in any GitHub URL to open the corresponding
 | **Settings → Providers** | LLM API keys / OAuth. Use this for the models you want and for providers you pay for.                                                   |
 | **Settings → GitHub**    | Optional **PAT** stored only in this browser: higher GitHub API rate limits (60/h → 5,000/h) and richer repo metadata where applicable. |
 
-If you have **no provider configured**, the app still offers a **free tier** model in the picker (“Free (with limits)”). That path is **rate-limited** and **subject to the host’s terms**; traffic goes through **gitinspect’s proxy** (`/api/proxy`) so we can enforce limits and run the shared API key on the server—your prompts are not sent straight from the browser to the model host the way they are when you bring your own key.
+Connect your own API key or existing provider subscription in **Settings → Providers** to chat. ChatGPT subscription OAuth remains available separately from OpenAI API keys.
 
 ---
 
@@ -38,30 +38,32 @@ We use **Vercel** (hosting) and **OneDollar Stats** for **aggregate** traffic an
 ## How it works
 
 - **Research agent** — Pick a repository, chat in natural language; answers are grounded in the code.
-- **Stack** — [pi-mono](https://github.com/badlogic/pi-mono), read-only shell via [just-bash](https://github.com/vercel-labs/just-bash), virtual FS from the GitHub API [just-github](https://github.com/ThallesP/just-github).
-- **Local first** — Agent work runs in a per-tab `DedicatedWorker`; durable state stays on the main thread (IndexedDB).
-- **Resilient** — Lease ownership, runtime recovery, and interrupted-turn repair on the main thread; the worker improves responsiveness, not hidden-tab guarantees.
-- **Lazy loading** — Nothing prefetched at construction; everything on demand.
-- **Tree cache** — Full repo tree once via Git Trees API; `stat`, `exists`, `readdir` from cache.
-- **Content cache** — File contents by blob SHA (content-addressable).
-- **Smart API selection** — Contents API for small files; raw endpoint for large files (>1 MB).
+- **Stack** — [fx/libfx](https://fx.sh/) owns the agent loop and conversation checkpoints. [Effect](https://effect.website/) owns runtime resource scopes, serialized operations, HTTP concurrency and cancellation. The existing read-only [just-bash](https://github.com/vercel-labs/just-bash) shell uses `@gitinspect/vfs`.
+- **Browser storage** — The app stores opaque fx checkpoints in a Dexie table, atomically with turn completion. Fx supplies checkpoint bytes; the host owns IndexedDB persistence. Transcript hashes and repository identity prevent restoring stale checkpoints. Existing conversations retain their UI transcript and seed fx with historical context on their first new turn.
+- **Providers** — Host fetch adapts fx's AI SDK v4 protocol to provider SDKs. No AI Gateway account is required. ChatGPT subscription login uses the existing OAuth flow, refresh token and ChatGPT account ID against the Codex Responses endpoint; it is separate from an OpenAI API key. The CLI's four-provider login helper still uses the upstream OAuth utility; Pi is absent from the browser agent runtime.
+- **Workers** — Agent work and durable turn writes run in a per-tab DedicatedWorker. The main thread manages leases, observes IndexedDB, and repairs interrupted sessions. Workers do not guarantee background-tab execution.
+- **Snapshots** — All repository reads use one immutable commit. A new snapshot resolves a changed branch; refreshing its caches keeps the same commit. Completed conversations retain the commit across worker restarts.
+- **Trees** — Concurrent tree loads share one request. Complete trees have indexed directory children. Truncated recursive responses fall back to complete non-recursive directory trees, fetched lazily, so missing entries never become false `ENOENT` results.
+- **Blobs** — Canonical bytes cached by SHA serve both text and binary reads. In-flight fetches are shared; cancelling one reader does not cancel other readers. The final cancellation aborts HTTP. The cache refuses oversized entries. Four retained worker snapshots have a combined 50 MiB content budget; active snapshots have the same individual bounds. Files default to a 10 MiB read limit and API responses to 32 MiB.
+- **Compatibility** — Browser fx requires WebAssembly JSPI (check `supportsJspi()`); unsupported browsers receive a clear runtime error. `libfx` is pinned at 0.0.12 because its SDK is experimental. No claim of faster model inference is implied by this migration.
 
 Inspired by [Sitegeist](https://sitegeist.ai), [btca](https://github.com/davis7dotsh/better-context) & [repogrep](https://repogrep.com).
 
 ---
 
-## Dexie Cloud local setup
+## Public sharing service
 
-If you want to test paid sync or public sharing locally:
+The web app can remain on its current host. `apps/sharing` is a standalone Cloudflare Worker with one SQLite-backed Durable Object per share; `packages/infra/alchemy.run.ts` defines it in Alchemy. Moving the full web app to Cloudflare is a separate decision.
 
-1. Create or connect a Dexie Cloud database.
-   - `npx dexie-cloud create`
-   - or `npx dexie-cloud connect`
-2. Whitelist your local and production origins.
-   - `npx dexie-cloud whitelist http://localhost:3001`
-   - `npx dexie-cloud whitelist https://gitinspect.com`
-3. Copy the generated URL, client id, and client secret into `apps/web/.env.example` values in your local `.env`.
-4. Keep `dexie-cloud.json` and `dexie-cloud.key` out of git. They are ignored in `.gitignore`.
+1. Copy `packages/infra/.env.example` to `.env` in that directory and set a random 32+ character `SHARING_SERVICE_SECRET`.
+2. Run `bun run --cwd packages/infra dev` for local Alchemy development (port 3002). Run `plan` to review cloud changes before using `deploy`.
+3. Configure the web server's `SHARING_SERVICE_URL` with that service URL and the same `SHARING_SERVICE_SECRET`. Neither is required for local chats; without them sharing returns 503.
+
+The web server authenticates the account and forwards mutations with a service secret. The DO keeps ownership private, preserves it across unpublish, and replaces each public snapshot in one SQL transaction. Public reads include only the selected transcript, never account IDs, provider keys or fx checkpoints. Payloads are validated and bounded at 2 MiB / 1,000 messages. Sharing needs GitHub sign-in; chatting with your own provider does not.
+
+Existing Dexie Cloud public snapshots are not copied automatically. Republish their local conversations after configuring the new service to keep the same share URLs. Private chats and credentials are preserved by the local database migration.
+
+The SQLite service is tested locally with Miniflare, including persistence across restart and ownership enforcement. Cloud resources have not been deployed by this cleanup. Retain the service and DO namespace when changing infrastructure; Alchemy's Worker has a retain removal policy.
 
 ---
 

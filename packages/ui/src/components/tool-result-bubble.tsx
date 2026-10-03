@@ -1,4 +1,4 @@
-import type { ToolResultMessage } from "@gitinspect/pi/types/chat";
+import type { ToolResultMessage } from "@gitinspect/runtime/types/chat";
 import { Badge } from "@gitinspect/ui/components/badge";
 
 interface BashDetails {

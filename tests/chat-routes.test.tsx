@@ -20,15 +20,15 @@ vi.mock("@gitinspect/ui/components/chat", () => ({
   ),
 }));
 
-vi.mock("@gitinspect/pi/repo/path-parser", () => ({
+vi.mock("@gitinspect/runtime/repo/path-parser", () => ({
   parseRepoRoutePath: (path: string) => parseRepoRoutePathMock(path),
 }));
 
-vi.mock("@gitinspect/pi/repo/ref-resolver", () => ({
+vi.mock("@gitinspect/runtime/repo/ref-resolver", () => ({
   resolveRepoIntent: (intent: unknown) => resolveRepoIntentMock(intent),
 }));
 
-vi.mock("@gitinspect/pi/repo/path-intent", () => ({
+vi.mock("@gitinspect/runtime/repo/path-intent", () => ({
   toResolvedRepoSource: (location: unknown) => toResolvedRepoSourceMock(location),
 }));
 

@@ -169,16 +169,15 @@ describe("resolveStoredApiKey", () => {
     );
   });
 
-  it("falls back to the bundled public key for the Fireworks free group", async () => {
+  it("requires a stored credential even for legacy hosted-model groups", async () => {
     const { resolveApiKeyForProvider } = await import("@/auth/resolve-api-key");
     const { getProviderKey } = await import("@gitinspect/db");
-    const { FIREWORKS_FREE_PROXY_MARKER } = await import("@/auth/public-provider-fallbacks");
 
     vi.mocked(getProviderKey).mockResolvedValue(undefined);
 
-    await expect(resolveApiKeyForProvider("fireworks-ai", "fireworks-free")).resolves.toBe(
-      FIREWORKS_FREE_PROXY_MARKER,
-    );
+    await expect(
+      resolveApiKeyForProvider("fireworks-ai", "fireworks-free"),
+    ).resolves.toBeUndefined();
   });
 
   it("does not use the bundled public key for full OpenCode", async () => {

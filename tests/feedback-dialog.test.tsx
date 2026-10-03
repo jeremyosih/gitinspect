@@ -31,7 +31,20 @@ vi.mock("@tanstack/react-router", () => ({
         },
       ],
     }),
-  useSearch: () => state.search,
+  useSearch: () => {
+    const [, render] = React.useReducer((value: number) => value + 1, 0);
+    React.useEffect(() => {
+      state.navigate.mockImplementation(
+        ({ search }: { search?: (prev: Record<string, unknown>) => Record<string, unknown> }) => {
+          if (search) {
+            state.search = search(state.search);
+            render();
+          }
+        },
+      );
+    }, []);
+    return state.search;
+  },
 }));
 
 vi.mock("next-themes", () => ({
@@ -48,7 +61,7 @@ vi.mock("sonner", () => ({
   },
 }));
 
-vi.mock("@gitinspect/pi/hooks/use-selected-session-summary", () => ({
+vi.mock("@gitinspect/runtime/hooks/use-selected-session-summary", () => ({
   useSelectedSessionSummary: () => ({
     model: "gpt-5-mini",
     provider: "openai-codex",
@@ -61,7 +74,7 @@ vi.mock("@gitinspect/pi/hooks/use-selected-session-summary", () => ({
   }),
 }));
 
-vi.mock("@gitinspect/pi/repo/path-parser", () => ({
+vi.mock("@gitinspect/runtime/repo/path-parser", () => ({
   parseRepoRoutePath: () => ({
     owner: "acme",
     repo: "demo",

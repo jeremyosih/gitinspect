@@ -64,12 +64,12 @@ describe("model catalog", () => {
     expect(getModel("github-copilot", "missing-model").id).toBe("gpt-4o");
   });
 
-  it("exposes the Fireworks free group and canonicalizes to fireworks-ai", () => {
-    expect(getProviderGroups()).toEqual(expect.arrayContaining(["opencode", "fireworks-free"]));
+  it("exposes Fireworks as an API-key provider and reads legacy group names", () => {
+    expect(getProviderGroups()).toEqual(expect.arrayContaining(["opencode", "fireworks-ai"]));
     expect(getCanonicalProvider("fireworks-free")).toBe("fireworks-ai");
   });
 
-  it("exposes the Fireworks free tier builtin model", () => {
+  it("keeps Fireworks model metadata for users with their own key", () => {
     const freeModels = getModelsForGroup("fireworks-free");
     expect(freeModels.map((m) => m.id)).toEqual([FIREWORKS_KIMI_K26_ID]);
     expect(getDefaultModelForGroup("fireworks-free").id).toBe(FIREWORKS_KIMI_K26_ID);

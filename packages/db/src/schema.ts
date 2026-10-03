@@ -4,8 +4,8 @@ import {
   createCommitRepoRef,
   createTagRepoRef,
   displayResolvedRepoRef,
-} from "@gitinspect/pi/repo/refs";
-import { normalizePersistedSessionState } from "@gitinspect/pi/sessions/session-state-normalization";
+} from "@gitinspect/shared/repo/refs";
+import { normalizePersistedSessionState } from "./session-state-normalization";
 import type {
   MessageRow,
   RepoRefOrigin,
@@ -446,4 +446,18 @@ export function registerAppDbSchema(db: Dexie): void {
     sessions: "id, updatedAt, createdAt, provider, model, isStreaming",
     settings: "key, updatedAt",
   });
+  db.version(10).stores({ fx_checkpoints: "sessionId, updatedAt" });
+  // Advance past the Cloud addon fractional versions, preserving private chats.
+  db.version(11)
+    .stores({ publicMessages: null, publicSessions: null })
+    .upgrade(async (tx) => {
+      for (const name of ["sessions", "messages"])
+        await tx
+          .table(name)
+          .toCollection()
+          .modify((row) => {
+            delete row.owner;
+            delete row.realmId;
+          });
+    });
 }

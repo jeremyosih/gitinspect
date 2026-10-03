@@ -1,493 +1,262 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { AgentTool } from "@mariozechner/pi-agent-core";
-import type { Message } from "@mariozechner/pi-ai";
+import { beforeEach, afterEach, describe, it, expect, vi } from "vitest";
 import {
+  db,
   deleteAllLocalData,
-  getSession,
   getSessionMessages,
   getSessionRuntime,
+  getSession,
+  putSession,
 } from "@gitinspect/db";
-import type { AssistantMessage } from "@/types/chat";
-import type { SessionData } from "@/types/storage";
-import { createEmptyUsage } from "@/types/models";
-import { TEST_REPO_SOURCE } from "./repo-test-utils";
+import type { SessionData } from "@gitinspect/db";
+import type { FxEvent, FxOptions, FxTurn } from "../packages/runtime/src/agent/fx-types";
 
-type MockAgentEvent =
-  | {
-      message: AssistantMessage;
-      type: "message_end" | "message_start" | "message_update";
-    }
-  | {
-      type: "tool_execution_end" | "tool_execution_start" | "tool_execution_update";
-    }
-  | {
-      type: "agent_start" | "turn_start" | "turn_end";
-    };
-
-type MockAgentState = {
-  error: string | undefined;
-  isStreaming: boolean;
-  messages: Array<Message>;
-  model: {
-    id: string;
-    provider: string;
-  };
-  streamMessage: Message | null;
-  thinkingLevel: "medium";
-};
-
-type Subscriber = (event: MockAgentEvent) => void;
-
-let subscriber: Subscriber | undefined;
-let resolvePrompt: (() => void) | undefined;
-let onRepoError: ((error: unknown) => void | Promise<void>) | undefined;
-
-const agentState: MockAgentState = {
-  error: undefined,
-  isStreaming: false,
-  messages: [],
-  model: {
-    id: "gpt-5.4",
-    provider: "openai-codex",
-  },
-  streamMessage: null,
-  thinkingLevel: "medium",
-};
-
-const promptMock = vi.fn(async (_message: Message & { id: string }): Promise<void> => {});
-const abortMock = vi.fn(() => {});
-const setModelMock = vi.fn((_model: { id: string; provider: string }): void => {});
-const setThinkingLevelMock = vi.fn((_thinkingLevel: "medium" | "off" | "high"): void => {});
-const setToolsMock = vi.fn((_tools: Array<AgentTool>): void => {});
-
-vi.mock("@/auth/resolve-api-key", () => ({
-  resolveApiKeyForProvider: vi.fn(async () => undefined),
+const mocks = vi.hoisted(() => ({
+  create: vi.fn(),
+  close: vi.fn(),
+  checkpoint: vi.fn(),
+  supports: vi.fn(() => true),
+  auth: vi.fn(),
+  repoError: undefined as ((error: unknown) => Promise<void>) | undefined,
 }));
-
-vi.mock("@mariozechner/pi-agent-core", () => ({
-  Agent: class {
-    state = agentState;
-    sessionId = "";
-
-    subscribe(listener: Subscriber) {
-      subscriber = listener;
-      return () => {
-        subscriber = undefined;
-      };
-    }
-
-    prompt = promptMock;
-    abort = abortMock;
-    setModel = setModelMock;
-    setThinkingLevel = setThinkingLevelMock;
-    setTools = setToolsMock;
-  },
+vi.mock("libfx/browser", () => ({ createFxAgent: mocks.create, supportsJspi: mocks.supports }));
+vi.mock("@/auth/resolve-api-key", () => ({ resolveProviderAuthForProvider: mocks.auth }));
+vi.mock("@/agent/provider-stream", () => ({
+  createProviderModel: async () => ({}),
+  createFxFetch: () => fetch,
 }));
-
+vi.mock("@/repo/repo-runtime", () => ({
+  createOptionalRepoRuntime: (source: unknown) =>
+    source ? { fs: { snapshotCommit: async () => "pinned-sha" } } : undefined,
+}));
 vi.mock("@/tools", () => ({
-  createRepoTools: vi.fn(
-    (
-      _runtime: unknown,
-      options?: {
-        onRepoError?: (error: unknown) => void | Promise<void>;
-      },
-    ) => {
-      onRepoError = options?.onRepoError;
-
-      return {
-        agentTools: [] as AgentTool[],
-      };
-    },
-  ),
+  createRepoTools: (_runtime: unknown, options: any) => {
+    mocks.repoError = options.onRepoError;
+    return { agentTools: [] };
+  },
 }));
 
-function createSession(): SessionData {
+function session(): SessionData {
   return {
-    cost: 0,
-    createdAt: "2026-03-24T12:00:00.000Z",
-    error: undefined,
     id: "session-1",
-    isStreaming: false,
-    messageCount: 0,
-    model: "gpt-5.4",
+    title: "",
     preview: "",
+    cost: 0,
+    messageCount: 0,
+    isStreaming: false,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    model: "gpt-5.4",
     provider: "openai-codex",
     providerGroup: "openai-codex",
-    repoSource: {
-      ...TEST_REPO_SOURCE,
-      owner: "acme",
-      repo: "demo",
-    },
     thinkingLevel: "medium",
-    title: "New chat",
-    updatedAt: "2026-03-24T12:00:00.000Z",
-    usage: createEmptyUsage(),
   };
 }
-
-function createAssistantMessage(overrides: Partial<AssistantMessage> = {}): AssistantMessage {
+function input(text = "hello", id = "user-1") {
   return {
-    api: "openai-responses",
-    content: [{ text: "Done", type: "text" }],
-    id: "assistant-1",
-    model: "gpt-5.4",
-    provider: "openai-codex",
-    role: "assistant",
-    stopReason: "stop",
-    timestamp: 2,
-    usage: createEmptyUsage(),
-    ...overrides,
-  };
-}
-
-function createTurn() {
-  return {
-    turnId: "turn-1",
-    userMessage: {
-      content: "hello",
-      id: "user-1",
-      role: "user" as const,
-      timestamp: 1,
+    ownerTabId: "tab-1",
+    session: session(),
+    turn: {
+      turnId: `turn-${id}`,
+      userMessage: { id, role: "user" as const, content: text, timestamp: Date.now() },
     },
   };
 }
-
-async function flushMicrotasks(): Promise<void> {
-  await Promise.resolve();
-  await Promise.resolve();
-}
-
-async function sleep(ms: number): Promise<void> {
-  await new Promise<void>((resolve) => {
-    setTimeout(resolve, ms);
-  });
-}
-
-describe("runtime worker", () => {
-  beforeEach(async () => {
-    vi.resetModules();
-    vi.useRealTimers();
-    await deleteAllLocalData();
-    promptMock.mockReset();
-    abortMock.mockReset();
-    setModelMock.mockClear();
-    setThinkingLevelMock.mockClear();
-    setToolsMock.mockClear();
-    subscriber = undefined;
-    resolvePrompt = undefined;
-    onRepoError = undefined;
-    agentState.error = undefined;
-    agentState.isStreaming = false;
-    agentState.messages = [];
-    agentState.streamMessage = null;
-  });
-
-  it("persists the user row immediately and coalesces runtime draft updates", async () => {
-    promptMock.mockImplementation(async () => {
-      agentState.isStreaming = true;
-
-      for (const text of ["A", "AB", "ABC"]) {
-        const assistant = createAssistantMessage({
-          content: [{ text, type: "text" }],
-          id: "assistant-stream",
-          stopReason: "toolUse",
-        });
-        agentState.streamMessage = assistant;
-        subscriber?.({
-          message: assistant,
-          type: "message_update",
-        });
+function deferredTurn() {
+  const events: FxEvent[] = [];
+  let finished = false;
+  let wake: () => void = () => {};
+  let resolveResult!: (result: any) => void;
+  const result = new Promise<any>((resolve) => (resolveResult = resolve));
+  const turn: FxTurn = {
+    result,
+    cancel: vi.fn(() => finish("cancelled")),
+    async *[Symbol.asyncIterator]() {
+      while (!finished || events.length) {
+        if (events.length) yield events.shift()!;
+        else await new Promise<void>((resolve) => (wake = resolve));
       }
+    },
+  };
+  function push(event: FxEvent) {
+    events.push(event);
+    wake();
+  }
+  function finish(stopReason = "end_turn") {
+    finished = true;
+    resolveResult({ stopReason, usage: { inputTokens: 5, outputTokens: 2 } });
+    wake();
+  }
+  return { turn, push, finish };
+}
+let turns: ReturnType<typeof deferredTurn>[] = [];
+let worker: typeof import("@/agent/runtime-worker");
+async function started() {
+  await vi.waitFor(() => expect(mocks.create).toHaveBeenCalled());
+  await vi.waitFor(() => expect(turns.length).toBeGreaterThan(0));
+  return turns.at(-1)!;
+}
 
-      await new Promise<void>((resolve) => {
-        resolvePrompt = () => {
-          const assistant = createAssistantMessage({
-            content: [{ text: "Finished", type: "text" }],
-            id: "assistant-final",
-          });
-          agentState.isStreaming = false;
-          agentState.streamMessage = null;
-          subscriber?.({
-            message: assistant,
-            type: "message_end",
-          });
-          resolve();
-        };
-      });
-    });
+beforeEach(async () => {
+  vi.clearAllMocks();
+  await deleteAllLocalData();
+  turns = [];
+  mocks.supports.mockReturnValue(true);
+  mocks.auth.mockResolvedValue({
+    apiKey: "test",
+    isOAuth: false,
+    provider: "openai-codex",
+    storedValue: "test",
+  });
+  mocks.checkpoint.mockResolvedValue(new Uint8Array([1, 2, 3]));
+  mocks.close.mockResolvedValue(undefined);
+  mocks.create.mockImplementation(async (_options: FxOptions) => ({
+    prompt: () => {
+      const turn = deferredTurn();
+      turns.push(turn);
+      return turn.turn;
+    },
+    checkpoint: mocks.checkpoint,
+    close: mocks.close,
+  }));
+  worker = await import("@/agent/runtime-worker");
+});
+afterEach(async () => {
+  await worker.disposeSession("session-1");
+});
 
-    const worker = await import("@/agent/runtime-worker");
-
-    await worker.startTurn({
-      ownerTabId: "tab-1",
-      session: createSession(),
-      turn: createTurn(),
-    });
-
+describe("fx runtime worker", () => {
+  it("persists the user immediately, streams, and commits a checkpoint with completion", async () => {
+    await worker.startTurn(input());
     expect(await getSessionMessages("session-1")).toEqual([
-      expect.objectContaining({
-        id: "user-1",
-        order: 0,
-        role: "user",
-      }),
+      expect.objectContaining({ id: "user-1", order: 0 }),
     ]);
-
-    await sleep(70);
-
-    expect(await getSessionRuntime("session-1")).toMatchObject({
-      ownerTabId: "tab-1",
-      phase: "running",
-      status: "streaming",
-      streamMessage: expect.objectContaining({
-        content: [{ text: "ABC", type: "text" }],
-      }),
-    });
-
-    resolvePrompt?.();
-    await flushMicrotasks();
-
-    expect(await worker.waitForTurn("session-1")).toEqual({
-      sessionId: "session-1",
-      status: "completed",
-    });
-    expect(await getSessionMessages("session-1")).toEqual([
-      expect.objectContaining({ id: "user-1", order: 0, role: "user" }),
-      expect.objectContaining({ id: "assistant-final", order: 1, role: "assistant" }),
-    ]);
-    expect(await getSessionRuntime("session-1")).toMatchObject({
-      phase: "idle",
-      status: "completed",
-      streamMessage: undefined,
-    });
-  });
-
-  it("preserves an interrupted draft in runtime when aborted", async () => {
-    abortMock.mockImplementation(() => {
-      agentState.isStreaming = false;
-      resolvePrompt?.();
-    });
-
-    promptMock.mockImplementation(async () => {
-      agentState.isStreaming = true;
-      const assistant = createAssistantMessage({
-        content: [{ text: "Partial", type: "text" }],
-        id: "assistant-stream",
-        stopReason: "toolUse",
-      });
-      agentState.streamMessage = assistant;
-      subscriber?.({
-        message: assistant,
-        type: "message_update",
-      });
-
-      await new Promise<void>((resolve) => {
-        resolvePrompt = resolve;
-      });
-    });
-
-    const worker = await import("@/agent/runtime-worker");
-
-    await worker.startTurn({
-      ownerTabId: "tab-1",
-      session: createSession(),
-      turn: createTurn(),
-    });
-    await sleep(70);
-
-    await worker.abortTurn("session-1");
-    await flushMicrotasks();
-
-    expect(await worker.waitForTurn("session-1")).toEqual({
-      sessionId: "session-1",
-      status: "aborted",
-    });
-    expect(await getSessionMessages("session-1")).toHaveLength(1);
-    expect(await getSessionRuntime("session-1")).toMatchObject({
-      phase: "interrupted",
-      status: "aborted",
-      streamMessage: expect.objectContaining({
-        content: [{ text: "Partial", type: "text" }],
-      }),
-    });
-  });
-
-  it("persists runtime notices for actionable repo errors", async () => {
-    abortMock.mockImplementation(() => {
-      agentState.isStreaming = false;
-      resolvePrompt?.();
-    });
-
-    promptMock.mockImplementation(async () => {
-      agentState.isStreaming = true;
-      const assistant = createAssistantMessage({
-        content: [{ text: "Reading...", type: "text" }],
-        id: "assistant-stream",
-        stopReason: "toolUse",
-      });
-      agentState.streamMessage = assistant;
-      subscriber?.({
-        message: assistant,
-        type: "message_update",
-      });
-
-      await new Promise<void>((resolve) => {
-        resolvePrompt = resolve;
-      });
-    });
-
-    const worker = await import("@/agent/runtime-worker");
-    const repoModule = await import("@/lib/github");
-
-    await worker.startTurn({
-      ownerTabId: "tab-1",
-      session: createSession(),
-      turn: createTurn(),
-    });
-
-    await onRepoError?.(new repoModule.GitHubFsError("EACCES", "Authentication required: /", "/"));
-    await flushMicrotasks();
-
-    expect(abortMock).toHaveBeenCalledTimes(1);
-    expect(await getSessionMessages("session-1")).toEqual(
-      expect.arrayContaining([expect.objectContaining({ role: "system", source: "github" })]),
-    );
-    expect(await getSessionRuntime("session-1")).toMatchObject({
-      phase: "running",
-      status: "streaming",
-    });
-
-    await worker.disposeSession("session-1");
-  });
-
-  it("routes idle configuration changes through the worker", async () => {
-    const worker = await import("@/agent/runtime-worker");
-    const session = createSession();
-
-    await worker.setModelSelection({
-      modelId: "gpt-5.5",
-      providerGroup: "openai-codex",
-      sessionId: session.id,
-    });
-
-    await worker.setThinkingLevel({
-      sessionId: session.id,
-      thinkingLevel: "high",
-    });
-
-    const persisted = await getSession(session.id);
-    expect(persisted).toBeUndefined();
-
-    await worker.startTurn({
-      ownerTabId: "tab-1",
-      session,
-      turn: createTurn(),
-    });
-    await worker.disposeSession(session.id);
-  });
-
-  it("does not write a late assistant draft after completion", async () => {
-    promptMock.mockImplementation(async () => {
-      await new Promise<void>((resolve) => {
-        resolvePrompt = () => {
-          const assistant = createAssistantMessage({
-            content: [{ text: "Finished", type: "text" }],
-            id: "assistant-final",
-          });
-          agentState.isStreaming = false;
-          agentState.streamMessage = null;
-          subscriber?.({
-            message: assistant,
-            type: "message_end",
-          });
-          resolve();
-        };
-      });
-    });
-
-    const worker = await import("@/agent/runtime-worker");
-
-    await worker.startTurn({
-      ownerTabId: "tab-1",
-      session: createSession(),
-      turn: createTurn(),
-    });
-
-    resolvePrompt?.();
-    await flushMicrotasks();
-    expect(await worker.waitForTurn("session-1")).toEqual({
-      sessionId: "session-1",
-      status: "completed",
-    });
-
-    const lateDraft = createAssistantMessage({
-      content: [{ text: "late", type: "text" }],
-      id: "assistant-late",
-      stopReason: "toolUse",
-    });
-    agentState.streamMessage = lateDraft;
-    subscriber?.({
-      message: lateDraft,
-      type: "message_update",
-    });
-    await sleep(70);
-
-    expect(await getSessionRuntime("session-1")).toMatchObject({
-      phase: "idle",
-      status: "completed",
-      streamMessage: undefined,
-    });
-    expect(await getSessionMessages("session-1")).not.toEqual(
-      expect.arrayContaining([expect.objectContaining({ id: "assistant-late" })]),
-    );
-  });
-
-  it("serializes startTurn and appendSessionNotice through one coordinator queue", async () => {
-    promptMock.mockImplementation(async () => {
-      agentState.isStreaming = true;
-      await new Promise<void>((resolve) => {
-        resolvePrompt = () => {
-          const assistant = createAssistantMessage({
-            content: [{ text: "Finished", type: "text" }],
-            id: "assistant-final",
-          });
-          agentState.isStreaming = false;
-          agentState.streamMessage = null;
-          subscriber?.({
-            message: assistant,
-            type: "message_end",
-          });
-          resolve();
-        };
-      });
-    });
-
-    const worker = await import("@/agent/runtime-worker");
-
-    await worker.startTurn({
-      ownerTabId: "tab-1",
-      session: createSession(),
-      turn: createTurn(),
-    });
-
-    const noticePromise = worker.appendSessionNotice({
-      error: "boom",
-      sessionId: "session-1",
-    });
-    resolvePrompt?.();
-    await noticePromise;
-    await flushMicrotasks();
-    await worker.waitForTurn("session-1");
-
-    const messages = await getSessionMessages("session-1");
-
-    expect(messages[0]).toEqual(expect.objectContaining({ id: "user-1", role: "user" }));
-    expect(new Set(messages.map((message) => message.order)).size).toBe(messages.length);
-    expect(messages.map((message) => message.order)).toEqual([0, 1, 2]);
-    expect(messages).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ id: "assistant-final", role: "assistant" }),
-        expect.objectContaining({ role: "system" }),
+    const turn = await started();
+    turn.push({ type: "text_delta", delta: "Hello" });
+    await vi.waitFor(async () =>
+      expect((await getSessionRuntime("session-1"))?.streamMessage?.content).toEqual([
+        { type: "text", text: "Hello" },
       ]),
     );
+    turn.push({ type: "text_delta", delta: " world" });
+    turn.finish();
+    expect(await worker.waitForTurn("session-1")).toEqual({
+      sessionId: "session-1",
+      status: "completed",
+    });
+    expect((await getSessionMessages("session-1"))[1]).toMatchObject({
+      role: "assistant",
+      content: [{ type: "text", text: "Hello world" }],
+      usage: { input: 5, output: 2 },
+    });
+    expect(Array.from((await db.fxCheckpoints.get("session-1"))!.bytes)).toEqual([1, 2, 3]);
+    expect(await getSessionRuntime("session-1")).toMatchObject({
+      phase: "idle",
+      streamMessage: undefined,
+    });
+    expect(mocks.close).toHaveBeenCalledOnce();
+  });
+  it("cancels fx, keeps the interrupted draft, and never saves an aborted checkpoint", async () => {
+    await worker.startTurn(input());
+    const turn = await started();
+    turn.push({ type: "text_delta", delta: "Partial" });
+    await vi.waitFor(async () =>
+      expect((await getSessionRuntime("session-1"))?.streamMessage).toBeDefined(),
+    );
+    await worker.abortTurn("session-1");
+    expect(await worker.waitForTurn("session-1")).toMatchObject({ status: "aborted" });
+    expect(turn.turn.cancel).toHaveBeenCalled();
+    expect(await db.fxCheckpoints.get("session-1")).toBeUndefined();
+    expect(await getSessionRuntime("session-1")).toMatchObject({
+      phase: "interrupted",
+      streamMessage: { content: [{ type: "text", text: "Partial" }] },
+    });
+    expect(mocks.close).toHaveBeenCalledOnce();
+  });
+  it("links fx tool results to their assistant row", async () => {
+    await worker.startTurn(input());
+    const turn = await started();
+    turn.push({ type: "tool_start", id: "call-1", name: "read", input: { path: "README.md" } });
+    turn.push({ type: "tool_end", id: "call-1", name: "read", content: "README", isError: false });
+    turn.push({ type: "text_delta", delta: "Done" });
+    turn.finish();
+    await worker.waitForTurn("session-1");
+    const rows = await getSessionMessages("session-1");
+    expect(rows[2]).toMatchObject({
+      role: "toolResult",
+      parentAssistantId: rows[1]!.id,
+      toolCallId: "call-1",
+    });
+    expect(rows.map((row) => row.order)).toEqual([0, 1, 2, 3]);
+  });
+  it("restores only checkpoints matching the persisted transcript", async () => {
+    await worker.startTurn(input());
+    let turn = await started();
+    turn.push({ type: "text_delta", delta: "First" });
+    turn.finish();
+    await worker.waitForTurn("session-1");
+    await worker.disposeSession("session-1");
+    await worker.startTurn(input("continue", "user-2"));
+    await vi.waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(2));
+    expect(Array.from(mocks.create.mock.calls[1]![0].checkpoint)).toEqual([1, 2, 3]);
+    turn = turns.at(-1)!;
+    turn.finish();
+    await worker.waitForTurn("session-1");
+    await worker.disposeSession("session-1");
+    const row = (await getSessionMessages("session-1"))[1]!;
+    await db.messages.put({ ...row, content: [{ type: "text", text: "edited" }] } as any);
+    await worker.startTurn(input("again", "user-3"));
+    await vi.waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(3));
+    expect(mocks.create.mock.calls[2]![0].checkpoint).toBeUndefined();
+    turns.at(-1)!.finish();
+    await worker.waitForTurn("session-1");
+  });
+  it("closes fx and records an error if checkpoint persistence fails", async () => {
+    mocks.checkpoint.mockRejectedValueOnce(new Error("Checkpoint failed"));
+    await worker.startTurn(input());
+    const turn = await started();
+    turn.push({ type: "text_delta", delta: "Done" });
+    turn.finish();
+    expect(await worker.waitForTurn("session-1")).toMatchObject({
+      status: "error",
+      lastError: "Checkpoint failed",
+    });
+    expect(mocks.close).toHaveBeenCalledOnce();
+    expect(await db.fxCheckpoints.get("session-1")).toBeUndefined();
+  });
+  it("keeps model and thinking settings in IndexedDB", async () => {
+    await putSession(session());
+    await worker.setModelSelection({
+      sessionId: "session-1",
+      providerGroup: "openai",
+      modelId: "gpt-5.4-mini",
+    });
+    await worker.setThinkingLevel({ sessionId: "session-1", thinkingLevel: "high" });
+    expect(await getSession("session-1")).toMatchObject({
+      provider: "openai",
+      model: "gpt-5.4-mini",
+      thinkingLevel: "high",
+    });
+  });
+  it("reports a clear browser capability error without invoking fx", async () => {
+    mocks.supports.mockReturnValue(false);
+    await worker.startTurn(input());
+    expect(await worker.waitForTurn("session-1")).toMatchObject({
+      status: "error",
+      lastError: expect.stringContaining("JSPI"),
+    });
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+  it("serializes notices with a turn without duplicate transcript order", async () => {
+    await Promise.all([
+      worker.startTurn(input()),
+      worker.appendSessionNotice({ sessionId: "session-1", error: "Notice" }),
+    ]);
+    const turn = await started();
+    turn.push({ type: "text_delta", delta: "Done" });
+    turn.finish();
+    await worker.waitForTurn("session-1");
+    const rows = await getSessionMessages("session-1");
+    expect(rows.map((row) => row.order)).toEqual([0, 1, 2]);
+    expect(rows[1]!.role).toBe("system");
   });
 });

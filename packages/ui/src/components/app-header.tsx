@@ -1,9 +1,9 @@
 import * as React from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import type { ResolvedRepoSource } from "@gitinspect/db";
-import type { PublicSessionSnapshot } from "@gitinspect/pi/lib/public-share-client";
-import { useSelectedSessionSummary } from "@gitinspect/pi/hooks/use-selected-session-summary";
-import { githubOwnerAvatarUrl } from "@gitinspect/pi/repo/url";
+import type { PublicSessionSnapshot } from "@gitinspect/runtime/lib/public-share-client";
+import { useSelectedSessionSummary } from "@gitinspect/runtime/hooks/use-selected-session-summary";
+import { githubOwnerAvatarUrl } from "@gitinspect/runtime/repo/url";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -142,7 +142,7 @@ function HeaderTooltip({ children, label }: { children: React.ReactElement; labe
 const repoLinkClass =
   "whitespace-nowrap font-geist-pixel-square text-sm font-semibold leading-none tracking-tight text-foreground underline-offset-4 hover:underline sm:text-base";
 
-export function AppHeader({ showGetPro = true }: { showGetPro?: boolean } = {}) {
+export function AppHeader() {
   const navigate = useNavigate();
   const currentMatch = useRouterState({
     select: (state) => state.matches[state.matches.length - 1],
@@ -222,26 +222,6 @@ export function AppHeader({ showGetPro = true }: { showGetPro?: boolean } = {}) 
       </div>
       <div className="flex items-center gap-2 px-3 md:hidden">
         <AuthStatusChip />
-        {showGetPro ? (
-          <Button
-            asChild
-            aria-label="Open get pro"
-            className="h-8 gap-1.5 shadow-none"
-            size="sm"
-            variant="ghost"
-          >
-            <Link
-              search={(prev) => ({
-                ...prev,
-                settings: "pricing",
-              })}
-              to="."
-            >
-              <Icons.crown className="text-foreground" />
-              <span>Get Pro</span>
-            </Link>
-          </Button>
-        ) : null}
         <Button
           asChild
           aria-label="Open settings"
@@ -261,25 +241,6 @@ export function AppHeader({ showGetPro = true }: { showGetPro?: boolean } = {}) 
         </Button>
       </div>
       <div className="hidden items-center gap-2 px-3 md:flex">
-        {showGetPro ? (
-          <>
-            <Separator className="!h-6 !self-center" orientation="vertical" />
-            <HeaderTooltip label="Open get pro">
-              <Button asChild className="h-8 gap-1.5 shadow-none" size="sm" variant="ghost">
-                <Link
-                  search={(prev) => ({
-                    ...prev,
-                    settings: "pricing",
-                  })}
-                  to="."
-                >
-                  <Icons.crown className="text-foreground" />
-                  <span>Get Pro</span>
-                </Link>
-              </Button>
-            </HeaderTooltip>
-          </>
-        ) : null}
         <Separator className="!h-6 !self-center" orientation="vertical" />
         <GitHubLink />
         <Separator className="!h-6 !self-center" orientation="vertical" />

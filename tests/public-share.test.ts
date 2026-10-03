@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   buildForkPromptFromSharedSession,
   createPublicShareSnapshot,
-} from "@gitinspect/pi/lib/public-share";
+} from "@gitinspect/runtime/lib/public-share";
 import type { MessageRow, SessionData } from "@gitinspect/db";
-import { createEmptyUsage } from "@gitinspect/pi/types/models";
+import { createEmptyUsage } from "@gitinspect/runtime/types/models";
 
 function buildSession(): SessionData {
   return {
@@ -118,7 +118,6 @@ describe("public share snapshot", () => {
   it("filters system and streaming rows while keeping tool results", () => {
     const snapshot = createPublicShareSnapshot({
       messages: buildMessages(),
-      ownerUserId: "gh_owner",
       publishedAt: "2026-04-16T12:06:00.000Z",
       session: buildSession(),
       updatedAt: "2026-04-16T12:06:00.000Z",
@@ -126,8 +125,6 @@ describe("public share snapshot", () => {
 
     expect(snapshot.session).toMatchObject({
       id: "session-1",
-      ownerUserId: "gh_owner",
-      realmId: "rlm-public",
       title: "Sharing test",
     });
     expect(snapshot.messages.map((message) => message.id)).toEqual([
@@ -135,13 +132,13 @@ describe("public share snapshot", () => {
       "assistant-1",
       "tool-result-1",
     ]);
-    expect(snapshot.messages.every((message) => message.realmId === "rlm-public")).toBe(true);
+    expect(snapshot.session).not.toHaveProperty("ownerUserId");
+    expect(snapshot.messages.every((message) => !("realmId" in message))).toBe(true);
   });
 
   it("builds a private fork prompt from the shared transcript", () => {
     const snapshot = createPublicShareSnapshot({
       messages: buildMessages(),
-      ownerUserId: "gh_owner",
       publishedAt: "2026-04-16T12:06:00.000Z",
       session: buildSession(),
       updatedAt: "2026-04-16T12:06:00.000Z",

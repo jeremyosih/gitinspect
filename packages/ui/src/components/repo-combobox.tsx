@@ -4,11 +4,11 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { toast } from "sonner";
 import type { ResolvedRepoSource } from "@gitinspect/db";
 import { listRepositories } from "@gitinspect/db";
-import { handleGithubError } from "@gitinspect/pi/repo/github-fetch";
-import { parseRepoInput } from "@gitinspect/pi/repo/path-parser";
-import { resolveRepoIntent } from "@gitinspect/pi/repo/ref-resolver";
-import { SUGGESTED_REPOS } from "@gitinspect/pi/repo/suggested-repos";
-import { githubOwnerAvatarUrl, repoSourceToPath } from "@gitinspect/pi/repo/url";
+import { handleGithubError } from "@gitinspect/runtime/repo/github-fetch";
+import { parseRepoInput } from "@gitinspect/runtime/repo/path-parser";
+import { resolveRepoIntent } from "@gitinspect/runtime/repo/ref-resolver";
+import { SUGGESTED_REPOS } from "@gitinspect/runtime/repo/suggested-repos";
+import { githubOwnerAvatarUrl, repoSourceToPath } from "@gitinspect/runtime/repo/url";
 import { Icons } from "@gitinspect/ui/components/icons";
 import { cn } from "@gitinspect/ui/lib/utils";
 

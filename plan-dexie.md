@@ -1,5 +1,7 @@
 # plan-dexie.md
 
+> Historical plan: superseded by the FX/Effect runtime and local storage cleanup. Billing and account sync are removed; public sharing uses the separate Cloudflare Durable Object service. See [README.md](README.md) for the current architecture.
+
 ## goal
 
 Add two related capabilities to GitInspect while preserving the existing local-first experience:

@@ -103,7 +103,7 @@ export function installMockRepoFetch() {
     }
 
     for (const [path, response] of Object.entries(mockFileContent)) {
-      if (url.includes(`contents/${path}`)) {
+      if (url.includes(`contents/${path}`) || url.includes(`git/blobs/${response.sha}`)) {
         return createJsonResponse(response);
       }
     }

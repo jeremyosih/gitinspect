@@ -1,5 +1,5 @@
 import type { Remote } from "comlink";
-import { createRuntimeWorkerClient } from "@gitinspect/pi/agent/runtime-worker-client-shared";
+import { createRuntimeWorkerClient } from "@gitinspect/runtime/agent/runtime-worker-client-shared";
 
 declare const ComlinkWorker: new <TModule>(
   scriptURL: URL,

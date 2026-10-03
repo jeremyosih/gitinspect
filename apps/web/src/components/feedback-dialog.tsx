@@ -3,8 +3,8 @@ import { useNavigate, useRouterState, useSearch } from "@tanstack/react-router";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import type { ResolvedRepoSource, SessionData } from "@gitinspect/db";
-import { useSelectedSessionSummary } from "@gitinspect/pi/hooks/use-selected-session-summary";
-import { parseRepoRoutePath } from "@gitinspect/pi/repo/path-parser";
+import { useSelectedSessionSummary } from "@gitinspect/runtime/hooks/use-selected-session-summary";
+import { parseRepoRoutePath } from "@gitinspect/runtime/repo/path-parser";
 import {
   type FeedbackPayload,
   type FeedbackSentiment,

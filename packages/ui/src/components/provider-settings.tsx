@@ -1,26 +1,26 @@
 import * as React from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { toast } from "sonner";
-import type { ProviderGroupId, ProviderId } from "@gitinspect/pi/types/models";
+import type { ProviderGroupId, ProviderId } from "@gitinspect/runtime/types/models";
 import {
   disconnectProvider,
   getOAuthProviderName,
   importOAuthCredentialsForProvider,
   setProviderApiKey,
   type OAuthProviderId,
-} from "@gitinspect/pi/auth/auth-service";
-import { isOAuthCredentials } from "@gitinspect/pi/auth/oauth-types";
+} from "@gitinspect/runtime/auth/auth-service";
+import { isOAuthCredentials } from "@gitinspect/runtime/auth/oauth-types";
 import { db } from "@gitinspect/db";
 import {
   getProviderGroupMetadata,
   getSortedApiKeyProvidersForSettings,
-} from "@gitinspect/pi/models/provider-registry";
+} from "@gitinspect/runtime/models/provider-registry";
 import {
   DEFAULT_PROXY_URL,
   PROXY_ENABLED_KEY,
   PROXY_URL_KEY,
   proxyConfigFromSettingsRows,
-} from "@gitinspect/pi/proxy/settings";
+} from "@gitinspect/runtime/proxy/settings";
 import { Button } from "@gitinspect/ui/components/button";
 import { Input } from "@gitinspect/ui/components/input";
 import {

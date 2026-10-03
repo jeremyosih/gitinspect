@@ -76,7 +76,13 @@ describe("repo runtime", () => {
         );
       }
 
-      if (url.includes("contents/README.md")) {
+      if (url.includes("git/trees/tree-sha"))
+        return Response.json({
+          sha: "tree-sha",
+          truncated: false,
+          tree: [{ path: "README.md", mode: "100644", type: "blob", sha: "readme-sha", size: 8 }],
+        });
+      if (url.includes("git/blobs/readme-sha")) {
         return new Response(
           JSON.stringify({
             content: btoa("# hello\n"),
@@ -118,7 +124,7 @@ describe("repo runtime", () => {
         }),
       }),
     );
-    expect(fetchMock.mock.calls[3]?.[1]).toEqual(
+    expect(fetchMock.mock.calls.at(-1)?.[1]).toEqual(
       expect.objectContaining({
         headers: expect.objectContaining({
           Authorization: "Bearer runtime-token-2",

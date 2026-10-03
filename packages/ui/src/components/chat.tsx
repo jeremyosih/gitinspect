@@ -3,28 +3,22 @@
 import * as React from "react";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useLiveQuery } from "dexie-react-hooks";
-import { useCustomer } from "autumn-js/react";
 import { event as trackEvent } from "onedollarstats";
 import { toast } from "sonner";
-import { getFoldedToolResultIds } from "@gitinspect/pi/lib/chat-adapter";
+import { getFoldedToolResultIds } from "@gitinspect/runtime/lib/chat-adapter";
 import {
   type PendingAuthAction,
   useGitHubAuthContext,
 } from "@gitinspect/ui/components/github-auth-context";
-import {
-  isGitinspectProviderGroup,
-  useMessageEntitlementGuard,
-  useModelAccessGuard,
-} from "@gitinspect/ui/hooks/use-chat-send-guards";
+import { useModelAccessGuard } from "@gitinspect/ui/hooks/use-chat-send-guards";
 import { ChatComposer } from "./chat-composer";
 import { SessionUtilityActions } from "./session-utility-actions";
-import { ChatUsageNotice } from "./chat-usage-notice";
 import { ChatEmptyState } from "./chat-empty-state";
 import { ChatMessage as ChatMessageBlock } from "./chat-message";
 import { RepoCombobox } from "./repo-combobox";
 import type { RepoComboboxHandle } from "./repo-combobox";
-import type { ProviderGroupId, ThinkingLevel } from "@gitinspect/pi/types/models";
-import type { AssistantMessage, DisplayChatMessage } from "@gitinspect/pi/types/chat";
+import type { ProviderGroupId, ThinkingLevel } from "@gitinspect/runtime/types/models";
+import type { AssistantMessage, DisplayChatMessage } from "@gitinspect/runtime/types/chat";
 import type { ResolvedRepoSource } from "@gitinspect/db";
 import {
   Conversation,
@@ -33,35 +27,35 @@ import {
 } from "@gitinspect/ui/components/ai-elements/conversation";
 import { StatusShimmer } from "@gitinspect/ui/components/ai-elements/shimmer";
 import { ProgressiveBlur } from "@gitinspect/ui/components/progressive-blur";
-import { copySessionToClipboard } from "@gitinspect/pi/lib/copy-session-markdown";
+import { copySessionToClipboard } from "@gitinspect/runtime/lib/copy-session-markdown";
 import {
   getSessionShareState,
   publishSessionShare,
   unshareSession,
   type SessionShareState,
-} from "@gitinspect/pi/lib/public-share-client";
-import { db, syncDb, touchRepository } from "@gitinspect/db";
-import { runtimeClient } from "@gitinspect/pi/agent/runtime-client";
-import { getRuntimeCommandErrorMessage } from "@gitinspect/pi/agent/runtime-command-errors";
-import { useRuntimeSession } from "@gitinspect/pi/hooks/use-runtime-session";
-import { useSessionOwnership } from "@gitinspect/pi/hooks/use-session-ownership";
+} from "@gitinspect/runtime/lib/public-share-client";
+import { db, touchRepository } from "@gitinspect/db";
+import { runtimeClient } from "@gitinspect/runtime/agent/runtime-client";
+import { getRuntimeCommandErrorMessage } from "@gitinspect/runtime/agent/runtime-command-errors";
+import { useRuntimeSession } from "@gitinspect/runtime/hooks/use-runtime-session";
+import { useSessionOwnership } from "@gitinspect/runtime/hooks/use-session-ownership";
 import {
   getCanonicalProvider,
   getConnectedProviders,
   getDefaultModelForGroup,
   getDefaultProviderGroup,
   getVisibleProviderGroups,
-} from "@gitinspect/pi/models/catalog";
-import { showGithubSystemNoticeToast } from "@gitinspect/pi/repo/github-fetch";
+} from "@gitinspect/runtime/models/catalog";
+import { showGithubSystemNoticeToast } from "@gitinspect/runtime/repo/github-fetch";
 import {
   persistLastUsedSessionSettings,
   resolveProviderDefaults,
-} from "@gitinspect/pi/sessions/session-actions";
-import { reconcileInterruptedSession } from "@gitinspect/pi/sessions/session-notices";
+} from "@gitinspect/runtime/sessions/session-actions";
+import { reconcileInterruptedSession } from "@gitinspect/runtime/sessions/session-notices";
 import {
   loadSessionViewModel,
   type SessionViewModel,
-} from "@gitinspect/pi/sessions/session-view-model";
+} from "@gitinspect/runtime/sessions/session-view-model";
 import {
   deriveActiveSessionViewState,
   deriveBannerState,
@@ -69,7 +63,7 @@ import {
   deriveRecoveryIntent,
   deriveResumeAction,
   shouldDisplayConversationStreaming,
-} from "@gitinspect/pi/sessions/session-view-state";
+} from "@gitinspect/runtime/sessions/session-view-state";
 import { useAutoRepublish } from "@gitinspect/ui/hooks/use-auto-republish";
 import { useConversationStarter } from "@gitinspect/ui/hooks/use-conversation-starter";
 
@@ -175,32 +169,6 @@ function getLastAssistantMessage(
     .find((message): message is AssistantMessage => message.role === "assistant");
 }
 
-function isPaidSubscription(autoEnable: boolean | undefined): boolean {
-  return autoEnable !== true;
-}
-
-function hasProSubscription(
-  customer: NonNullable<ReturnType<typeof useCustomer>["data"]>,
-): boolean {
-  const activeSubscription =
-    customer.subscriptions?.find(
-      (subscription) =>
-        !subscription.addOn &&
-        (subscription.status === "active" || subscription.status === "scheduled"),
-    ) ?? customer.subscriptions?.find((subscription) => !subscription.addOn);
-
-  if (activeSubscription) {
-    return isPaidSubscription(activeSubscription.autoEnable);
-  }
-
-  const now = Date.now();
-  return (
-    customer.purchases?.some(
-      (purchase) => purchase.expiresAt === null || purchase.expiresAt > now,
-    ) ?? false
-  );
-}
-
 export function Chat(props: ChatProps) {
   const navigate = useNavigate();
   const search = useSearch({ strict: false });
@@ -238,22 +206,7 @@ export function Chat(props: ChatProps) {
   const runtime = useRuntimeSession(props.sessionId);
   const auth = useGitHubAuthContext();
   const { isStartingSession, startNewConversation } = useConversationStarter();
-  const {
-    customer,
-    customerError,
-    customerLoading,
-    ensureMessageEntitlement,
-    refreshMessageEntitlement,
-  } = useMessageEntitlementGuard();
   const { requireModelAccess } = useModelAccessGuard();
-  const proCustomerState = useCustomer({
-    expand: ["subscriptions.plan", "purchases.plan"],
-    queryOptions: {
-      enabled: auth?.authState.session === "signed-in",
-      refetchOnWindowFocus: false,
-      staleTime: 1000 * 60 * 5,
-    },
-  });
   const ownership = useSessionOwnership(
     loadedSessionState?.kind === "active" ? loadedSessionState.viewModel.session.id : undefined,
   );
@@ -301,11 +254,6 @@ export function Chat(props: ChatProps) {
     () => getConnectedProviders(providerKeys),
     [providerKeys],
   );
-  const isPro = React.useMemo(
-    () => (proCustomerState.data ? hasProSubscription(proCustomerState.data) : false),
-    [proCustomerState.data],
-  );
-
   React.useEffect(() => {
     let cancelled = false;
 
@@ -374,9 +322,14 @@ export function Chat(props: ChatProps) {
       return;
     }
 
-    const fallbackProviderGroup = visibleProviderGroups[0] ?? "fireworks-free";
+    const fallbackProviderGroup = visibleProviderGroups[0] ?? "openai";
     setDraft((currentDraft) => {
-      if (!currentDraft || visibleProviderGroups.includes(currentDraft.providerGroup)) {
+      if (
+        !currentDraft ||
+        visibleProviderGroups.includes(currentDraft.providerGroup) ||
+        (currentDraft.providerGroup === fallbackProviderGroup &&
+          currentDraft.model === getDefaultModelForGroup(fallbackProviderGroup).id)
+      ) {
         return currentDraft;
       }
 
@@ -640,10 +593,10 @@ export function Chat(props: ChatProps) {
     async (content: string) => {
       if (activeSession) {
         if (
-          !requireModelAccess({
+          !(await requireModelAccess({
             providerGroup:
               activeSession.providerGroup ?? getDefaultProviderGroup(activeSession.provider),
-          })
+          }))
         ) {
           return;
         }
@@ -655,21 +608,8 @@ export function Chat(props: ChatProps) {
           return;
         }
 
-        if (
-          !(await ensureMessageEntitlement({
-            providerGroup:
-              activeSession.providerGroup ?? getDefaultProviderGroup(activeSession.provider),
-          }))
-        ) {
-          return;
-        }
-
         try {
           await runtime.send(content);
-          await refreshMessageEntitlement({
-            providerGroup:
-              activeSession.providerGroup ?? getDefaultProviderGroup(activeSession.provider),
-          });
           void trackEvent("Message sent", "/chat").catch(() => {
             // Analytics must never interfere with chat sends.
           });
@@ -684,9 +624,7 @@ export function Chat(props: ChatProps) {
     [
       activeComposerState,
       activeSession,
-      ensureMessageEntitlement,
       handleFirstSend,
-      refreshMessageEntitlement,
       reportRuntimeFailure,
       requireModelAccess,
       runtime,
@@ -715,23 +653,13 @@ export function Chat(props: ChatProps) {
     );
   }, [activeSession?.sourceUrl, displayRepoSource, messages, props.sourceUrl]);
 
-  const handleUpgradeToPro = React.useCallback(() => {
-    void navigate({
-      search: (prev) => ({
-        ...prev,
-        settings: "pricing",
-      }),
-      to: ".",
-    });
-  }, [navigate]);
-
   const handleShareToggle = React.useCallback(async () => {
     if (!activeSession || !sessionViewModel) {
       return;
     }
 
-    if (!isPro && !(shareState.isShared && shareState.canUnshare)) {
-      handleUpgradeToPro();
+    if (auth?.authState.session !== "signed-in") {
+      auth?.openAuthDialog({ mode: "github-only", reason: "settings" });
       return;
     }
 
@@ -748,8 +676,6 @@ export function Chat(props: ChatProps) {
         toast.success("Share link removed");
         return;
       }
-
-      await syncDb();
 
       const nextShareState = await publishSessionShare({
         messages: sessionViewModel.transcriptMessages,
@@ -772,14 +698,7 @@ export function Chat(props: ChatProps) {
     } finally {
       setIsSharing(false);
     }
-  }, [
-    activeSession,
-    handleUpgradeToPro,
-    isPro,
-    sessionViewModel,
-    shareState.canUnshare,
-    shareState.isShared,
-  ]);
+  }, [activeSession, auth, sessionViewModel, shareState.canUnshare, shareState.isShared]);
 
   if (loadedSessionState === undefined) {
     return <LoadingState label="Loading session..." />;
@@ -798,10 +717,8 @@ export function Chat(props: ChatProps) {
     activeSession?.providerGroup ??
     (activeSession ? getDefaultProviderGroup(activeSession.provider) : undefined) ??
     draft?.providerGroup ??
-    "fireworks-free";
+    "openai";
   const currentThinkingLevel = activeSession?.thinkingLevel ?? draft?.thinkingLevel ?? "medium";
-  const showUsageNotice = isGitinspectProviderGroup(currentProviderGroup);
-  const messageBalance = showUsageNotice ? customer?.balances?.messages : null;
   const isStreaming =
     activeSession !== undefined ? (activeComposerState?.isStreaming ?? false) : isStartingSession;
   const composerDisabled = !displayRepoSource || activeComposerState?.disabled === true;
@@ -897,14 +814,12 @@ export function Chat(props: ChatProps) {
             {messages.length > 0 ? (
               <SessionUtilityActions
                 canUnshare={shareState.canUnshare}
-                isPro={isPro}
                 isShared={shareState.isShared}
                 isSharing={isSharing}
                 onCopy={handleCopySession}
                 onShareToggle={() => {
                   void handleShareToggle();
                 }}
-                onUpgradeClick={handleUpgradeToPro}
               />
             ) : null}
           </div>
@@ -1006,28 +921,6 @@ export function Chat(props: ChatProps) {
                 }}
                 providerGroup={currentProviderGroup}
                 thinkingLevel={currentThinkingLevel}
-              />
-              <ChatUsageNotice
-                balance={messageBalance}
-                error={customerError}
-                isLoading={customerLoading}
-                isVisible={showUsageNotice}
-                onSignIn={() => {
-                  auth?.openAuthDialog({
-                    mode: "github-only",
-                    reason: "free-models",
-                  });
-                }}
-                onUpgrade={() => {
-                  void navigate({
-                    search: (prev) => ({
-                      ...prev,
-                      settings: "pricing",
-                    }),
-                    to: ".",
-                  });
-                }}
-                session={auth?.authState.session ?? "signed-out"}
               />
             </div>
           </div>

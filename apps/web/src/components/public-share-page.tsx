@@ -3,14 +3,14 @@ import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useLiveQuery } from "dexie-react-hooks";
 import { toast } from "sonner";
-import { buildForkPromptFromSharedSession } from "@gitinspect/pi/lib/public-share";
-import { repoSourceToGitHubUrl } from "@gitinspect/pi/repo/url";
+import { buildForkPromptFromSharedSession } from "@gitinspect/runtime/lib/public-share";
+import { repoSourceToGitHubUrl } from "@gitinspect/runtime/repo/url";
 import {
   persistLastUsedSessionSettings,
   resolveProviderDefaults,
-} from "@gitinspect/pi/sessions/session-actions";
-import { getCanonicalProvider } from "@gitinspect/pi/models/catalog";
-import type { ProviderGroupId, ThinkingLevel } from "@gitinspect/pi/types/models";
+} from "@gitinspect/runtime/sessions/session-actions";
+import { getCanonicalProvider } from "@gitinspect/runtime/models/catalog";
+import type { ProviderGroupId, ThinkingLevel } from "@gitinspect/runtime/types/models";
 import { ChatComposer } from "@gitinspect/ui/components/chat-composer";
 import { ChatMessage as ChatMessageBlock } from "@gitinspect/ui/components/chat-message";
 import {
@@ -23,11 +23,11 @@ import { Button } from "@gitinspect/ui/components/button";
 import { Icons } from "@gitinspect/ui/components/icons";
 import { ProgressiveBlur } from "@gitinspect/ui/components/progressive-blur";
 import { useConversationStarter } from "@gitinspect/ui/hooks/use-conversation-starter";
-import { getFoldedToolResultIds } from "@gitinspect/pi/lib/chat-adapter";
+import { getFoldedToolResultIds } from "@gitinspect/runtime/lib/chat-adapter";
 import {
   loadPublicSessionSnapshot,
   type PublicSessionSnapshot,
-} from "@gitinspect/pi/lib/public-share-client";
+} from "@gitinspect/runtime/lib/public-share-client";
 import { setPublicShareHeaderRepo } from "@gitinspect/ui/lib/public-share-header-bridge";
 
 type Draft = {

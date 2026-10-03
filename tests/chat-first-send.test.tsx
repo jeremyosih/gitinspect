@@ -5,6 +5,17 @@ import { createEmptyUsage } from "@/types/models";
 import type { ResolvedRepoSource, SessionData } from "@/types/storage";
 
 const useLiveQueryMock = vi.fn();
+const subscriptionKey = {
+  provider: "openai-codex",
+  value: JSON.stringify({
+    providerId: "openai-codex",
+    access: "fixture",
+    refresh: "fixture-refresh",
+    accountId: "fixture-account",
+    expires: Date.now() + 60_000,
+  }),
+};
+const providerKeysMock = vi.fn(async () => [subscriptionKey]);
 const navigateMock = vi.fn(async () => {});
 const useSearchMock = vi.fn(() => ({}));
 const startInitialTurnMock = vi.fn(async () => {});
@@ -76,6 +87,7 @@ vi.mock("@/sessions/session-actions", () => ({
 
 vi.mock("@gitinspect/db", () => ({
   touchRepository: vi.fn(async () => {}),
+  db: { providerKeys: { toArray: providerKeysMock } },
 }));
 
 vi.mock("@/components/chat-empty-state", () => ({
@@ -169,7 +181,7 @@ function mockChatQueries(options: {
     providerGroup: string;
     thinkingLevel: string;
   };
-  guestChatAcknowledged?: boolean;
+  withoutProvider?: boolean;
   loadedSessionState:
     | { kind: "none" | "missing" }
     | {
@@ -193,7 +205,7 @@ function mockChatQueries(options: {
       case 1:
         return options.defaults;
       default:
-        return [];
+        return options.withoutProvider ? [] : [subscriptionKey];
     }
   });
 }
@@ -201,6 +213,7 @@ function mockChatQueries(options: {
 describe("Chat first send", () => {
   beforeEach(() => {
     authContextState.value = null;
+    providerKeysMock.mockResolvedValue([subscriptionKey]);
     createSessionForRepoMock.mockReset();
     navigateMock.mockReset();
     persistLastUsedSessionSettingsMock.mockReset();
@@ -280,7 +293,9 @@ describe("Chat first send", () => {
     });
   });
 
-  it("opens the auth dialog before the first guest send when acknowledgement is missing", async () => {
+  it("starts with a connected subscription without requiring app sign-in", async () => {
+    const session = buildSession();
+    createSessionForRepoMock.mockResolvedValue(session);
     const openAuthDialog = vi.fn();
     authContextState.value = {
       authState: {
@@ -299,7 +314,6 @@ describe("Chat first send", () => {
         providerGroup: "openai-codex",
         thinkingLevel: "medium",
       },
-      guestChatAcknowledged: false,
       loadedSessionState: { kind: "none" },
     });
 
@@ -311,16 +325,33 @@ describe("Chat first send", () => {
       fireEvent.click(screen.getByText("Send"));
     });
 
-    expect(openAuthDialog).toHaveBeenCalledWith(
-      expect.objectContaining({
-        postAuthAction: expect.objectContaining({
-          content: "hello",
-          type: "send-first-message",
-        }),
-        variant: "first-message",
-      }),
-    );
+    expect(openAuthDialog).not.toHaveBeenCalled();
+    expect(startInitialTurnMock).toHaveBeenCalledWith(session, "hello");
+  });
+
+  it("stays stable without a provider and directs the first send to Providers", async () => {
+    providerKeysMock.mockResolvedValue([]);
+    mockChatQueries({
+      defaults: {
+        model: "gpt-5.1-codex-mini",
+        providerGroup: "openai-codex",
+        thinkingLevel: "medium",
+      },
+      withoutProvider: true,
+      loadedSessionState: { kind: "none" },
+    });
+    const { Chat } = await import("@/components/chat");
+    render(<Chat repoSource={buildRepoSource()} />);
+    await act(async () => {
+      fireEvent.click(screen.getByText("Send"));
+    });
+    expect(createSessionForRepoMock).not.toHaveBeenCalled();
     expect(startInitialTurnMock).not.toHaveBeenCalled();
+    expect(navigateMock).toHaveBeenCalledWith(
+      expect.objectContaining({ to: ".", search: expect.any(Function) }),
+    );
+    const search = navigateMock.mock.calls[0]?.[0]?.search;
+    expect(search({ sidebar: "open" })).toEqual({ sidebar: "open", settings: "providers" });
   });
 
   it("auto-sends the drafted first message after sign-in", async () => {
@@ -358,7 +389,6 @@ describe("Chat first send", () => {
         providerGroup: "openai-codex",
         thinkingLevel: "medium",
       },
-      guestChatAcknowledged: true,
       loadedSessionState: { kind: "none" },
     });
 

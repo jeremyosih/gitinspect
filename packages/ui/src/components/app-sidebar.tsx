@@ -12,15 +12,15 @@ import { ChatFooter } from "@gitinspect/ui/components/chat-footer";
 import { ChatLogo } from "@gitinspect/ui/components/chat-logo";
 import { ChatSessionList } from "@gitinspect/ui/components/chat-session-list";
 import { listSessionLeases, listSessions } from "@gitinspect/db";
-import { getCurrentTabId } from "@gitinspect/pi/agent/tab-id";
+import { getCurrentTabId } from "@gitinspect/runtime/agent/tab-id";
 import { isSessionLeaseStale } from "@gitinspect/db/session-leases";
 import {
   buildSessionHref,
   deleteSessionAndResolveNext,
   persistLastUsedSessionSettings,
-} from "@gitinspect/pi/sessions/session-actions";
+} from "@gitinspect/runtime/sessions/session-actions";
 
-export function AppSidebar({ showGetPro = true }: { showGetPro?: boolean } = {}) {
+export function AppSidebar() {
   const navigate = useNavigate();
   const currentMatch = useRouterState({
     select: (state) => state.matches[state.matches.length - 1],
@@ -182,7 +182,7 @@ export function AppSidebar({ showGetPro = true }: { showGetPro?: boolean } = {})
         sessions={sessionList}
       />
       <SidebarFooter className="border-t border-sidebar-border">
-        <ChatFooter showGetPro={showGetPro} />
+        <ChatFooter />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

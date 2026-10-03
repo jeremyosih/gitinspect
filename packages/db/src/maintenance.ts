@@ -28,7 +28,7 @@ export async function exportAllChatData(): Promise<ChatDataExportV1> {
 }
 
 /**
- * Wipes this browser's IndexedDB for this app without syncing deletions to Dexie Cloud.
+ * Wipes this browser's IndexedDB for this app without affecting published shares.
  * Release active runtime ownership and sign the user out before calling.
  */
 export async function deleteAllLocalData(): Promise<void> {

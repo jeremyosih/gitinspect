@@ -1,5 +1,7 @@
 # optimise plan — faster first token without proxy work
 
+> Historical plan: superseded by the FX/Effect runtime and local storage cleanup. Billing and account sync are removed; public sharing uses the separate Cloudflare Durable Object service. See [README.md](README.md) for the current architecture.
+
 ## purpose
 
 Reduce time-to-first-token for the first send, especially on cold starts and repo chats, without moving usage accounting into the proxy.

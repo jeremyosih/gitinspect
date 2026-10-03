@@ -1,119 +1,30 @@
 import * as React from "react";
-import { useCustomer } from "autumn-js/react";
+import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import {
-  type AuthDialogVariant,
-  type PendingAuthAction,
-  useGitHubAuthContext,
+import { db } from "@gitinspect/db";
+import { getCanonicalProvider, getConnectedProviders } from "@gitinspect/runtime/models/catalog";
+import type { ProviderGroupId } from "@gitinspect/runtime/types/models";
+import type {
+  AuthDialogVariant,
+  PendingAuthAction,
 } from "@gitinspect/ui/components/github-auth-context";
-import type { ProviderGroupId } from "@gitinspect/pi/types/models";
-
-const AUTUMN_MESSAGES_FEATURE_ID = "messages";
-
-export function isGitinspectProviderGroup(providerGroup: ProviderGroupId): boolean {
-  return providerGroup === "fireworks-free";
-}
 
 export function useModelAccessGuard() {
-  const auth = useGitHubAuthContext();
-
+  const navigate = useNavigate();
   const requireModelAccess = React.useCallback(
-    (input: {
-      postAuthAction?: PendingAuthAction;
+    async (input: {
       providerGroup: ProviderGroupId;
+      postAuthAction?: PendingAuthAction;
       variant?: AuthDialogVariant;
-    }): boolean => {
-      if (!auth) {
-        return true;
-      }
-
-      if (
-        auth.authState.session === "signed-out" &&
-        isGitinspectProviderGroup(input.providerGroup)
-      ) {
-        auth.openAuthDialog({
-          mode: input.variant === "first-message" ? "full" : "github-only",
-          postAuthAction: input.postAuthAction,
-          reason: "free-models",
-          variant: input.variant,
-        });
-        return false;
-      }
-
-      return true;
+    }) => {
+      const provider = getCanonicalProvider(input.providerGroup);
+      const keys = await db.providerKeys.toArray();
+      if (getConnectedProviders(keys).includes(provider)) return true;
+      toast.error("Connect an API key or subscription in Providers to start chatting.");
+      void navigate({ to: ".", search: (previous) => ({ ...previous, settings: "providers" }) });
+      return false;
     },
-    [auth],
+    [navigate],
   );
-
-  return {
-    requireModelAccess,
-  };
-}
-
-export function useMessageEntitlementGuard() {
-  const auth = useGitHubAuthContext();
-  const autumnCustomer = useCustomer({
-    queryOptions: {
-      enabled: auth?.authState.session === "signed-in",
-      refetchOnWindowFocus: false,
-      staleTime: 1000 * 60 * 5,
-    },
-  });
-
-  const ensureMessageEntitlement = React.useCallback(
-    async (input: { providerGroup: ProviderGroupId }) => {
-      if (!isGitinspectProviderGroup(input.providerGroup)) {
-        return true;
-      }
-
-      if (auth?.authState.session !== "signed-in") {
-        return true;
-      }
-
-      if (autumnCustomer.error) {
-        toast.error(autumnCustomer.error.message);
-        return false;
-      }
-
-      if (autumnCustomer.isLoading || !autumnCustomer.data) {
-        toast.error("Checking your subscription...");
-        return false;
-      }
-
-      const { allowed } = autumnCustomer.check({
-        featureId: AUTUMN_MESSAGES_FEATURE_ID,
-      });
-
-      if (!allowed) {
-        toast.error("You're out of messages");
-        return false;
-      }
-
-      return true;
-    },
-    [auth?.authState.session, autumnCustomer],
-  );
-
-  const refreshMessageEntitlement = React.useCallback(
-    async (input: { providerGroup: ProviderGroupId }) => {
-      if (!isGitinspectProviderGroup(input.providerGroup)) {
-        return;
-      }
-
-      if (auth?.authState.session !== "signed-in") {
-        return;
-      }
-
-      await autumnCustomer.refetch();
-    },
-    [auth?.authState.session, autumnCustomer],
-  );
-
-  return {
-    customer: autumnCustomer.data,
-    customerError: autumnCustomer.error,
-    customerLoading: autumnCustomer.isLoading,
-    ensureMessageEntitlement,
-    refreshMessageEntitlement,
-  };
+  return { requireModelAccess };
 }

@@ -29,7 +29,7 @@ import {
   SidebarProvider,
 } from "@gitinspect/ui/components/sidebar";
 import { isSettingsSection } from "@gitinspect/ui/lib/search-state";
-import { useSelectedSessionSummary } from "@gitinspect/pi/hooks/use-selected-session-summary";
+import { useSelectedSessionSummary } from "@gitinspect/runtime/hooks/use-selected-session-summary";
 
 type SettingsSectionItem = {
   description: string;
@@ -77,11 +77,7 @@ const BASE_SETTINGS_SECTIONS: Array<SettingsSectionItem> = [
   },
 ];
 
-export function AppSettingsDialog(props: {
-  dataPanel?: React.ReactNode;
-  pricingLabel?: string;
-  pricingPanel?: React.ReactNode;
-}) {
+export function AppSettingsDialog(props: { dataPanel?: React.ReactNode }) {
   const navigate = useNavigate();
   const router = useRouter();
   const search = useSearch({ strict: false });
@@ -91,24 +87,7 @@ export function AppSettingsDialog(props: {
   const sessionId =
     currentMatch.routeId === "/chat/$sessionId" ? currentMatch.params.sessionId : undefined;
   const session = useSelectedSessionSummary(sessionId);
-  const settingsSections = React.useMemo<Array<SettingsSectionItem>>(() => {
-    if (!props.pricingPanel) {
-      return BASE_SETTINGS_SECTIONS;
-    }
-
-    return [
-      BASE_SETTINGS_SECTIONS[0],
-      BASE_SETTINGS_SECTIONS[1],
-      BASE_SETTINGS_SECTIONS[2],
-      {
-        description: "Plans, checkout, and billing management",
-        icon: Icons.crown,
-        id: "pricing",
-        label: props.pricingLabel ?? "Pricing",
-      },
-      ...BASE_SETTINGS_SECTIONS.slice(3),
-    ];
-  }, [props.pricingLabel, props.pricingPanel]);
+  const settingsSections = BASE_SETTINGS_SECTIONS;
   const requestedSection =
     typeof search.settings === "string" && isSettingsSection(search.settings)
       ? search.settings
@@ -239,7 +218,6 @@ export function AppSettingsDialog(props: {
                 ) : null}
                 {section === "proxy" ? <ProxySettings /> : null}
                 {section === "costs" ? <CostsPanel session={session} /> : null}
-                {section === "pricing" ? (props.pricingPanel ?? null) : null}
                 {section === "data" ? (props.dataPanel ?? <DataSettings />) : null}
                 {section === "about" ? <AboutPanel /> : null}
               </div>
@@ -361,18 +339,16 @@ function AboutPanel() {
           </div>
           <div className="space-y-2 text-muted-foreground">
             <p>
-              <span className="font-medium text-foreground">No gitinspect backend for your data.</span>{" "}
-              Chats, sessions, settings, optional GitHub token, provider keys, and usage stay only
-              in this browser (IndexedDB).
+              <span className="font-medium text-foreground">Local by default.</span> Chats,
+              sessions, settings, optional GitHub token, provider keys, and usage stay only in this
+              browser (IndexedDB). Publishing a share uploads that transcript to Cloudflare.
             </p>
             <p>
               <span className="font-medium text-foreground">Network:</span>{" "}
               <span className="font-medium text-foreground">GitHub</span> is called from your
-              browser for repo data. With <span className="font-medium text-foreground">your own</span>{" "}
-              provider keys, chat goes to those APIs (optional proxy in settings). The{" "}
-              <span className="font-medium text-foreground">free tier</span> uses gitinspect&apos;s
-              server proxy for limits and a shared key—not a direct browser-to-provider call like
-              when you add your own keys.
+              browser for repo data. With{" "}
+              <span className="font-medium text-foreground">your own</span> provider keys or
+              subscriptions, chat goes to those APIs (optional proxy in settings).
             </p>
           </div>
         </div>
@@ -405,10 +381,8 @@ function AboutPanel() {
             </table>
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
-            With no provider configured, you can still use the free-tier model in the picker
-            (&quot;Free (with limits)&quot;). That traffic goes through gitinspect&apos;s proxy for
-            rate limiting and shared hosting of the API key—not a direct browser-to-provider call
-            like when you add your own keys.
+            Connect your own API key or provider subscription to chat. Credentials stay in this
+            browser.
           </p>
         </div>
 
@@ -432,8 +406,8 @@ function AboutPanel() {
               repository and chat in natural language; answers are grounded in the code.
             </li>
             <li>
-              <span className="font-medium text-foreground">Stack</span> — pi-mono, read-only
-              shell via just-bash, virtual filesystem from the GitHub API.
+              <span className="font-medium text-foreground">Stack</span> — pi-mono, read-only shell
+              via just-bash, virtual filesystem from the GitHub API.
             </li>
             <li>
               <span className="font-medium text-foreground">Local first</span> — Agent runs in a
@@ -444,16 +418,16 @@ function AboutPanel() {
               recovery, and interrupted-turn repair on the main thread.
             </li>
             <li>
-              <span className="font-medium text-foreground">Lazy loading</span> — Nothing
-              prefetched at construction; everything on demand.
+              <span className="font-medium text-foreground">Lazy loading</span> — Nothing prefetched
+              at construction; everything on demand.
             </li>
             <li>
-              <span className="font-medium text-foreground">Tree cache</span> — Full repo tree
-              once; stat, exists, readdir from cache.
+              <span className="font-medium text-foreground">Tree cache</span> — Full repo tree once;
+              stat, exists, readdir from cache.
             </li>
             <li>
-              <span className="font-medium text-foreground">Content cache</span> — File contents
-              by blob SHA (content-addressable).
+              <span className="font-medium text-foreground">Content cache</span> — File contents by
+              blob SHA (content-addressable).
             </li>
             <li>
               <span className="font-medium text-foreground">Smart API selection</span> — Contents
@@ -469,9 +443,9 @@ function AboutPanel() {
         </p>
 
         <p className="text-xs text-muted-foreground">
-          <span className="font-medium text-foreground">AI disclosure:</span> This codebase has
-          been built with a lot of support from AI. Very little is hand-written; GPT 5.4 was used
-          to create this repository alongside that small amount of manual code.
+          <span className="font-medium text-foreground">AI disclosure:</span> This codebase has been
+          built with a lot of support from AI. Very little is hand-written; GPT 5.4 was used to
+          create this repository alongside that small amount of manual code.
         </p>
       </div>
 
