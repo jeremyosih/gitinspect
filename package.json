@@ -33,7 +33,10 @@
     "version-packages": "changeset version",
     "release": "changeset publish",
     "prepare": "husky",
-    "test": "vitest run"
+    "test": "vitest run",
+    "bench:prepare": "bun benchmarks/prepare.ts",
+    "bench:vfs": "bun benchmarks/vfs.ts",
+    "bench:report": "bun benchmarks/report.ts"
   },
   "dependencies": {
     "@gitinspect/env": "workspace:*",

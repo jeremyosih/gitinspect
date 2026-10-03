@@ -51,6 +51,10 @@ Inspired by [Sitegeist](https://sitegeist.ai), [btca](https://github.com/davis7d
 
 ---
 
+## Performance measurements
+
+[Reproducible benchmarks and results](benchmarks/README.md) compare this cleanup with the original commit. The VFS improves repeated reads and indexed directory listings, but cold reads and bursts of different files can be slower. FX adds a few milliseconds of warm agent overhead in the controlled browser benchmark; this migration is not a model-inference speedup.
+
 ## Public sharing service
 
 The web app can remain on its current host. `apps/sharing` is a standalone Cloudflare Worker with one SQLite-backed Durable Object per share; `packages/infra/alchemy.run.ts` defines it in Alchemy. Moving the full web app to Cloudflare is a separate decision.
