@@ -1,4 +1,4 @@
-import { getIsoNow } from "@gitinspect/pi/lib/dates";
+import { getIsoNow } from "@gitinspect/shared/lib/dates";
 import { db } from "./db";
 import type { RepositoryRow } from "./types";
 

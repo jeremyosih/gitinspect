@@ -1,6 +1,10 @@
 import * as React from "react";
 import { toast } from "sonner";
-import { DEFAULT_PROXY_URL, getProxyConfig, setProxyConfig } from "@gitinspect/pi/proxy/settings";
+import {
+  DEFAULT_PROXY_URL,
+  getProxyConfig,
+  setProxyConfig,
+} from "@gitinspect/runtime/proxy/settings";
 import { Button } from "@gitinspect/ui/components/button";
 import { Input } from "@gitinspect/ui/components/input";
 import { Label } from "@gitinspect/ui/components/label";

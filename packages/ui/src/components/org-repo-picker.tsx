@@ -3,7 +3,7 @@ import * as React from "react";
 import { GithubRepo } from "@gitinspect/ui/components/github-repo";
 import { LetsInspectHeading } from "@gitinspect/ui/components/chat-empty-state";
 import { StatusShimmer } from "@gitinspect/ui/components/ai-elements/shimmer";
-import { fetchPublicReposForLogin } from "@gitinspect/pi/repo/github-owner-repos";
+import { fetchPublicReposForLogin } from "@gitinspect/runtime/repo/github-owner-repos";
 import { cn } from "@gitinspect/ui/lib/utils";
 
 type OrgRepoPickerProps = {

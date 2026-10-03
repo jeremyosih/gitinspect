@@ -56,7 +56,7 @@ describe("runtime worker client", () => {
 
   it("preserves direct ComlinkWorker syntax for vite-plugin-comlink", () => {
     const packageSource = readFileSync(
-      join(process.cwd(), "packages/pi/src/agent/runtime-worker-client.ts"),
+      join(process.cwd(), "packages/runtime/src/agent/runtime-worker-client.ts"),
       "utf8",
     );
     const webSource = readFileSync(

@@ -10,8 +10,8 @@ import {
   type GitHubAuthState,
   type ResolveGitHubAccessOptions,
   registerGitHubAccessResolver,
-} from "@gitinspect/pi/repo/github-access";
-import { getGithubPersonalAccessToken } from "@gitinspect/pi/repo/github-token";
+} from "@gitinspect/runtime/repo/github-access";
+import { getGithubPersonalAccessToken } from "@gitinspect/runtime/repo/github-token";
 
 const GITHUB_REPO_SCOPE = "repo";
 const PENDING_REPO_ACCESS_KEY = "gitinspect.pending-github-repo-access";

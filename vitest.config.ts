@@ -1,4 +1,5 @@
-import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { defineConfig } from "vitest/config";
 
 function fromRoot(path: string) {
@@ -8,6 +9,20 @@ function fromRoot(path: string) {
 export default defineConfig({
   resolve: {
     alias: [
+      {
+        find: "@/lib/sharing-service.server",
+        replacement: fromRoot("./apps/web/src/lib/sharing-service.server.ts"),
+      },
+      {
+        find: "libfx/fx-core.wasm?url",
+        replacement:
+          fileURLToPath(
+            new URL(
+              "./fx-core.wasm",
+              pathToFileURL(createRequire(import.meta.url).resolve("libfx/browser")),
+            ),
+          ) + "?url",
+      },
       {
         find: "@/components/root-guard",
         replacement: fromRoot("./apps/web/src/components/root-guard.tsx"),
@@ -50,7 +65,7 @@ export default defineConfig({
       },
       {
         find: "@/components/chat-adapter",
-        replacement: fromRoot("./packages/pi/src/lib/chat-adapter.ts"),
+        replacement: fromRoot("./packages/runtime/src/lib/chat-adapter.ts"),
       },
       {
         find: "@/components/ui",
@@ -61,14 +76,6 @@ export default defineConfig({
         replacement: fromRoot("./packages/ui/src/hooks/use-mobile.ts"),
       },
       {
-        find: "@/hooks/use-subscription",
-        replacement: fromRoot("./apps/web/src/hooks/use-subscription.ts"),
-      },
-      {
-        find: "@/lib/app-bootstrap",
-        replacement: fromRoot("./apps/web/src/lib/app-bootstrap.ts"),
-      },
-      {
         find: "@/lib/auth-client",
         replacement: fromRoot("./apps/web/src/lib/auth-client.ts"),
       },
@@ -77,28 +84,8 @@ export default defineConfig({
         replacement: fromRoot("./apps/web/src/lib/github-access.ts"),
       },
       {
-        find: "@/lib/autumn.server",
-        replacement: fromRoot("./apps/web/src/lib/autumn.server.ts"),
-      },
-      {
-        find: "@/lib/bootstrap-dexie-cloud",
-        replacement: fromRoot("./apps/web/src/lib/bootstrap-dexie-cloud.ts"),
-      },
-      {
-        find: "@/lib/dexie-cloud-rest.server",
-        replacement: fromRoot("./apps/web/src/lib/dexie-cloud-rest.server.ts"),
-      },
-      {
-        find: "@/lib/fetch-dexie-cloud-tokens",
-        replacement: fromRoot("./apps/web/src/lib/fetch-dexie-cloud-tokens.ts"),
-      },
-      {
         find: "@/lib/feedback.server",
         replacement: fromRoot("./apps/web/src/lib/feedback.server.ts"),
-      },
-      {
-        find: "@/lib/subscription-entitlements",
-        replacement: fromRoot("./apps/web/src/lib/subscription-entitlements.ts"),
       },
       {
         find: "@/middleware/auth",
@@ -108,33 +95,33 @@ export default defineConfig({
         find: "@/store/auth-store",
         replacement: fromRoot("./apps/web/src/store/auth-store.ts"),
       },
-      { find: "@/lib/github/cache", replacement: fromRoot("./packages/just-github/src/cache.ts") },
+      { find: "@/lib/github/cache", replacement: fromRoot("./packages/vfs/src/cache.ts") },
       {
         find: "@/lib/github/github-fs",
-        replacement: fromRoot("./packages/just-github/src/github-fs.ts"),
+        replacement: fromRoot("./packages/vfs/src/github-fs.ts"),
       },
-      { find: "@/lib/github/refs", replacement: fromRoot("./packages/just-github/src/refs.ts") },
-      { find: "@/lib/github/types", replacement: fromRoot("./packages/just-github/src/types.ts") },
-      { find: "@/lib/github", replacement: fromRoot("./packages/just-github/src/index.ts") },
+      { find: "@/lib/github/refs", replacement: fromRoot("./packages/vfs/src/refs.ts") },
+      { find: "@/lib/github/types", replacement: fromRoot("./packages/vfs/src/types.ts") },
+      { find: "@/lib/github", replacement: fromRoot("./packages/vfs/src/index.ts") },
       { find: "@/lib/utils", replacement: fromRoot("./packages/ui/src/lib/utils.ts") },
       { find: "@/types/storage", replacement: fromRoot("./packages/db/src/types.ts") },
-      { find: "@/agent", replacement: fromRoot("./packages/pi/src/agent") },
-      { find: "@/auth", replacement: fromRoot("./packages/pi/src/auth") },
+      { find: "@/agent", replacement: fromRoot("./packages/runtime/src/agent") },
+      { find: "@/auth", replacement: fromRoot("./packages/runtime/src/auth") },
       { find: "@/components", replacement: fromRoot("./packages/ui/src/components") },
       { find: "@/db", replacement: fromRoot("./packages/db/src") },
-      { find: "@/hooks", replacement: fromRoot("./packages/pi/src/hooks") },
-      { find: "@/lib", replacement: fromRoot("./packages/pi/src/lib") },
-      { find: "@/models", replacement: fromRoot("./packages/pi/src/models") },
+      { find: "@/hooks", replacement: fromRoot("./packages/runtime/src/hooks") },
+      { find: "@/lib", replacement: fromRoot("./packages/runtime/src/lib") },
+      { find: "@/models", replacement: fromRoot("./packages/runtime/src/models") },
       { find: "@/features", replacement: fromRoot("./apps/web/src/features") },
       { find: "@/navigation", replacement: fromRoot("./apps/web/src/navigation") },
-      { find: "@/proxy", replacement: fromRoot("./packages/pi/src/proxy") },
-      { find: "@/repo", replacement: fromRoot("./packages/pi/src/repo") },
+      { find: "@/proxy", replacement: fromRoot("./packages/runtime/src/proxy") },
+      { find: "@/repo", replacement: fromRoot("./packages/runtime/src/repo") },
       { find: "@/routes", replacement: fromRoot("./apps/web/src/routes") },
-      { find: "@/sessions", replacement: fromRoot("./packages/pi/src/sessions") },
-      { find: "@/tools", replacement: fromRoot("./packages/pi/src/tools") },
-      { find: "@/types", replacement: fromRoot("./packages/pi/src/types") },
+      { find: "@/sessions", replacement: fromRoot("./packages/runtime/src/sessions") },
+      { find: "@/tools", replacement: fromRoot("./packages/runtime/src/tools") },
+      { find: "@/types", replacement: fromRoot("./packages/runtime/src/types") },
       { find: "@/test", replacement: fromRoot("./tests/lib") },
-      { find: "@/just-github", replacement: fromRoot("./packages/just-github/src") },
+      { find: "@/just-github", replacement: fromRoot("./packages/vfs/src") },
       {
         find: /^@gitinspect\/db$/,
         replacement: fromRoot("./packages/db/src/index.ts"),
@@ -148,11 +135,7 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     globals: true,
-    include: [
-      "tests/**/*.test.ts",
-      "tests/**/*.test.tsx",
-      "packages/just-github/tests/**/*.test.ts",
-    ],
+    include: ["tests/**/*.test.ts", "tests/**/*.test.tsx", "packages/vfs/tests/**/*.test.ts"],
     setupFiles: ["./tests/setup.ts"],
   },
 });

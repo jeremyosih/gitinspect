@@ -1,191 +1,86 @@
-import type {
-  MessageRow,
-  PublicMessageRecord,
-  PublicSessionRecord,
-  SessionData,
-  SyncedSessionRow,
-} from "@gitinspect/db";
+import type { MessageRow, SessionData } from "@gitinspect/db";
 import { auth } from "@gitinspect/auth";
-import { env } from "@gitinspect/env/server";
-import { createPublicShareSnapshot } from "@gitinspect/pi/lib/public-share";
+import { createPublicShareSnapshot } from "@gitinspect/runtime/lib/public-share";
+import { ShareIdSchema, SharePublishSchema, readShareBody } from "@gitinspect/shared/public-share";
 import { createFileRoute } from "@tanstack/react-router";
-import { getCanonicalAppUserId, isShareEntitledForUser } from "@/lib/autumn.server";
-import {
-  DexieCloudSchemaPendingError,
-  deleteDexieCloudRecord,
-  getDexieCloudRecord,
-  listDexieCloudRecords,
-  putDexieCloudRecord,
-} from "@/lib/dexie-cloud-rest.server";
+import { sharingServiceRequest } from "@/lib/sharing-service.server";
 
-type SharePublishPayload = {
-  messages: MessageRow[];
-  session: SessionData;
-};
-
-function isDexieCloudConfigured(): boolean {
-  return Boolean(
-    env.DEXIE_CLOUD_DB_URL && env.DEXIE_CLOUD_CLIENT_ID && env.DEXIE_CLOUD_CLIENT_SECRET,
-  );
+const json = (body: unknown, status = 200) =>
+  Response.json(body, { status, headers: { "cache-control": "no-store" } });
+function shareUrl(request: Request, id: string) {
+  return new URL(`/share/${encodeURIComponent(id)}`, request.url).toString();
 }
-
-function buildPublicShareUrl(request: Request, sessionId: string): string {
-  return new URL(`/share/${encodeURIComponent(sessionId)}`, request.url).toString();
+async function currentOwner(request: Request) {
+  const session = await auth.api.getSession({ headers: request.headers });
+  return session?.user ? (session.user.ghId ?? session.user.id) : undefined;
+}
+function invalidOrigin(request: Request) {
+  const origin = request.headers.get("origin");
+  return origin !== null && origin !== new URL(request.url).origin;
 }
 
 export const Route = createFileRoute("/api/shares/$sessionId")({
   server: {
     handlers: {
       GET: async ({ params, request }) => {
-        if (!isDexieCloudConfigured()) {
-          return Response.json({ error: "Dexie Cloud is not configured" }, { status: 503 });
-        }
-
-        const session = await auth.api.getSession({
-          headers: request.headers,
-        });
-
-        if (!session?.user) {
-          return Response.json({ error: "Unauthorized" }, { status: 401 });
-        }
-
-        const publicSession = await getDexieCloudRecord<PublicSessionRecord>(
-          `/public/publicSessions/${params.sessionId}`,
-        );
-        const currentUserId = getCanonicalAppUserId(session.user);
-        const isShared = publicSession?.ownerUserId === currentUserId;
-
-        return Response.json({
-          canUnshare: isShared,
-          isShared,
-          url: isShared ? buildPublicShareUrl(request, params.sessionId) : null,
-        });
+        if (!ShareIdSchema.safeParse(params.sessionId).success)
+          return json({ error: "Invalid session id" }, 400);
+        if (new URL(request.url).searchParams.get("view") === "public")
+          return sharingServiceRequest({ sessionId: params.sessionId, publicView: true });
+        const ownerUserId = await currentOwner(request);
+        if (!ownerUserId) return json({ error: "Unauthorized" }, 401);
+        const response = await sharingServiceRequest({ sessionId: params.sessionId, ownerUserId });
+        if (!response.ok) return response;
+        const state = (await response.json()) as { isShared: boolean; canUnshare: boolean };
+        return json({ ...state, url: state.isShared ? shareUrl(request, params.sessionId) : null });
       },
       PUT: async ({ params, request }) => {
-        if (!isDexieCloudConfigured()) {
-          return Response.json({ error: "Dexie Cloud is not configured" }, { status: 503 });
-        }
-
-        const session = await auth.api.getSession({
-          headers: request.headers,
-        });
-
-        if (!session?.user) {
-          return Response.json({ error: "Unauthorized" }, { status: 401 });
-        }
-
-        if (!(await isShareEntitledForUser(session.user))) {
-          return Response.json(
-            { error: "Sharing is not enabled for this account" },
-            { status: 403 },
-          );
-        }
-
-        const payload = (await request.json()) as SharePublishPayload;
-
-        if (payload.session.id !== params.sessionId) {
-          return Response.json({ error: "Session id mismatch" }, { status: 400 });
-        }
-
-        if (payload.messages.some((message) => message.sessionId !== params.sessionId)) {
-          return Response.json({ error: "Message session mismatch" }, { status: 400 });
-        }
-
-        const currentUserId = getCanonicalAppUserId(session.user);
-
+        if (invalidOrigin(request)) return json({ error: "Forbidden" }, 403);
+        const ownerUserId = await currentOwner(request);
+        if (!ownerUserId) return json({ error: "Unauthorized" }, 401);
+        let payload;
         try {
-          const syncedSession = await getDexieCloudRecord<SyncedSessionRow>(
-            `/all/sessions/${params.sessionId}`,
-          );
-
-          if (syncedSession && syncedSession.owner !== currentUserId) {
-            return Response.json({ error: "Forbidden" }, { status: 403 });
-          }
-
-          const existingPublic = await getDexieCloudRecord<PublicSessionRecord>(
-            `/public/publicSessions/${params.sessionId}`,
-          );
-
-          if (existingPublic && existingPublic.ownerUserId !== currentUserId) {
-            return Response.json({ error: "Forbidden" }, { status: 403 });
-          }
-
-          const now = new Date().toISOString();
-          const publishedAt = existingPublic?.publishedAt ?? now;
-          const snapshot = createPublicShareSnapshot({
-            messages: payload.messages,
-            ownerUserId: currentUserId,
-            publishedAt,
-            session: payload.session,
-            updatedAt: now,
-          });
-
-          const existingMessages = await listDexieCloudRecords<PublicMessageRecord>(
-            `/public/publicMessages?sessionId=${encodeURIComponent(params.sessionId)}`,
-          );
-
-          await Promise.all(
-            existingMessages.map((message) =>
-              deleteDexieCloudRecord(`/public/publicMessages/${message.id}`),
-            ),
-          );
-
-          await putDexieCloudRecord(`/public/publicSessions`, snapshot.session);
-          await Promise.all(
-            snapshot.messages.map((message) =>
-              putDexieCloudRecord(`/public/publicMessages`, message),
-            ),
-          );
-
-          return Response.json({
-            ok: true,
-            url: buildPublicShareUrl(request, params.sessionId),
-          });
+          payload = SharePublishSchema.parse(JSON.parse(await readShareBody(request)));
         } catch (error) {
-          if (error instanceof DexieCloudSchemaPendingError) {
-            return Response.json({ error: error.message }, { status: 503 });
-          }
-          throw error;
+          return json(
+            { error: error instanceof RangeError ? error.message : "Invalid share payload" },
+            error instanceof RangeError ? 413 : 400,
+          );
         }
+        if (
+          payload.session.id !== params.sessionId ||
+          payload.messages.some(
+            (message) => "sessionId" in message && message.sessionId !== params.sessionId,
+          )
+        )
+          return json({ error: "Session id mismatch" }, 400);
+        const now = new Date().toISOString();
+        const snapshot = createPublicShareSnapshot({
+          messages: payload.messages as MessageRow[],
+          session: payload.session as SessionData,
+          publishedAt: now,
+          updatedAt: now,
+        });
+        const response = await sharingServiceRequest({
+          sessionId: params.sessionId,
+          ownerUserId,
+          method: "PUT",
+          body: JSON.stringify(snapshot),
+        });
+        if (!response.ok) return response;
+        return json({ ok: true, url: shareUrl(request, params.sessionId) });
       },
       DELETE: async ({ params, request }) => {
-        if (!isDexieCloudConfigured()) {
-          return Response.json({ error: "Dexie Cloud is not configured" }, { status: 503 });
-        }
-
-        const session = await auth.api.getSession({
-          headers: request.headers,
+        if (invalidOrigin(request)) return json({ error: "Forbidden" }, 403);
+        if (!ShareIdSchema.safeParse(params.sessionId).success)
+          return json({ error: "Invalid session id" }, 400);
+        const ownerUserId = await currentOwner(request);
+        if (!ownerUserId) return json({ error: "Unauthorized" }, 401);
+        return sharingServiceRequest({
+          sessionId: params.sessionId,
+          ownerUserId,
+          method: "DELETE",
         });
-
-        if (!session?.user) {
-          return Response.json({ error: "Unauthorized" }, { status: 401 });
-        }
-
-        const publicSession = await getDexieCloudRecord<PublicSessionRecord>(
-          `/public/publicSessions/${params.sessionId}`,
-        );
-        const currentUserId = getCanonicalAppUserId(session.user);
-
-        if (!publicSession) {
-          return Response.json({ ok: true });
-        }
-
-        if (publicSession.ownerUserId !== currentUserId) {
-          return Response.json({ error: "Forbidden" }, { status: 403 });
-        }
-
-        const existingMessages = await listDexieCloudRecords<PublicMessageRecord>(
-          `/public/publicMessages?sessionId=${encodeURIComponent(params.sessionId)}`,
-        );
-
-        await Promise.all(
-          existingMessages.map((message) =>
-            deleteDexieCloudRecord(`/public/publicMessages/${message.id}`),
-          ),
-        );
-        await deleteDexieCloudRecord(`/public/publicSessions/${params.sessionId}`);
-
-        return Response.json({ ok: true });
       },
     },
   },

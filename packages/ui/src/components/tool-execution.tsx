@@ -7,8 +7,11 @@ import {
   ToolInput,
   ToolOutput,
 } from "@gitinspect/ui/components/ai-elements/tool";
-import { isUserAbortError, USER_ABORT_NOTICE_MESSAGE } from "@gitinspect/pi/agent/runtime-errors";
-import type { ToolCall, ToolResultMessage } from "@gitinspect/pi/types/chat";
+import {
+  isUserAbortError,
+  USER_ABORT_NOTICE_MESSAGE,
+} from "@gitinspect/runtime/agent/runtime-errors";
+import type { ToolCall, ToolResultMessage } from "@gitinspect/runtime/types/chat";
 
 interface BashDetails {
   command: string;
@@ -57,8 +60,9 @@ function getDisplayToolResultText(message: ToolResultMessage): string {
 
 function renderToolResultBody(message: ToolResultMessage) {
   const text = getDisplayToolResultText(message);
-  const hasReadDetails = isReadDetails(message.details);
-  const hasBashDetails = isBashDetails(message.details);
+  const details = message.details;
+  const hasReadDetails = isReadDetails(details);
+  const hasBashDetails = isBashDetails(details);
 
   if (!text && !hasReadDetails && !hasBashDetails) {
     return null;
@@ -68,17 +72,17 @@ function renderToolResultBody(message: ToolResultMessage) {
     <div className="space-y-3 text-xs">
       {hasReadDetails ? (
         <div className="text-muted-foreground">
-          {message.details.path} → {message.details.resolvedPath}
+          {details.path} → {details.resolvedPath}
         </div>
       ) : null}
 
       {hasBashDetails ? (
         <div className="space-y-1 text-muted-foreground">
           <div>
-            {message.details.cwd} · exit {message.details.exitCode}
+            {details.cwd} · exit {details.exitCode}
           </div>
           <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-md bg-background/60 p-3 font-mono text-foreground/80">
-            {message.details.command}
+            {details.command}
           </pre>
         </div>
       ) : null}

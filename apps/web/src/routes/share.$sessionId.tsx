@@ -1,15 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { env as packageEnv } from "@gitinspect/env/web";
-import { loadPublicSessionSnapshot } from "@gitinspect/pi/lib/public-share-client";
+import { loadPublicSessionSnapshot } from "@gitinspect/runtime/lib/public-share-client";
 import { PublicSharePage } from "@/components/public-share-page";
-
-console.log("share env debug", {
-  directDexie: import.meta.env.VITE_DEXIE_CLOUD_DB_URL,
-  directAuth: import.meta.env.VITE_BETTER_AUTH_URL,
-  packageDexie: packageEnv.VITE_DEXIE_CLOUD_DB_URL,
-  packageAuth: packageEnv.VITE_BETTER_AUTH_URL,
-});
 
 const shareQueryClient = new QueryClient({
   defaultOptions: {

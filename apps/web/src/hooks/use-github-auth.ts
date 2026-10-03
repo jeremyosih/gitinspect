@@ -2,8 +2,8 @@ import * as React from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { authClient } from "@/lib/auth-client";
 import { deriveGitHubAuthState } from "@/lib/github-access";
-import { getGithubPersonalAccessToken } from "@gitinspect/pi/repo/github-token";
-import type { GitHubAuthState } from "@gitinspect/pi/repo/github-access";
+import { getGithubPersonalAccessToken } from "@gitinspect/runtime/repo/github-token";
+import type { GitHubAuthState } from "@gitinspect/runtime/repo/github-access";
 
 const DEFAULT_AUTH_STATE: GitHubAuthState = {
   fallbackPat: false,

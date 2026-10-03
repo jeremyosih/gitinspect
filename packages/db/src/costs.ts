@@ -1,5 +1,5 @@
-import { getDateKey } from "@gitinspect/pi/lib/dates";
-import type { ProviderId, Usage } from "@gitinspect/pi/types/models";
+import { getDateKey } from "@gitinspect/shared/lib/dates";
+import type { ProviderId, Usage } from "@gitinspect/shared/types/models";
 import { db } from "./db";
 import type { DailyCostAggregate } from "./types";
 

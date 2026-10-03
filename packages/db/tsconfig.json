@@ -5,7 +5,7 @@
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "types": ["vite/client"],
     "paths": {
-      "@gitinspect/pi/*": ["../pi/src/*"]
+      "@gitinspect/runtime/*": ["../runtime/src/*"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],

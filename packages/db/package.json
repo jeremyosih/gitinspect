@@ -7,14 +7,15 @@
     ".": "./src/index.ts",
     "./session-leases": "./src/session-leases.ts",
     "./session-runtime": "./src/session-runtime.ts",
-    "./session-runtime-normalization": "./src/session-runtime-normalization.ts"
+    "./session-runtime-normalization": "./src/session-runtime-normalization.ts",
+    "./session-state-normalization": "./src/session-state-normalization.ts"
   },
   "scripts": {
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
-    "dexie": "^4.3.0",
-    "dexie-cloud-addon": "^4.4.10"
+    "@gitinspect/shared": "workspace:*",
+    "dexie": "^4.3.0"
   },
   "devDependencies": {
     "@gitinspect/config": "workspace:*",

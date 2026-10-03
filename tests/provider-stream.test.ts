@@ -1,463 +1,164 @@
-import { Type } from "@sinclair/typebox";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createAssistantMessageEventStream } from "@mariozechner/pi-ai";
-import type * as PiAi from "@mariozechner/pi-ai";
-import type { AssistantMessage as PiAssistantMessage } from "@mariozechner/pi-ai";
+import { beforeEach, describe, it, expect, vi } from "vitest";
+import { createProviderModel, codexRequestBody, createFxFetch } from "@/agent/provider-stream";
 import { getModel } from "@/models/catalog";
-import { createEmptyUsage } from "@/types/models";
-import { buildProxiedUrl } from "@/proxy/url";
-
-const { getProxyConfig, resolveProviderAuthForProvider, streamSimple } = vi.hoisted(() => ({
-  getProxyConfig: vi.fn(),
-  resolveProviderAuthForProvider: vi.fn(),
-  streamSimple: vi.fn(),
-}));
-
-vi.mock("@/auth/resolve-api-key", () => ({
-  resolveProviderAuthForProvider,
-}));
+import { serializeOAuthCredentials } from "@/auth/oauth-types";
+import type { LanguageModelV4CallOptions } from "@ai-sdk/provider";
 
 vi.mock("@/proxy/settings", () => ({
-  getProxyConfig,
+  getProxyConfig: async () => ({ enabled: true, url: "https://proxy.test" }),
 }));
-
-vi.mock("@mariozechner/pi-ai", async () => {
-  const actual = await vi.importActual<typeof PiAi>("@mariozechner/pi-ai");
-
-  return {
-    ...actual,
-    streamSimple,
-  };
-});
-
-function createAssistant(
-  model: {
-    api: string;
-    id: string;
-    provider: string;
-  },
-  overrides: Partial<PiAssistantMessage> = {},
-): PiAssistantMessage {
-  return {
-    api: model.api,
-    content: [],
-    model: model.id,
-    provider: model.provider,
-    role: "assistant",
-    stopReason: "stop",
-    timestamp: 2,
-    usage: createEmptyUsage(),
-    ...overrides,
-  };
+const options: LanguageModelV4CallOptions = {
+  prompt: [
+    { role: "system", content: "Inspect repos" },
+    { role: "user", content: [{ type: "text", text: "hello" }] },
+  ],
+  maxOutputTokens: 1024,
+};
+function sse(events: unknown[]) {
+  return new Response(events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join(""), {
+    headers: { "content-type": "text/event-stream" },
+  });
 }
 
-function createMockStream(
-  emit: (stream: ReturnType<typeof createAssistantMessageEventStream>) => void,
-) {
-  const stream = createAssistantMessageEventStream();
-
-  queueMicrotask(() => {
-    emit(stream);
-  });
-
-  return stream;
-}
-
-describe("provider stream", () => {
-  beforeEach(() => {
-    resolveProviderAuthForProvider.mockReset();
-    getProxyConfig.mockReset();
-    streamSimple.mockReset();
-  });
-
-  it("delegates codex streaming to pi-ai and proxies the model baseUrl", async () => {
-    resolveProviderAuthForProvider.mockResolvedValue({
-      apiKey: "api-key",
-      isOAuth: true,
-      provider: "openai-codex",
-      storedValue: '{"providerId":"openai-codex"}',
-    });
-    getProxyConfig.mockResolvedValue({
-      enabled: true,
-      url: "https://proxy.example/proxy",
-    });
-    streamSimple.mockImplementation((model) =>
-      createMockStream((stream) => {
-        const partial = createAssistant(model, {
-          content: [{ text: "", type: "text" }],
-        });
-        const finalMessage = createAssistant(model, {
-          content: [{ text: "Hello", type: "text" }],
-        });
-
-        stream.push({ partial, type: "start" });
-        stream.push({ contentIndex: 0, partial, type: "text_start" });
-        stream.push({
-          contentIndex: 0,
-          delta: "Hello",
-          partial: {
-            ...partial,
-            content: [{ text: "Hello", type: "text" }],
+describe("fx provider transport", () => {
+  beforeEach(() => vi.restoreAllMocks());
+  it("routes ChatGPT OAuth through the subscription endpoint and account", async () => {
+    const fetchMock = vi.fn(async () =>
+      sse([
+        { type: "response.created", response: { id: "resp_1", created_at: 1, model: "gpt-5.4" } },
+        {
+          type: "response.completed",
+          response: {
+            id: "resp_1",
+            status: "completed",
+            output: [],
+            usage: { input_tokens: 5, output_tokens: 2 },
           },
-          type: "text_delta",
-        });
-        stream.push({
-          content: "Hello",
-          contentIndex: 0,
-          partial: finalMessage,
-          type: "text_end",
-        });
-        stream.push({
-          message: finalMessage,
-          reason: "stop",
-          type: "done",
-        });
-        stream.end(finalMessage);
-      }),
-    );
-
-    const { streamChat } = await import("@/agent/provider-stream");
-    const model = getModel("openai-codex", "gpt-5.1-codex-mini");
-    let text = "";
-    const result = await streamChat({
-      messages: [],
-      model: "gpt-5.1-codex-mini",
-      onTextDelta(delta) {
-        text += delta;
-      },
-      provider: "openai-codex",
-      sessionId: "session-1",
-      signal: new AbortController().signal,
-      thinkingLevel: "medium",
-      tools: [],
-    });
-
-    expect(streamSimple).toHaveBeenCalledWith(
-      expect.objectContaining({
-        baseUrl: buildProxiedUrl("https://proxy.example/proxy", model.baseUrl),
-        id: model.id,
-      }),
-      expect.objectContaining({
-        messages: [],
-        systemPrompt: expect.any(String),
-      }),
-      expect.objectContaining({
-        apiKey: "api-key",
-        maxTokens: model.maxTokens,
-        reasoning: "medium",
-        sessionId: "session-1",
-      }),
-    );
-    expect(text).toBe("Hello");
-    expect(result.assistantMessage.content).toEqual([{ text: "Hello", type: "text" }]);
-    expect(result.assistantMessage.id).toBeTruthy();
-  });
-
-  it("keeps google gemini requests direct while still delegating to pi-ai", async () => {
-    resolveProviderAuthForProvider.mockResolvedValue({
-      apiKey: JSON.stringify({
-        projectId: "project-1",
-        token: "google-access",
-      }),
-      isOAuth: true,
-      provider: "google-gemini-cli",
-      storedValue: '{"providerId":"google-gemini-cli"}',
-    });
-    getProxyConfig.mockResolvedValue({
-      enabled: true,
-      url: "https://proxy.example/proxy",
-    });
-    streamSimple.mockImplementation((model) =>
-      createMockStream((stream) => {
-        const message = createAssistant(model, {
-          content: [{ text: "Gemini", type: "text" }],
-        });
-
-        stream.push({ partial: message, type: "start" });
-        stream.push({
-          message,
-          reason: "stop",
-          type: "done",
-        });
-        stream.end(message);
-      }),
-    );
-
-    const { streamChat } = await import("@/agent/provider-stream");
-    const model = getModel("google-gemini-cli", "gemini-2.5-pro");
-    const result = await streamChat({
-      messages: [],
-      model: "gemini-2.5-pro",
-      onTextDelta() {},
-      provider: "google-gemini-cli",
-      sessionId: "session-4",
-      signal: new AbortController().signal,
-      thinkingLevel: "medium",
-      tools: [],
-    });
-
-    expect(streamSimple).toHaveBeenCalledWith(
-      expect.objectContaining({
-        baseUrl: model.baseUrl,
-        id: model.id,
-      }),
-      expect.any(Object),
-      expect.objectContaining({
-        apiKey: JSON.stringify({
-          projectId: "project-1",
-          token: "google-access",
-        }),
-      }),
-    );
-    expect(result.assistantMessage.content).toEqual([{ text: "Gemini", type: "text" }]);
-  });
-
-  it("throws when the delegated stream ends with an error event", async () => {
-    resolveProviderAuthForProvider.mockResolvedValue({
-      apiKey: "api-key",
-      isOAuth: false,
-      provider: "fireworks-ai",
-      storedValue: "api-key",
-    });
-    getProxyConfig.mockResolvedValue({
-      enabled: true,
-      url: "https://proxy.example/proxy",
-    });
-    streamSimple.mockImplementation((model) =>
-      createMockStream((stream) => {
-        const partial = createAssistant(model, {
-          content: [{ text: "Partial", type: "text" }],
-        });
-        const error = createAssistant(model, {
-          content: [{ text: "Partial", type: "text" }],
-          errorMessage: "Boom",
-          stopReason: "error",
-        });
-
-        stream.push({ partial, type: "start" });
-        stream.push({
-          contentIndex: 0,
-          delta: "Partial",
-          partial,
-          type: "text_delta",
-        });
-        stream.push({
-          error,
-          reason: "error",
-          type: "error",
-        });
-        stream.end(error);
-      }),
-    );
-
-    const { streamChat } = await import("@/agent/provider-stream");
-    const deltas: Array<string> = [];
-
-    await expect(
-      streamChat({
-        messages: [],
-        model: "accounts/fireworks/routers/kimi-k2p5-turbo",
-        onTextDelta(delta) {
-          deltas.push(delta);
         },
-        provider: "fireworks-ai",
-        providerGroup: "fireworks-free",
-        sessionId: "session-error",
-        signal: new AbortController().signal,
-        thinkingLevel: "medium",
-        tools: [],
-      }),
-    ).rejects.toThrow(
-      "Boom [fireworks-ai/accounts/fireworks/routers/kimi-k2p5-turbo → https://api.fireworks.ai/inference/v1]",
+      ]),
     );
-
-    expect(deltas).toEqual(["Partial"]);
-  });
-
-  it("preserves pi-ai tool call events for agent mode and attaches app ids", async () => {
-    getProxyConfig.mockResolvedValue({
-      enabled: false,
-      url: "https://proxy.example/proxy",
+    const storedValue = serializeOAuthCredentials({
+      providerId: "openai-codex",
+      access: "oauth-test-token",
+      refresh: "refresh-test",
+      expires: Date.now() + 600000,
+      accountId: "account-test",
     });
-    streamSimple.mockImplementation((model) =>
-      createMockStream((stream) => {
-        const partial = createAssistant(model, {
-          content: [
-            {
-              arguments: { path: "README.md" },
-              id: "call_123",
-              name: "read",
-              type: "toolCall",
-            },
-          ],
-          stopReason: "toolUse",
-        });
-        const finalMessage = createAssistant(model, {
-          content: [
-            {
-              arguments: { path: "README.md" },
-              id: "call_123",
-              name: "read",
-              type: "toolCall",
-            },
-          ],
-          stopReason: "toolUse",
-        });
-
-        stream.push({ partial, type: "start" });
-        stream.push({
-          contentIndex: 0,
-          partial,
-          type: "toolcall_start",
-        });
-        stream.push({
-          contentIndex: 0,
-          delta: '{"path":"README.md"}',
-          partial,
-          type: "toolcall_delta",
-        });
-        stream.push({
-          contentIndex: 0,
-          partial,
-          toolCall: {
-            arguments: { path: "README.md" },
-            id: "call_123",
-            name: "read",
-            type: "toolCall",
-          },
-          type: "toolcall_end",
-        });
-        stream.push({
-          message: finalMessage,
-          reason: "toolUse",
-          type: "done",
-        });
-        stream.end(finalMessage);
-      }),
-    );
-
-    const { streamChatWithPiAgent } = await import("@/agent/provider-stream");
-    const model = getModel("opencode", "gpt-5-nano");
-    const eventStream = await streamChatWithPiAgent(
-      model,
-      {
-        messages: [],
-        systemPrompt: "system",
-        tools: [
-          {
-            description: "Read a file",
-            name: "read",
-            parameters: Type.Object({
-              path: Type.String(),
-            }),
-          },
-        ],
-      },
-      {
-        apiKey: "sk-public-free-key",
-        reasoning: "medium",
-        sessionId: "session-tools",
-      },
-    );
-    const events: Array<string> = [];
-    let startId: string | undefined;
-    let finalId: string | undefined;
-
-    for await (const event of eventStream) {
-      events.push(event.type);
-
-      if (event.type === "start") {
-        startId =
-          "id" in event.partial && typeof event.partial.id === "string"
-            ? event.partial.id
-            : undefined;
-      }
-
-      if (event.type === "done") {
-        finalId =
-          "id" in event.message && typeof event.message.id === "string"
-            ? event.message.id
-            : undefined;
-      }
-    }
-
-    expect(streamSimple).toHaveBeenCalledWith(
-      expect.objectContaining({
-        id: "gpt-5-nano",
-        provider: "opencode",
-      }),
-      expect.objectContaining({
-        tools: [
-          expect.objectContaining({
-            name: "read",
-          }),
-        ],
-      }),
-      expect.objectContaining({
-        apiKey: "sk-public-free-key",
-        reasoning: "medium",
-        sessionId: "session-tools",
-      }),
-    );
-    expect(events).toEqual(
-      expect.arrayContaining(["start", "toolcall_start", "toolcall_end", "done"]),
-    );
-    expect(startId).toBeTruthy();
-    expect(finalId).toBe(startId);
-  });
-
-  it("drops an empty trailing assistant placeholder before delegating to pi-ai", async () => {
-    getProxyConfig.mockResolvedValue({
-      enabled: false,
-      url: "https://proxy.example/proxy",
+    const model = await createProviderModel({
+      model: getModel("openai-codex", "gpt-5.4"),
+      auth: { apiKey: "oauth-test-token", provider: "openai-codex", isOAuth: true, storedValue },
+      sessionId: "session-test",
+      thinkingLevel: "medium",
+      fetch: fetchMock,
     });
-    streamSimple.mockImplementation((_model, context) =>
-      createMockStream((stream) => {
-        expect(context.messages).toEqual([
-          {
-            content: "hello",
-            role: "user",
-            timestamp: 1,
-          },
-        ]);
-        const message = createAssistant(_model, {
-          content: [{ text: "Done", type: "text" }],
-        });
-        stream.push({ partial: message, type: "start" });
-        stream.push({
-          message,
-          reason: "stop",
-          type: "done",
-        });
-        stream.end(message);
+    const stream = await model.doStream(options);
+    await stream.stream.pipeTo(new WritableStream());
+    const [url, request] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(decodeURIComponent(url)).toContain("https://chatgpt.com/backend-api/codex/responses");
+    const headers = new Headers(request.headers);
+    expect(headers.get("Authorization")).toBe("Bearer oauth-test-token");
+    expect(headers.get("ChatGPT-Account-Id")).toBe("account-test");
+    const body = JSON.parse(String(request.body));
+    expect(body).toMatchObject({ store: false, stream: true, instructions: "Inspect repos" });
+    expect(body.max_output_tokens).toBeUndefined();
+    expect(body.input.every((item: any) => !["system", "developer"].includes(item.role))).toBe(
+      true,
+    );
+  });
+  it("rejects an API key masquerading as a ChatGPT subscription", async () => {
+    await expect(
+      createProviderModel({
+        model: getModel("openai-codex", "gpt-5.4"),
+        auth: {
+          apiKey: "sk-test",
+          provider: "openai-codex",
+          isOAuth: false,
+          storedValue: "sk-test",
+        },
+        sessionId: "test",
+        thinkingLevel: "off",
       }),
+    ).rejects.toThrow("Sign in with ChatGPT");
+  });
+  it("keeps direct Google keys on the Google API", async () => {
+    const fetchMock = vi.fn(async () =>
+      sse([
+        {
+          candidates: [
+            { content: { role: "model", parts: [{ text: "hello" }] }, finishReason: "STOP" },
+          ],
+        },
+      ]),
     );
-
-    const { streamChatWithPiAgent } = await import("@/agent/provider-stream");
-    const model = getModel("opencode", "gpt-5-nano");
-    const eventStream = await streamChatWithPiAgent(
-      model,
-      {
-        messages: [
-          {
-            content: "hello",
-            role: "user",
-            timestamp: 1,
+    const model = await createProviderModel({
+      model: getModel("google", "gemini-2.5-pro"),
+      auth: {
+        apiKey: "google-test",
+        provider: "google",
+        isOAuth: false,
+        storedValue: "google-test",
+      },
+      sessionId: "test",
+      thinkingLevel: "off",
+      fetch: fetchMock,
+    });
+    const response = await model.doStream(options);
+    await response.stream.pipeTo(new WritableStream());
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain("generativelanguage.googleapis.com");
+  });
+  it("bridges SDK stream parts to fx without a gateway request", async () => {
+    const model = {
+      doStream: vi.fn(async () => ({
+        stream: new ReadableStream({
+          start(c) {
+            c.enqueue({ type: "text-delta", id: "a", delta: "hello" });
+            c.close();
           },
-          createAssistant(model, {
-            content: [{ text: "", type: "text" }],
+        }),
+      })),
+    };
+    const fetch = createFxFetch(model as any, getModel("openai", "gpt-5.4"), "off");
+    const response = await fetch("https://ai-gateway.vercel.sh/v4/ai/language-model", {
+      method: "POST",
+      body: new TextEncoder().encode(JSON.stringify(options)),
+    });
+    expect(await response.text()).toContain('"delta":"hello"');
+    expect(model.doStream).toHaveBeenCalledOnce();
+  });
+  it("normalizes the subscription request without removing tool input", () => {
+    const body = codexRequestBody({
+      input: [
+        { role: "developer", content: "rules" },
+        { type: "function_call_output", call_id: "call-1", output: "file" },
+      ],
+      max_output_tokens: 100,
+      previous_response_id: "old",
+    });
+    expect(body).toMatchObject({
+      instructions: "rules",
+      store: false,
+      input: [{ type: "function_call_output", call_id: "call-1", output: "file" }],
+    });
+    expect(body.previous_response_id).toBeUndefined();
+  });
+  it("preserves provider stream errors across the WASM JSON boundary", async () => {
+    const model = {
+      async doStream() {
+        return {
+          stream: new ReadableStream({
+            start(c) {
+              c.enqueue({ type: "error", error: new Error("Subscription limit reached") });
+              c.close();
+            },
           }),
-        ],
-        systemPrompt: "system",
-        tools: [],
+        };
       },
-      {
-        apiKey: "sk-public-free-key",
-        sessionId: "session-placeholder",
-      },
-    );
-
-    await eventStream.result();
-    expect(streamSimple).toHaveBeenCalledTimes(1);
+    };
+    const fetch = createFxFetch(model as any, getModel("openai-codex", "gpt-5.4"), "off");
+    const response = await fetch("https://ai-gateway.vercel.sh/v4/ai/language-model", {
+      method: "POST",
+      body: JSON.stringify(options),
+    });
+    expect(await response.text()).toContain('"error":{"message":"Subscription limit reached"}');
   });
 });

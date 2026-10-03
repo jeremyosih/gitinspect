@@ -50,7 +50,7 @@ function buildMessagesWithTools(): ChatMessage[] {
           type: "toolCall",
         },
         {
-          arguments: { path: "packages/pi/src/lib/copy-session-markdown.ts" },
+          arguments: { path: "packages/runtime/src/lib/copy-session-markdown.ts" },
           id: "call-pending",
           name: "read",
           type: "toolCall",
@@ -170,7 +170,7 @@ describe("messagesToMarkdown", () => {
     expect(markdown).toContain("   cwd: /repo");
     expect(markdown).toContain("   error: command failed loudly");
     expect(markdown).toContain("3. read — Running");
-    expect(markdown).toContain("   path: packages/pi/src/lib/copy-session-markdown.ts");
+    expect(markdown).toContain("   path: packages/runtime/src/lib/copy-session-markdown.ts");
     expect(markdown).not.toContain("file contents that should not be copied");
   });
 });

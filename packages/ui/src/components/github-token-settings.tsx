@@ -5,7 +5,7 @@ import {
   getGithubPersonalAccessToken,
   setGithubPersonalAccessToken,
   validateGithubPersonalAccessToken,
-} from "@gitinspect/pi/repo/github-token";
+} from "@gitinspect/runtime/repo/github-token";
 import { toast } from "sonner";
 import { useGitHubAuthContext } from "@gitinspect/ui/components/github-auth-context";
 import { Button } from "@gitinspect/ui/components/button";

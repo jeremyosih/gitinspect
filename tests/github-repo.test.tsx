@@ -37,13 +37,13 @@ vi.mock("@gitinspect/ui/components/tooltip", () => ({
     React.createElement("div", undefined, children),
 }));
 
-vi.mock("@gitinspect/pi/repo/github-fetch", () => ({
+vi.mock("@gitinspect/runtime/repo/github-fetch", () => ({
   githubApiFetch: githubApiFetchMock,
   handleGithubError: vi.fn(async () => false),
   openGithubTokenSettings: vi.fn(),
 }));
 
-vi.mock("@gitinspect/pi/repo/github-token", () => ({
+vi.mock("@gitinspect/runtime/repo/github-token", () => ({
   getGithubPersonalAccessToken: vi.fn(async () => "token"),
 }));
 

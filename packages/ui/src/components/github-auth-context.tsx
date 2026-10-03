@@ -1,9 +1,12 @@
 import * as React from "react";
-import type { GitHubAuthState, GitHubNoticeCtaIntent } from "@gitinspect/pi/repo/github-access";
+import type {
+  GitHubAuthState,
+  GitHubNoticeCtaIntent,
+} from "@gitinspect/runtime/repo/github-access";
 
 export type AuthDialogVariant = "default" | "first-message";
 export type AuthDialogMode = "full" | "github-only";
-export type AuthDialogReason = "free-models" | "private-repo-access" | "settings";
+export type AuthDialogReason = "private-repo-access" | "settings";
 
 export type PendingAuthAction = {
   content: string;

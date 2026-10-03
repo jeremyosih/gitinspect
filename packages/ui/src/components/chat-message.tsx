@@ -1,14 +1,14 @@
 import { Link } from "@tanstack/react-router";
 import { AlertCircle, AlertTriangle, ChevronDown, Info } from "lucide-react";
-import { getGitHubNoticeCta } from "@gitinspect/pi/repo/github-access";
+import { getGitHubNoticeCta } from "@gitinspect/runtime/repo/github-access";
 import { useGitHubAuthContext } from "@gitinspect/ui/components/github-auth-context";
 import {
   deriveAssistantView,
   getUserText,
   isSystemMessage,
   isToolResultMessage,
-} from "@gitinspect/pi/lib/chat-adapter";
-import type { DisplayChatMessage } from "@gitinspect/pi/types/chat";
+} from "@gitinspect/runtime/lib/chat-adapter";
+import type { DisplayChatMessage } from "@gitinspect/runtime/types/chat";
 import {
   Message,
   MessageBranch,

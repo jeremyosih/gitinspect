@@ -15,14 +15,11 @@ import { Route as ChatIndexRouteImport } from "./routes/chat.index";
 import { Route as OwnerIndexRouteImport } from "./routes/$owner.index";
 import { Route as ShareSessionIdRouteImport } from "./routes/share.$sessionId";
 import { Route as ChatSessionIdRouteImport } from "./routes/chat.$sessionId";
-import { Route as ApiProxyRouteImport } from "./routes/api/proxy";
 import { Route as ApiFeedbackRouteImport } from "./routes/api/feedback";
 import { Route as ApiERouteImport } from "./routes/api/e";
-import { Route as ApiDexieCloudTokenRouteImport } from "./routes/api/dexie-cloud-token";
 import { Route as OwnerRepoIndexRouteImport } from "./routes/$owner.$repo.index";
 import { Route as ApiSharesSessionIdRouteImport } from "./routes/api/shares.$sessionId";
 import { Route as ApiGithubSplatRouteImport } from "./routes/api/github/$";
-import { Route as ApiAutumnSplatRouteImport } from "./routes/api/autumn/$";
 import { Route as ApiAuthSplatRouteImport } from "./routes/api/auth/$";
 import { Route as OwnerRepoSplatRouteImport } from "./routes/$owner.$repo.$";
 
@@ -56,11 +53,6 @@ const ChatSessionIdRoute = ChatSessionIdRouteImport.update({
   path: "/$sessionId",
   getParentRoute: () => ChatRoute,
 } as any);
-const ApiProxyRoute = ApiProxyRouteImport.update({
-  id: "/api/proxy",
-  path: "/api/proxy",
-  getParentRoute: () => rootRouteImport,
-} as any);
 const ApiFeedbackRoute = ApiFeedbackRouteImport.update({
   id: "/api/feedback",
   path: "/api/feedback",
@@ -69,11 +61,6 @@ const ApiFeedbackRoute = ApiFeedbackRouteImport.update({
 const ApiERoute = ApiERouteImport.update({
   id: "/api/e",
   path: "/api/e",
-  getParentRoute: () => rootRouteImport,
-} as any);
-const ApiDexieCloudTokenRoute = ApiDexieCloudTokenRouteImport.update({
-  id: "/api/dexie-cloud-token",
-  path: "/api/dexie-cloud-token",
   getParentRoute: () => rootRouteImport,
 } as any);
 const OwnerRepoIndexRoute = OwnerRepoIndexRouteImport.update({
@@ -91,11 +78,6 @@ const ApiGithubSplatRoute = ApiGithubSplatRouteImport.update({
   path: "/api/github/$",
   getParentRoute: () => rootRouteImport,
 } as any);
-const ApiAutumnSplatRoute = ApiAutumnSplatRouteImport.update({
-  id: "/api/autumn/$",
-  path: "/api/autumn/$",
-  getParentRoute: () => rootRouteImport,
-} as any);
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: "/api/auth/$",
   path: "/api/auth/$",
@@ -110,34 +92,28 @@ const OwnerRepoSplatRoute = OwnerRepoSplatRouteImport.update({
 export interface FileRoutesByFullPath {
   "/": typeof IndexRoute;
   "/chat": typeof ChatRouteWithChildren;
-  "/api/dexie-cloud-token": typeof ApiDexieCloudTokenRoute;
   "/api/e": typeof ApiERoute;
   "/api/feedback": typeof ApiFeedbackRoute;
-  "/api/proxy": typeof ApiProxyRoute;
   "/chat/$sessionId": typeof ChatSessionIdRoute;
   "/share/$sessionId": typeof ShareSessionIdRoute;
   "/$owner/": typeof OwnerIndexRoute;
   "/chat/": typeof ChatIndexRoute;
   "/$owner/$repo/$": typeof OwnerRepoSplatRoute;
   "/api/auth/$": typeof ApiAuthSplatRoute;
-  "/api/autumn/$": typeof ApiAutumnSplatRoute;
   "/api/github/$": typeof ApiGithubSplatRoute;
   "/api/shares/$sessionId": typeof ApiSharesSessionIdRoute;
   "/$owner/$repo/": typeof OwnerRepoIndexRoute;
 }
 export interface FileRoutesByTo {
   "/": typeof IndexRoute;
-  "/api/dexie-cloud-token": typeof ApiDexieCloudTokenRoute;
   "/api/e": typeof ApiERoute;
   "/api/feedback": typeof ApiFeedbackRoute;
-  "/api/proxy": typeof ApiProxyRoute;
   "/chat/$sessionId": typeof ChatSessionIdRoute;
   "/share/$sessionId": typeof ShareSessionIdRoute;
   "/$owner": typeof OwnerIndexRoute;
   "/chat": typeof ChatIndexRoute;
   "/$owner/$repo/$": typeof OwnerRepoSplatRoute;
   "/api/auth/$": typeof ApiAuthSplatRoute;
-  "/api/autumn/$": typeof ApiAutumnSplatRoute;
   "/api/github/$": typeof ApiGithubSplatRoute;
   "/api/shares/$sessionId": typeof ApiSharesSessionIdRoute;
   "/$owner/$repo": typeof OwnerRepoIndexRoute;
@@ -146,17 +122,14 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport;
   "/": typeof IndexRoute;
   "/chat": typeof ChatRouteWithChildren;
-  "/api/dexie-cloud-token": typeof ApiDexieCloudTokenRoute;
   "/api/e": typeof ApiERoute;
   "/api/feedback": typeof ApiFeedbackRoute;
-  "/api/proxy": typeof ApiProxyRoute;
   "/chat/$sessionId": typeof ChatSessionIdRoute;
   "/share/$sessionId": typeof ShareSessionIdRoute;
   "/$owner/": typeof OwnerIndexRoute;
   "/chat/": typeof ChatIndexRoute;
   "/$owner/$repo/$": typeof OwnerRepoSplatRoute;
   "/api/auth/$": typeof ApiAuthSplatRoute;
-  "/api/autumn/$": typeof ApiAutumnSplatRoute;
   "/api/github/$": typeof ApiGithubSplatRoute;
   "/api/shares/$sessionId": typeof ApiSharesSessionIdRoute;
   "/$owner/$repo/": typeof OwnerRepoIndexRoute;
@@ -166,34 +139,28 @@ export interface FileRouteTypes {
   fullPaths:
     | "/"
     | "/chat"
-    | "/api/dexie-cloud-token"
     | "/api/e"
     | "/api/feedback"
-    | "/api/proxy"
     | "/chat/$sessionId"
     | "/share/$sessionId"
     | "/$owner/"
     | "/chat/"
     | "/$owner/$repo/$"
     | "/api/auth/$"
-    | "/api/autumn/$"
     | "/api/github/$"
     | "/api/shares/$sessionId"
     | "/$owner/$repo/";
   fileRoutesByTo: FileRoutesByTo;
   to:
     | "/"
-    | "/api/dexie-cloud-token"
     | "/api/e"
     | "/api/feedback"
-    | "/api/proxy"
     | "/chat/$sessionId"
     | "/share/$sessionId"
     | "/$owner"
     | "/chat"
     | "/$owner/$repo/$"
     | "/api/auth/$"
-    | "/api/autumn/$"
     | "/api/github/$"
     | "/api/shares/$sessionId"
     | "/$owner/$repo";
@@ -201,17 +168,14 @@ export interface FileRouteTypes {
     | "__root__"
     | "/"
     | "/chat"
-    | "/api/dexie-cloud-token"
     | "/api/e"
     | "/api/feedback"
-    | "/api/proxy"
     | "/chat/$sessionId"
     | "/share/$sessionId"
     | "/$owner/"
     | "/chat/"
     | "/$owner/$repo/$"
     | "/api/auth/$"
-    | "/api/autumn/$"
     | "/api/github/$"
     | "/api/shares/$sessionId"
     | "/$owner/$repo/";
@@ -220,15 +184,12 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute;
   ChatRoute: typeof ChatRouteWithChildren;
-  ApiDexieCloudTokenRoute: typeof ApiDexieCloudTokenRoute;
   ApiERoute: typeof ApiERoute;
   ApiFeedbackRoute: typeof ApiFeedbackRoute;
-  ApiProxyRoute: typeof ApiProxyRoute;
   ShareSessionIdRoute: typeof ShareSessionIdRoute;
   OwnerIndexRoute: typeof OwnerIndexRoute;
   OwnerRepoSplatRoute: typeof OwnerRepoSplatRoute;
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute;
-  ApiAutumnSplatRoute: typeof ApiAutumnSplatRoute;
   ApiGithubSplatRoute: typeof ApiGithubSplatRoute;
   ApiSharesSessionIdRoute: typeof ApiSharesSessionIdRoute;
   OwnerRepoIndexRoute: typeof OwnerRepoIndexRoute;
@@ -278,13 +239,6 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof ChatSessionIdRouteImport;
       parentRoute: typeof ChatRoute;
     };
-    "/api/proxy": {
-      id: "/api/proxy";
-      path: "/api/proxy";
-      fullPath: "/api/proxy";
-      preLoaderRoute: typeof ApiProxyRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
     "/api/feedback": {
       id: "/api/feedback";
       path: "/api/feedback";
@@ -297,13 +251,6 @@ declare module "@tanstack/react-router" {
       path: "/api/e";
       fullPath: "/api/e";
       preLoaderRoute: typeof ApiERouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/api/dexie-cloud-token": {
-      id: "/api/dexie-cloud-token";
-      path: "/api/dexie-cloud-token";
-      fullPath: "/api/dexie-cloud-token";
-      preLoaderRoute: typeof ApiDexieCloudTokenRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     "/$owner/$repo/": {
@@ -325,13 +272,6 @@ declare module "@tanstack/react-router" {
       path: "/api/github/$";
       fullPath: "/api/github/$";
       preLoaderRoute: typeof ApiGithubSplatRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/api/autumn/$": {
-      id: "/api/autumn/$";
-      path: "/api/autumn/$";
-      fullPath: "/api/autumn/$";
-      preLoaderRoute: typeof ApiAutumnSplatRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     "/api/auth/$": {
@@ -366,15 +306,12 @@ const ChatRouteWithChildren = ChatRoute._addFileChildren(ChatRouteChildren);
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ChatRoute: ChatRouteWithChildren,
-  ApiDexieCloudTokenRoute: ApiDexieCloudTokenRoute,
   ApiERoute: ApiERoute,
   ApiFeedbackRoute: ApiFeedbackRoute,
-  ApiProxyRoute: ApiProxyRoute,
   ShareSessionIdRoute: ShareSessionIdRoute,
   OwnerIndexRoute: OwnerIndexRoute,
   OwnerRepoSplatRoute: OwnerRepoSplatRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
-  ApiAutumnSplatRoute: ApiAutumnSplatRoute,
   ApiGithubSplatRoute: ApiGithubSplatRoute,
   ApiSharesSessionIdRoute: ApiSharesSessionIdRoute,
   OwnerRepoIndexRoute: OwnerRepoIndexRoute,

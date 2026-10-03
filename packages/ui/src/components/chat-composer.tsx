@@ -2,8 +2,8 @@ import * as React from "react";
 import { ChatModelSelector } from "./chat-model-selector";
 import type { ChatStatus } from "ai";
 import type { PromptInputMessage } from "@gitinspect/ui/components/ai-elements/prompt-input";
-import type { ProviderGroupId, ThinkingLevel } from "@gitinspect/pi/types/models";
-import { getModelForGroup } from "@gitinspect/pi/models/catalog";
+import type { ProviderGroupId, ThinkingLevel } from "@gitinspect/runtime/types/models";
+import { getModelForGroup } from "@gitinspect/runtime/models/catalog";
 import {
   Select,
   SelectContent,

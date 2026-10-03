@@ -13,9 +13,9 @@ import {
   openAuthDialog,
   useAuthStore,
 } from "@/store/auth-store";
-import type { GitHubNoticeCtaIntent } from "@gitinspect/pi/repo/github-access";
-import { registerGitHubAuthUiBridge } from "@gitinspect/pi/repo/github-auth-ui";
-import { openGithubTokenSettings } from "@gitinspect/pi/repo/github-fetch";
+import type { GitHubNoticeCtaIntent } from "@gitinspect/runtime/repo/github-access";
+import { registerGitHubAuthUiBridge } from "@gitinspect/runtime/repo/github-auth-ui";
+import { openGithubTokenSettings } from "@gitinspect/runtime/repo/github-fetch";
 import { GitHubAuthProvider } from "@gitinspect/ui/components/github-auth-context";
 import { useGithubAuth } from "@/hooks/use-github-auth";
 

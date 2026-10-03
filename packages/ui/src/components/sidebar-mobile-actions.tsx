@@ -4,7 +4,7 @@ import { Link } from "@tanstack/react-router";
 import { useTheme } from "next-themes";
 import { Icons } from "@gitinspect/ui/components/icons";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@gitinspect/ui/components/sidebar";
-import { GITHUB_APP_REPO } from "@gitinspect/pi/hooks/use-github-repo-stargazers";
+import { GITHUB_APP_REPO } from "@gitinspect/runtime/hooks/use-github-repo-stargazers";
 
 /** Mobile sidebar only: links and actions that are hidden from the header on small screens. Renders under the Home link. */
 export function SidebarMobileActions() {

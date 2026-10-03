@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { resolveRepoIntent } from "@gitinspect/pi/repo/ref-resolver";
+import { resolveRepoIntent } from "@gitinspect/runtime/repo/ref-resolver";
 import { Chat } from "@gitinspect/ui/components/chat";
-import { parseRepoRoutePath } from "@gitinspect/pi/repo/path-parser";
-import { toResolvedRepoSource } from "@gitinspect/pi/repo/path-intent";
-import { githubRepoPathUrl } from "@gitinspect/pi/repo/url";
+import { parseRepoRoutePath } from "@gitinspect/runtime/repo/path-parser";
+import { toResolvedRepoSource } from "@gitinspect/runtime/repo/path-intent";
+import { githubRepoPathUrl } from "@gitinspect/runtime/repo/url";
 
 type RepoSplatSearch = {
   q?: string;

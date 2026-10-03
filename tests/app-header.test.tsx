@@ -32,20 +32,12 @@ vi.mock("@tanstack/react-router", () => ({
     }),
 }));
 
-vi.mock("@gitinspect/pi/hooks/use-selected-session-summary", () => ({
+vi.mock("@gitinspect/runtime/hooks/use-selected-session-summary", () => ({
   useSelectedSessionSummary: () => ({
     repoSource: {
       owner: "acme",
       ref: "main",
       repo: "demo",
-    },
-  }),
-}));
-
-vi.mock("@/hooks/use-subscription", () => ({
-  useSubscription: () => ({
-    subscriptionState: {
-      isSubscribed: false,
     },
   }),
 }));
