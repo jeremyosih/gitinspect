@@ -1,4 +1,4 @@
-import { Type, type Static } from "@sinclair/typebox";
+import * as Schema from "effect/Schema";
 import { GitHubFsError } from "@gitinspect/vfs/types";
 import { execInRepoShell } from "@gitinspect/runtime/repo/repo-runtime";
 import type { RepoRuntime } from "@gitinspect/runtime/repo/repo-types";
@@ -6,13 +6,13 @@ import { warningMessageToError } from "@gitinspect/runtime/tools/repo-warnings";
 import { truncateTail, type TruncationResult } from "@gitinspect/runtime/tools/truncate";
 import type { AppToolDefinition } from "@gitinspect/runtime/tools/types";
 
-const bashSchema = Type.Object({
-  command: Type.String({
+const bashSchema = Schema.Struct({
+  command: Schema.String.annotate({
     description: "Shell command (read-only virtual shell on the repo snapshot; not host OS)",
   }),
 });
 
-export type BashToolParams = Static<typeof bashSchema>;
+export type BashToolParams = typeof bashSchema.Type;
 
 export interface BashToolDetails {
   command: string;
@@ -98,15 +98,22 @@ function detectWriteAttempt(command: string): GitHubFsError | undefined {
   });
 }
 
+export const bashTool = {
+  description:
+    "Run a command in the repo's read-only virtual shell (browser snapshot). " +
+    "Banned: writes, installs, network, git, node/npm/python/sqlite/curl. " +
+    "OK: pipes + grep/sed/awk/cat/head/tail/ls/find.",
+  label: "Bash",
+  name: "bash",
+  parameters: bashSchema,
+};
+
 export function createBashTool(
   runtime: RepoRuntime,
   onRepoError?: (error: unknown) => void | Promise<void>,
-): AppToolDefinition<typeof bashSchema, BashToolDetails> {
+): AppToolDefinition<BashToolParams, BashToolDetails> {
   return {
-    description:
-      "Run a command in the repo's read-only virtual shell (browser snapshot). " +
-      "Banned: writes, installs, network, git, node/npm/python/sqlite/curl. " +
-      "OK: pipes + grep/sed/awk/cat/head/tail/ls/find.",
+    ...bashTool,
     async execute(_toolCallId, params, signal) {
       if (signal?.aborted) {
         throw new Error("Command aborted");
@@ -176,8 +183,5 @@ export function createBashTool(
         },
       };
     },
-    label: "Bash",
-    name: "bash",
-    parameters: bashSchema,
   };
 }

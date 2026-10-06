@@ -63,3 +63,6 @@ todos.json
 tmp
 temp
 .vercel
+
+# Vendored build of the unpublished effect-pi-durable package
+!vendor/*.tgz

@@ -11,10 +11,7 @@ import type {
   SessionData,
 } from "./types";
 
-import type { FxCheckpointRow } from "./fx-checkpoints";
-
 export class AppDb extends Dexie {
-  fxCheckpoints!: EntityTable<FxCheckpointRow, "sessionId">;
   dailyCosts!: EntityTable<DailyCostAggregate, "date">;
   messages!: EntityTable<MessageRow, "id">;
   providerKeys!: EntityTable<ProviderKeyRecord, "provider">;
@@ -29,7 +26,6 @@ export class AppDb extends Dexie {
 
     registerAppDbSchema(this);
 
-    this.fxCheckpoints = this.table("fx_checkpoints");
     this.dailyCosts = this.table("daily_costs");
     this.messages = this.table("messages");
     this.providerKeys = this.table("provider-keys");

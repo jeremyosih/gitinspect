@@ -2,8 +2,7 @@ import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { nitro } from "nitro/vite";
-import { createRequire } from "node:module";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
 import { comlink } from "vite-plugin-comlink";
 import viteTsConfigPaths from "vite-tsconfig-paths";
@@ -33,13 +32,6 @@ function createBrowserNodeZlibAliasPlugin() {
   };
 }
 
-const runtimeRequire = createRequire(
-  new URL("../../packages/runtime/package.json", import.meta.url),
-);
-const fxWasmPath = fileURLToPath(
-  new URL("./fx-core.wasm", pathToFileURL(runtimeRequire.resolve("libfx/browser"))),
-);
-
 export default defineConfig({
   optimizeDeps: {
     include: [
@@ -64,7 +56,6 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      "libfx/fx-core.wasm?url": `${fxWasmPath}?url`,
       "@gitinspect/runtime/agent/runtime-worker-client": fileURLToPath(
         new URL("./src/agent/runtime-worker-client.ts", import.meta.url),
       ),

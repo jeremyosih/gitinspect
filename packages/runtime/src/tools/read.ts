@@ -1,4 +1,4 @@
-import { Type, type Static } from "@sinclair/typebox";
+import * as Schema from "effect/Schema";
 import type { RepoRuntime } from "@gitinspect/runtime/repo/repo-types";
 import { warningMessageToError } from "@gitinspect/runtime/tools/repo-warnings";
 import {
@@ -9,25 +9,23 @@ import {
 } from "@gitinspect/runtime/tools/truncate";
 import type { AppToolDefinition } from "@gitinspect/runtime/tools/types";
 
-const readSchema = Type.Object({
-  limit: Type.Optional(
-    Type.Number({
+const readSchema = Schema.Struct({
+  limit: Schema.optionalKey(
+    Schema.Finite.check(Schema.isGreaterThanOrEqualTo(1)).annotate({
       description: "Maximum number of lines to read",
-      minimum: 1,
     }),
   ),
-  offset: Type.Optional(
-    Type.Number({
+  offset: Schema.optionalKey(
+    Schema.Finite.check(Schema.isGreaterThanOrEqualTo(1)).annotate({
       description: "1-indexed line number to start reading from",
-      minimum: 1,
     }),
   ),
-  path: Type.String({
+  path: Schema.String.annotate({
     description: "Path to the file to read from the active repository",
   }),
 });
 
-export type ReadToolParams = Static<typeof readSchema>;
+export type ReadToolParams = typeof readSchema.Type;
 
 export interface ReadToolDetails {
   path: string;
@@ -48,14 +46,21 @@ function isProbablyBinary(content: string): boolean {
   return content.includes("\u0000");
 }
 
+export const readTool = {
+  description:
+    "Read text file contents from the active repository. Use offset and limit for large files. " +
+    `Output is truncated to ${DEFAULT_MAX_LINES} lines or ${Math.floor(DEFAULT_MAX_BYTES / 1024)}KB.`,
+  label: "Read",
+  name: "read",
+  parameters: readSchema,
+};
+
 export function createReadTool(
   runtime: RepoRuntime,
   onRepoError?: (error: unknown) => void | Promise<void>,
-): AppToolDefinition<typeof readSchema, ReadToolDetails> {
+): AppToolDefinition<ReadToolParams, ReadToolDetails> {
   return {
-    description:
-      "Read text file contents from the active repository. Use offset and limit for large files. " +
-      `Output is truncated to ${DEFAULT_MAX_LINES} lines or ${Math.floor(DEFAULT_MAX_BYTES / 1024)}KB.`,
+    ...readTool,
     async execute(_toolCallId, params, signal) {
       if (signal?.aborted) {
         throw new Error("Read aborted");
@@ -126,8 +131,5 @@ export function createReadTool(
         },
       };
     },
-    label: "Read",
-    name: "read",
-    parameters: readSchema,
   };
 }

@@ -5,7 +5,7 @@ import { buildSystemMessage, classifyRuntimeError } from "@gitinspect/runtime/ag
 import { getIsoNow } from "@gitinspect/runtime/lib/dates";
 import { createId } from "@gitinspect/runtime/lib/ids";
 import { buildPersistedSession } from "@gitinspect/runtime/sessions/session-service";
-import type { FxCheckpointRow, MessageRow, SessionData, SessionRuntimeRow } from "@gitinspect/db";
+import type { MessageRow, SessionData, SessionRuntimeRow } from "@gitinspect/db";
 import type {
   AssistantMessage,
   ToolResultMessage,
@@ -184,7 +184,10 @@ export class TurnEventStore {
     }
   }
 
-  completeRun(params?: { turnId?: string; checkpoint?: FxCheckpointRow }): Promise<void> {
+  completeRun(params?: {
+    turnId?: string;
+    repoSnapshot?: SessionRuntimeRow["repoSnapshot"];
+  }): Promise<void> {
     return this.enqueue(async () => {
       const now = getIsoNow();
       const runtime: SessionRuntimeRow = {
@@ -195,6 +198,7 @@ export class TurnEventStore {
         ownerTabId: undefined,
         pendingToolCallOwners: {},
         phase: "idle",
+        repoSnapshot: params?.repoSnapshot ?? this.runtime?.repoSnapshot,
         sessionId: this.session.id,
         status: "completed",
         streamMessage: undefined,
@@ -206,7 +210,6 @@ export class TurnEventStore {
       await runConversationTransaction(async () => {
         await db.sessions.put(session);
         await db.sessionRuntime.put(runtime);
-        if (params?.checkpoint) await db.fxCheckpoints.put(params.checkpoint);
       });
 
       this.runtime = runtime;
@@ -239,7 +242,6 @@ export class TurnEventStore {
       await runConversationTransaction(async () => {
         await db.sessions.put(session);
         await db.sessionRuntime.put(runtime);
-        await db.fxCheckpoints.delete(this.session.id);
       });
 
       this.runtime = runtime;

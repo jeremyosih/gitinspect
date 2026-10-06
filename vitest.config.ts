@@ -1,5 +1,4 @@
-import { createRequire } from "node:module";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
 function fromRoot(path: string) {
@@ -12,16 +11,6 @@ export default defineConfig({
       {
         find: "@/lib/sharing-service.server",
         replacement: fromRoot("./apps/web/src/lib/sharing-service.server.ts"),
-      },
-      {
-        find: "libfx/fx-core.wasm?url",
-        replacement:
-          fileURLToPath(
-            new URL(
-              "./fx-core.wasm",
-              pathToFileURL(createRequire(import.meta.url).resolve("libfx/browser")),
-            ),
-          ) + "?url",
       },
       {
         find: "@/components/root-guard",

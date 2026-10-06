@@ -460,4 +460,6 @@ export function registerAppDbSchema(db: Dexie): void {
             delete row.realmId;
           });
     });
+  // The transcript is the agent's durable state; Pi rebuilds its conversation from it.
+  db.version(12).stores({ fx_checkpoints: null });
 }

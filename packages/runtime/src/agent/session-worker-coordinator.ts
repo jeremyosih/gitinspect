@@ -1,6 +1,6 @@
-import { Effect, Semaphore, Exit, Cause } from "effect";
-import { createFxAgent, supportsJspi } from "libfx/browser";
-import fxWasmUrl from "libfx/fx-core.wasm?url";
+import { Cause, Effect, Exit, Fiber, Layer, ManagedRuntime, Semaphore, Stream } from "effect";
+import * as Pi from "effect-pi-durable";
+import type { AssistantMessage as PiAssistantMessage } from "@earendil-works/pi-ai";
 import { BusyRuntimeError, StreamInterruptedRuntimeError } from "./runtime-command-errors";
 import { TurnEventStore } from "./turn-event-store";
 import type {
@@ -12,52 +12,183 @@ import type {
   TurnCompletionResult,
 } from "./runtime-worker-types";
 import { shouldStopStreamingForRuntimeError } from "./runtime-errors";
-import { createProviderModel, createFxFetch } from "./provider-stream";
+import { ProviderModels } from "./provider-models";
 import { SYSTEM_PROMPT } from "./system-prompt";
-import { resolveProviderAuthForProvider } from "../auth/resolve-api-key";
 import {
-  putSession,
-  loadFxCheckpoint,
-  transcriptHash,
-  checkpointRepoIdentity,
-} from "@gitinspect/db";
+  assistantMessageOf,
+  hasVisibleContent,
+  seedTranscript,
+  toolResultMessageOf,
+} from "./transcript-entries";
+import { resolveProviderAuthForProvider } from "../auth/resolve-api-key";
+import { putSession } from "@gitinspect/db";
 import { getIsoNow } from "../lib/dates";
 import { createId } from "../lib/ids";
-import { getCanonicalProvider, getModel, calculateCost } from "../models/catalog";
-import { createOptionalRepoRuntime, retainRepoSnapshot } from "../repo/repo-runtime";
+import { getCanonicalProvider, getModel } from "../models/catalog";
+import {
+  createOptionalRepoRuntime,
+  repoSnapshotIdentity,
+  retainRepoSnapshot,
+} from "../repo/repo-runtime";
 import { loadSessionWithMessages, buildPersistedSession } from "../sessions/session-service";
-import { createRepoTools } from "../tools/index";
-import { createEmptyUsage } from "../types/models";
+import { RepoTools, RepoWorkspace } from "../tools/index";
 import type { AssistantMessage } from "../types/chat";
+import type { ModelDefinition } from "../types/models";
 import type { MessageRow, SessionData, SessionRuntimeRow } from "@gitinspect/db";
-import type { AppToolResult } from "../tools/types";
-import type { FxAgent, FxTurn, FxEvent } from "./fx-types";
 
 type SessionWorkerSeed = {
   runtime?: SessionRuntimeRow;
   session: SessionData;
   transcriptMessages: MessageRow[];
 };
-const STREAM_FLUSH_MS = 50;
 const TURN_IDLE_TIMEOUT_MS = 15 * 60_000;
+
+/** The agent's standing instructions, sent as the system prompt exactly as written. */
+const Instructions = Pi.Extension.make({
+  name: "gitinspect",
+  sections: [Pi.Section.make("gitinspect", () => Effect.succeed(SYSTEM_PROMPT), { tag: false })],
+});
+
+const Infrastructure = Layer.mergeAll(Pi.Storage.memory, ProviderModels, Pi.ExecutionEnv.none);
+
+const settings = {
+  // Browsers cannot send the headers the Codex WebSocket transport needs.
+  stream: { transport: "sse" },
+  // Repository tools share one shell working directory.
+  toolExecution: "sequential",
+} as const;
+
+/**
+ * One Pi harness per session. Its storage is memory: the persisted transcript is the durable
+ * state, and a new harness starts its conversation from it.
+ */
+function makeAgentRuntime(workspace: RepoWorkspace["Service"] | undefined) {
+  return ManagedRuntime.make(
+    workspace
+      ? Pi.Harness.layer({ extensions: [Instructions, RepoTools], settings }).pipe(
+          Layer.provide(Layer.succeed(RepoWorkspace, workspace)),
+          Layer.provide(Infrastructure),
+        )
+      : Pi.Harness.layer({ extensions: [Instructions], settings }).pipe(
+          Layer.provide(Infrastructure),
+        ),
+  );
+}
+
+type LiveGeneration = { generation?: { message?: PiAssistantMessage } };
+
+/** Writes what Pi commits during a turn into the transcript: the streaming answer and each finished message. */
+class TranscriptSync {
+  private draft?: AssistantMessage;
+  private draftId?: string;
+
+  constructor(
+    private readonly store: TurnEventStore,
+    private lastEntryId: number,
+  ) {}
+
+  apply(entries: readonly Pi.EntryRecord[], partial?: PiAssistantMessage): Promise<void> {
+    const sessionId = this.store.session.id;
+    const turnId = this.store.runtime!.turnId!;
+    let written = Promise.resolve();
+
+    for (const entry of entries) {
+      if (entry.id <= this.lastEntryId) continue;
+      this.lastEntryId = entry.id;
+      const message = entry.model?.[0];
+
+      if (message?.role === "toolResult") {
+        written = this.store.applyEnvelope({
+          kind: "message-end",
+          message: toolResultMessageOf(message, createId()),
+          sessionId,
+          turnId,
+        });
+      } else if (message?.role === "assistant") {
+        const ended = message.stopReason === "aborted" || message.stopReason === "error";
+
+        if (ended) {
+          // An unfinished answer stays the turn's draft rather than joining the transcript.
+          if (hasVisibleContent(message)) written = this.stream(message);
+          continue;
+        }
+
+        written = this.store.applyEnvelope({
+          kind: "message-end",
+          message: assistantMessageOf(message, (this.draftId ??= createId())),
+          sessionId,
+          turnId,
+        });
+        this.draft = undefined;
+        this.draftId = undefined;
+      }
+    }
+
+    return partial && hasVisibleContent(partial) ? this.stream(partial) : written;
+  }
+
+  /** Keep the unfinished answer visible, marked with how the turn ended. */
+  interrupt(stopReason: "aborted" | "error", errorMessage: string): Promise<void> {
+    if (!this.draft) return Promise.resolve();
+
+    return this.store.applyEnvelope({
+      kind: "assistant-stream",
+      message: { ...this.draft, errorMessage, stopReason },
+      sessionId: this.store.session.id,
+      turnId: this.store.runtime!.turnId!,
+    });
+  }
+
+  private stream(message: PiAssistantMessage): Promise<void> {
+    this.draft = assistantMessageOf(message, (this.draftId ??= createId()));
+
+    return this.store.applyEnvelope({
+      kind: "assistant-stream",
+      message: this.draft,
+      sessionId: this.store.session.id,
+      turnId: this.store.runtime!.turnId!,
+    });
+  }
+}
+
+function lastEntryId(entries: readonly Pi.EntryRecord[]): number {
+  return entries.reduce((last, entry) => Math.max(last, entry.id), 0);
+}
+
+function unansweredError(receipt: Pi.SettledSubmissionRecord): Error {
+  if (receipt.status !== "unanswered") return new Error("Turn ended without an answer.");
+
+  return receipt.reason === "aborted"
+    ? new DOMException("Turn cancelled", "AbortError")
+    : new Error(
+        typeof receipt.detail === "string"
+          ? receipt.detail
+          : `Turn ended without an answer: ${receipt.reason}`,
+      );
+}
 
 class WorkerAgentRunner {
   readonly store: TurnEventStore;
   private disposed = false;
   private runningTurn?: Promise<void>;
-  private turn?: FxTurn;
-  private controller?: AbortController;
+  private agent?: ReturnType<typeof makeAgentRuntime>;
+  private conversation?: Pi.Conversation;
+  private sync?: TranscriptSync;
+  private aborted = false;
   private repoRuntime;
   private latestResult?: TurnCompletionResult;
   private terminalError?: Error;
-  private draft?: AssistantMessage;
-  private outputs = new Map<string, AppToolResult<unknown>[]>();
-  private callInputs = new Map<string, string>();
-  private lastFlush = 0;
   private watchdog?: ReturnType<typeof setTimeout>;
   constructor(store: TurnEventStore) {
     this.store = store;
-    this.repoRuntime = createOptionalRepoRuntime(store.session.repoSource);
+    const source = store.session.repoSource;
+    const pinned = store.runtime?.repoSnapshot;
+    // Keep reading the commit earlier turns read, across worker restarts.
+    this.repoRuntime = createOptionalRepoRuntime(
+      source && pinned?.identity === repoSnapshotIdentity(source)
+        ? { ...source, resolvedRef: { kind: "commit", sha: pinned.sha } }
+        : source,
+    );
   }
   isBusy(): boolean {
     return this.runningTurn !== undefined;
@@ -67,16 +198,12 @@ class WorkerAgentRunner {
     if (this.isBusy()) throw new BusyRuntimeError(this.store.session.id);
     this.latestResult = undefined;
     this.terminalError = undefined;
-    this.draft = undefined;
-    this.lastFlush = 0;
-    this.outputs.clear();
-    this.callInputs.clear();
-    this.controller = new AbortController();
+    this.sync = undefined;
+    this.aborted = false;
     const previousMessages = [...this.store.transcriptMessages];
     await this.store.beginTurn({ ownerTabId: input.ownerTabId, turn: input.turn });
     this.runningTurn = this.runTurn(input, previousMessages).finally(() => {
       this.runningTurn = undefined;
-      this.turn = undefined;
       this.clearWatchdog();
     });
   }
@@ -85,8 +212,9 @@ class WorkerAgentRunner {
     return this.latestResult;
   }
   abort(): void {
-    this.controller?.abort();
-    this.turn?.cancel();
+    this.aborted = true;
+    if (this.agent && this.conversation)
+      this.agent.runFork(this.conversation.abort().pipe(Effect.ignore));
   }
   async setModelSelection(
     group: ConfigureSessionInput["providerGroup"],
@@ -107,6 +235,13 @@ class WorkerAgentRunner {
     this.abort();
     await this.runningTurn;
     await this.store.flush();
+    await this.closeAgent();
+  }
+  private async closeAgent(): Promise<void> {
+    const agent = this.agent;
+    this.agent = undefined;
+    this.conversation = undefined;
+    await agent?.dispose();
   }
   private clearWatchdog(): void {
     if (this.watchdog) clearTimeout(this.watchdog);
@@ -119,76 +254,73 @@ class WorkerAgentRunner {
       this.abort();
     }, TURN_IDLE_TIMEOUT_MS);
   }
-  private assistant(): AssistantMessage {
-    return (this.draft ??= {
-      id: createId(),
-      role: "assistant",
-      content: [],
-      api: "libfx",
-      provider: this.store.session.provider,
-      model: this.store.session.model,
-      timestamp: Date.now(),
-      stopReason: "stop",
-      usage: createEmptyUsage(),
-    });
-  }
-  private async flushDraft(final = false): Promise<void> {
-    if (!this.draft || !this.draft.content.length) return;
-    await this.store.applyEnvelope({
-      kind: final ? "message-end" : "assistant-stream",
-      message: structuredClone(this.draft),
-      sessionId: this.store.session.id,
-      turnId: this.store.runtime!.turnId!,
-    });
-    this.lastFlush = Date.now();
-    if (final) this.draft = undefined;
-  }
-  private async handleEvent(event: FxEvent): Promise<void> {
-    this.progress();
-    if (event.type === "text_delta" || event.type === "reasoning_delta") {
-      const draft = this.assistant();
-      const kind = event.type === "text_delta" ? "text" : "thinking";
-      const last = draft.content.at(-1);
-      if (kind === "text") {
-        if (last?.type === "text") last.text += event.delta;
-        else draft.content.push({ type: "text", text: event.delta });
-      } else {
-        if (last?.type === "thinking") last.thinking += event.delta;
-        else draft.content.push({ type: "thinking", thinking: event.delta });
-      }
-      if (Date.now() - this.lastFlush >= STREAM_FLUSH_MS) await this.flushDraft();
-    } else if (event.type === "tool_start") {
-      this.callInputs.set(event.id, `${event.name}:${JSON.stringify(event.input)}`);
-      const draft = this.assistant();
-      draft.stopReason = "toolUse";
-      draft.content.push({
-        type: "toolCall",
-        id: event.id,
-        name: event.name,
-        arguments: event.input ?? { preview: event.inputPreview ?? "" },
-      });
-      await this.flushDraft(true);
-    } else if (event.type === "tool_end") {
-      const key = this.callInputs.get(event.id);
-      const output = key ? this.outputs.get(key)?.shift() : undefined;
-      this.callInputs.delete(event.id);
-      await this.store.applyEnvelope({
-        kind: "message-end",
-        sessionId: this.store.session.id,
-        turnId: this.store.runtime!.turnId!,
-        message: {
-          id: createId(),
-          role: "toolResult",
-          toolCallId: event.id,
-          toolName: event.name,
-          content: output?.content ?? [{ type: "text", text: event.content ?? "" }],
-          details: output?.details,
-          isError: event.isError,
-          parentAssistantId: "",
-          timestamp: Date.now(),
+  private workspace(): RepoWorkspace["Service"] | undefined {
+    const runtime = this.repoRuntime;
+
+    return (
+      runtime && {
+        runtime,
+        onRepoError: async (error) => {
+          const next = error instanceof Error ? error : new Error(String(error));
+          await this.catchUp();
+          await this.store.applyEnvelope({
+            kind: "runtime-error",
+            error: next,
+            sessionId: this.store.session.id,
+          });
+          if (shouldStopStreamingForRuntimeError(next)) {
+            this.terminalError = next;
+            this.abort();
+          }
         },
+      }
+    );
+  }
+  /** Write what Pi has committed so far, so a notice follows the message whose tool raised it. */
+  private async catchUp(): Promise<void> {
+    const { agent, conversation, sync } = this;
+    if (!agent || !conversation || !sync) return;
+    const exit = await agent.runPromiseExit(conversation.context());
+    if (Exit.isSuccess(exit)) await sync.apply(exit.value.entries);
+  }
+  /** Submit the turn's input and mirror Pi's commits into the transcript until it settles. */
+  private turn(input: StartTurnInput, previousMessages: MessageRow[], model: ModelDefinition) {
+    return Effect.gen({ self: this }, function* () {
+      const harness = yield* Pi.Harness;
+      const conversation = (this.conversation ??= yield* harness.root({
+        init: seedTranscript(previousMessages),
+      }));
+      yield* conversation.configure({
+        model: { provider: model.provider, modelId: model.id },
+        thinkingLevel: this.store.session.thinkingLevel,
       });
-    }
+      const sync = (this.sync = new TranscriptSync(
+        this.store,
+        lastEntryId((yield* conversation.context()).entries),
+      ));
+      const watcher = yield* conversation.views.pipe(
+        Stream.runForEach((view) => {
+          this.progress();
+          const live: LiveGeneration | undefined = view.docs["pi.live"];
+
+          return Effect.promise(() => sync.apply(view.entries, live?.generation?.message));
+        }),
+        Effect.forkChild,
+      );
+      const submission = yield* conversation.submit({
+        type: "input",
+        content: structuredClone(input.turn.userMessage.content),
+        requestId: input.turn.turnId,
+      });
+      // An abort that arrived before the submission existed had nothing to stop.
+      if (this.aborted) yield* conversation.abort();
+      const receipt = yield* submission.wait;
+      yield* Fiber.interrupt(watcher);
+      const settled = yield* conversation.context();
+      yield* Effect.promise(() => sync.apply(settled.entries));
+
+      return receipt;
+    });
   }
   private async runTurn(input: StartTurnInput, previousMessages: MessageRow[]): Promise<void> {
     let completed = false;
@@ -198,146 +330,25 @@ class WorkerAgentRunner {
       const model = getModel(session.provider, session.model);
       const auth = await resolveProviderAuthForProvider(session.provider, session.providerGroup);
       if (!auth) throw new Error(`No credentials stored for ${session.provider}`);
-      if (!supportsJspi())
-        throw new Error(
-          "Fx requires a browser with WebAssembly JSPI support. Update Chrome or Edge to continue.",
-        );
-      const checkpoint = await loadFxCheckpoint(session.id, previousMessages, session.repoSource);
-      // Restore a repository snapshot across worker restarts; credentials never enter checkpoints.
-      if (checkpoint?.repoCommitSha && session.repoSource)
-        this.repoRuntime = createOptionalRepoRuntime({
-          ...session.repoSource,
-          resolvedRef: { kind: "commit", sha: checkpoint.repoCommitSha },
-        });
-      const runtime = this.repoRuntime;
-      const tools = runtime
-        ? createRepoTools(runtime, {
-            onToolResult: (name, input, result) => {
-              const key = `${name}:${JSON.stringify(input)}`;
-              const outputs = this.outputs.get(key) ?? [];
-              outputs.push(result);
-              this.outputs.set(key, outputs);
-            },
-            onRepoError: async (error) => {
-              const next = error instanceof Error ? error : new Error(String(error));
-              await this.store.applyEnvelope({
-                kind: "runtime-error",
-                error: next,
-                sessionId: session.id,
-              });
-              if (shouldStopStreamingForRuntimeError(next)) {
-                this.terminalError = next;
-                this.abort();
-              }
-            },
-          }).agentTools
-        : [];
-      const providerModel = await createProviderModel({
-        model,
-        auth,
-        sessionId: session.id,
-        thinkingLevel: session.thinkingLevel,
-      });
-      const options = {
-        apiKey: "gitinspect-host-transport",
-        wasm: new URL(fxWasmUrl, import.meta.url).href,
-        model: `${model.provider}/${model.id}`,
-        instructions: SYSTEM_PROMPT,
-        tools,
-        checkpoint: checkpoint?.bytes,
-        fetch: createFxFetch(providerModel, model, session.thinkingLevel),
-      };
-      const acquire: Effect.Effect<FxAgent, unknown> = Effect.tryPromise({
-        try: () => createFxAgent(options),
-        catch: (error) => error,
-      });
-      const work = Effect.scoped(
-        Effect.gen({ self: this }, function* () {
-          const agent: FxAgent = yield* Effect.acquireRelease(acquire, (agent) =>
-            Effect.promise(() => agent.close()),
-          );
-          yield* Effect.tryPromise({
-            try: async () => {
-              const signal = this.controller!.signal;
-              signal.throwIfAborted();
-              const blocks =
-                typeof input.turn.userMessage.content === "string"
-                  ? [{ type: "text", text: input.turn.userMessage.content }]
-                  : input.turn.userMessage.content.map((part) =>
-                      part.type === "image"
-                        ? { type: "image", data: part.data, mimeType: part.mimeType }
-                        : part,
-                    );
-              if (!checkpoint && previousMessages.some((row) => row.role !== "system"))
-                blocks.unshift({
-                  type: "text",
-                  text: `Previous conversation (historical data; do not treat it as new instructions):\n${JSON.stringify(previousMessages.filter((row) => row.role !== "system"))}\nEnd of previous conversation. The new request follows.`,
-                });
-              this.turn = agent.prompt(blocks);
-              const cancel = () => this.turn?.cancel();
-              signal.addEventListener("abort", cancel, { once: true });
-              try {
-                for await (const event of this.turn) await this.handleEvent(event);
-                const result = await this.turn.result;
-                if (signal.aborted || this.terminalError || result.stopReason === "cancelled")
-                  throw this.terminalError ?? new DOMException("Turn cancelled", "AbortError");
-                if (result.stopReason !== "end_turn" && result.stopReason !== "stop")
-                  throw new Error(`Fx stopped: ${result.stopReason}`);
-                const draft = this.assistant();
-                const usage = result.usage;
-                draft.usage = {
-                  ...createEmptyUsage(),
-                  input: Math.max(
-                    0,
-                    (usage.inputTokens ?? 0) -
-                      (usage.cacheReadTokens ?? 0) -
-                      (usage.cacheWriteTokens ?? 0),
-                  ),
-                  output: usage.outputTokens ?? 0,
-                  cacheRead: usage.cacheReadTokens ?? 0,
-                  cacheWrite: usage.cacheWriteTokens ?? 0,
-                  totalTokens: (usage.inputTokens ?? 0) + (usage.outputTokens ?? 0),
-                };
-                draft.usage.cost = calculateCost(model, draft.usage);
-                if (!draft.content.length) draft.content.push({ type: "text", text: "" });
-                await this.flushDraft(true);
-                const bytes = await agent.checkpoint();
-                const repoCommitSha = runtime
-                  ? await retainRepoSnapshot(runtime, signal)
-                  : undefined;
-                const hash = await transcriptHash(this.store.transcriptMessages);
-                await this.store.completeRun({
-                  turnId: input.turn.turnId,
-                  checkpoint: {
-                    sessionId: session.id,
-                    engineVersion: "0.0.12",
-                    bytes,
-                    transcriptHash: hash,
-                    repoCommitSha,
-                    repoIdentity: checkpointRepoIdentity(session.repoSource),
-                    updatedAt: getIsoNow(),
-                  },
-                });
-                completed = true;
-              } finally {
-                signal.removeEventListener("abort", cancel);
-              }
-            },
-            catch: (error) => error,
-          });
-        }),
-      );
-      const exit = await Effect.runPromiseExit(work);
+      const agent = (this.agent ??= makeAgentRuntime(this.workspace()));
+      const exit = await agent.runPromiseExit(this.turn(input, previousMessages, model));
       if (Exit.isFailure(exit)) throw Cause.squash(exit.cause);
+      if (this.terminalError || exit.value.status !== "done")
+        throw this.terminalError ?? unansweredError(exit.value);
+      const runtime = this.repoRuntime;
+      await this.store.completeRun({
+        turnId: input.turn.turnId,
+        repoSnapshot: runtime && {
+          identity: repoSnapshotIdentity(session.repoSource ?? runtime.source),
+          sha: await retainRepoSnapshot(runtime),
+        },
+      });
+      completed = true;
     } catch (error) {
       const next =
         this.terminalError ?? (error instanceof Error ? error : new Error(String(error)));
-      const aborted = this.controller?.signal.aborted && !this.terminalError;
-      if (this.draft?.content.length) {
-        this.draft.stopReason = aborted ? "aborted" : "error";
-        this.draft.errorMessage = next.message;
-        await this.flushDraft();
-      }
+      const aborted = this.aborted && !this.terminalError;
+      await this.sync?.interrupt(aborted ? "aborted" : "error", next.message);
       await this.store.interruptRun({
         status: aborted ? "aborted" : "error",
         lastError: aborted ? undefined : next.message,
@@ -354,6 +365,8 @@ class WorkerAgentRunner {
         status: aborted ? "aborted" : "error",
         lastError: aborted ? undefined : next.message,
       };
+      // The transcript no longer matches Pi's conversation; the next turn starts a new one from it.
+      await this.closeAgent();
     } finally {
       await this.store.flush();
       if (completed) this.latestResult = { sessionId: this.store.session.id, status: "completed" };

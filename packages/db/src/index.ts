@@ -8,4 +8,3 @@ export * from "./schema";
 export * from "./sessions";
 export * from "./settings";
 export * from "./types";
-export * from "./fx-checkpoints";
