@@ -53,7 +53,7 @@ Inspired by [Sitegeist](https://sitegeist.ai), [btca](https://github.com/davis7d
 
 ## Performance measurements
 
-[Reproducible benchmarks and results](benchmarks/README.md) compare this cleanup with the original commit. The VFS improves repeated reads and indexed directory listings, but cold reads and bursts of different files can be slower. FX adds a few milliseconds of warm agent overhead in the controlled browser benchmark; this migration is not a model-inference speedup.
+[Reproducible benchmarks and results](benchmarks/README.md) compare this cleanup with the original commit. The VFS improves repeated reads and indexed directory listings, but cold reads and bursts of different files can be slower. The Pi Durable agent adds a few milliseconds of warm overhead per turn in the controlled browser benchmark, about what the fx engine it replaced added; this migration is not a model-inference speedup.
 
 ## Public sharing service
 
