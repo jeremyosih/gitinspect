@@ -16,6 +16,6 @@
       "@/navigation/*": ["../../apps/web/src/navigation/*"]
     }
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "../runtime/src/libfx.d.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": ["node_modules"]
 }

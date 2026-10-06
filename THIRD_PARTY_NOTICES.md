@@ -2,7 +2,8 @@
 
 `packages/runtime/src/models/registry.json` is a metadata snapshot from
 [@mariozechner/pi-ai 0.62.0](https://github.com/badlogic/pi-mono/tree/main/packages/ai).
-The browser runtime does not load Pi. Its metadata retains the MIT license below.
+The agent itself runs on the MIT-licensed `@earendil-works/pi-ai` and
+`@earendil-works/pi-durable` 1.0.1 packages. The snapshot retains the MIT license below.
 
 ```text
 MIT License

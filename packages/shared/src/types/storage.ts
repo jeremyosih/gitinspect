@@ -98,6 +98,8 @@ export interface SessionRuntimeRow {
   ownerTabId?: string;
   pendingToolCallOwners?: Record<string, string>;
   phase?: RuntimePhase;
+  /** Commit the last completed turn read, so later turns inspect the same snapshot. */
+  repoSnapshot?: { identity: string; sha: string };
   sessionId: string;
   startedAt?: string;
   status?: SessionRuntimeStatus;

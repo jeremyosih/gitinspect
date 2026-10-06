@@ -1,0 +1,1453 @@
+{
+  "candidateCommit": "c1a426a3fb2bf7c6005664a8166d1bca04c37643",
+  "cpu": "Apple M1 Pro",
+  "baseline": "0f30313ef198d1aecc380489cd2429f51d4a9371",
+  "date": "2026-10-06T11:34:37.160Z",
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/147.0.7727.15 Safari/537.36",
+  "hardwareConcurrency": 8,
+  "iterations": 11,
+  "warmups": 3,
+  "chunksPerAnswer": 16,
+  "results": [
+    {
+      "scenario": "text",
+      "providerDelayMs": 0,
+      "original": {
+        "readyMs": {
+          "median": 0,
+          "p95": 0.10000002384185791,
+          "min": 0,
+          "max": 0.10000002384185791
+        },
+        "firstTextMs": {
+          "median": 0.19999998807907104,
+          "p95": 1.800000011920929,
+          "min": 0,
+          "max": 1.800000011920929
+        },
+        "totalMs": {
+          "median": 0.20000004768371582,
+          "p95": 2,
+          "min": 0.10000002384185791,
+          "max": 2
+        },
+        "checkpointMs": {
+          "median": 0,
+          "p95": 0,
+          "min": 0,
+          "max": 0
+        },
+        "calls": 1,
+        "tools": 0,
+        "samples": [
+          {
+            "readyMs": 0.10000002384185791,
+            "firstTextMs": 1.800000011920929,
+            "totalMs": 2,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 0.10000002384185791,
+            "totalMs": 0.20000004768371582,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 0.19999998807907104,
+            "totalMs": 0.19999998807907104,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 0.30000001192092896,
+            "totalMs": 0.3999999761581421,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 0,
+            "totalMs": 0.20000004768371582,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 1.800000011920929,
+            "totalMs": 1.9000000357627869,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 0.19999998807907104,
+            "totalMs": 0.19999998807907104,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 0.19999998807907104,
+            "totalMs": 0.2999999523162842,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 0.10000002384185791,
+            "totalMs": 0.10000002384185791,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 0.10000002384185791,
+            "totalMs": 0.19999998807907104,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 0.10000002384185791,
+            "totalMs": 0.10000002384185791,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          }
+        ]
+      },
+      "cleanup": {
+        "readyMs": {
+          "median": 0.30000001192092896,
+          "p95": 0.5,
+          "min": 0.2999999523162842,
+          "max": 0.5
+        },
+        "firstTextMs": {
+          "median": 1.399999976158142,
+          "p95": 1.7000000476837158,
+          "min": 1,
+          "max": 1.7000000476837158
+        },
+        "totalMs": {
+          "median": 2.599999964237213,
+          "p95": 3.199999988079071,
+          "min": 2.099999964237213,
+          "max": 3.199999988079071
+        },
+        "checkpointMs": {
+          "median": 0.09999996423721313,
+          "p95": 0.19999998807907104,
+          "min": 0,
+          "max": 0.19999998807907104
+        },
+        "calls": 1,
+        "tools": 0,
+        "samples": [
+          {
+            "readyMs": 0.2999999523162842,
+            "firstTextMs": 1.399999976158142,
+            "totalMs": 2.599999964237213,
+            "checkpointMs": 0.19999998807907104,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0.30000001192092896,
+            "firstTextMs": 1.300000011920929,
+            "totalMs": 2.400000035762787,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0.5,
+            "firstTextMs": 1.699999988079071,
+            "totalMs": 3.199999988079071,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0.30000001192092896,
+            "firstTextMs": 1.7000000476837158,
+            "totalMs": 3.100000023841858,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0.30000001192092896,
+            "firstTextMs": 1.399999976158142,
+            "totalMs": 2.599999964237213,
+            "checkpointMs": 0.09999996423721313,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0.3999999761581421,
+            "firstTextMs": 1.5,
+            "totalMs": 2.799999952316284,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0.5,
+            "firstTextMs": 1.600000023841858,
+            "totalMs": 2.900000035762787,
+            "checkpointMs": 0.10000002384185791,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0.3999999761581421,
+            "firstTextMs": 1.399999976158142,
+            "totalMs": 2.600000023841858,
+            "checkpointMs": 0.10000002384185791,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0.30000001192092896,
+            "firstTextMs": 1.199999988079071,
+            "totalMs": 2.300000011920929,
+            "checkpointMs": 0.10000002384185791,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0.2999999523162842,
+            "firstTextMs": 1.0999999642372131,
+            "totalMs": 2.099999964237213,
+            "checkpointMs": 0.09999996423721313,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0.2999999523162842,
+            "firstTextMs": 1,
+            "totalMs": 2.099999964237213,
+            "checkpointMs": 0.09999996423721313,
+            "calls": 1,
+            "tools": 0
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "text",
+      "providerDelayMs": 50,
+      "original": {
+        "readyMs": {
+          "median": 0,
+          "p95": 0.09999996423721313,
+          "min": 0,
+          "max": 0.09999996423721313
+        },
+        "firstTextMs": {
+          "median": 60.30000001192093,
+          "p95": 62.90000003576279,
+          "min": 55.59999996423721,
+          "max": 62.90000003576279
+        },
+        "totalMs": {
+          "median": 60.5,
+          "p95": 63.30000001192093,
+          "min": 56.19999998807907,
+          "max": 63.30000001192093
+        },
+        "checkpointMs": {
+          "median": 0,
+          "p95": 0,
+          "min": 0,
+          "max": 0
+        },
+        "calls": 1,
+        "tools": 0,
+        "samples": [
+          {
+            "readyMs": 0,
+            "firstTextMs": 60.30000001192093,
+            "totalMs": 60.5,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 60.30000001192093,
+            "totalMs": 60.39999997615814,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 60.30000001192093,
+            "totalMs": 60.5,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 60.90000003576279,
+            "totalMs": 61.5,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 62.90000003576279,
+            "totalMs": 63.30000001192093,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0.09999996423721313,
+            "firstTextMs": 61.299999952316284,
+            "totalMs": 62,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 55.59999996423721,
+            "totalMs": 56.299999952316284,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 61.39999997615814,
+            "totalMs": 62.09999996423721,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 60.80000001192093,
+            "totalMs": 61.69999998807907,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 55.80000001192093,
+            "totalMs": 56.19999998807907,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 59.60000002384186,
+            "totalMs": 60.30000001192093,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          }
+        ]
+      },
+      "cleanup": {
+        "readyMs": {
+          "median": 0.800000011920929,
+          "p95": 2.600000023841858,
+          "min": 0.30000001192092896,
+          "max": 2.600000023841858
+        },
+        "firstTextMs": {
+          "median": 64.80000001192093,
+          "p95": 69.10000002384186,
+          "min": 59.40000003576279,
+          "max": 69.10000002384186
+        },
+        "totalMs": {
+          "median": 68.89999997615814,
+          "p95": 75.10000002384186,
+          "min": 62.80000001192093,
+          "max": 75.10000002384186
+        },
+        "checkpointMs": {
+          "median": 0.19999998807907104,
+          "p95": 0.40000003576278687,
+          "min": 0,
+          "max": 0.40000003576278687
+        },
+        "calls": 1,
+        "tools": 0,
+        "samples": [
+          {
+            "readyMs": 0.30000001192092896,
+            "firstTextMs": 61.5,
+            "totalMs": 62.80000001192093,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0.30000001192092896,
+            "firstTextMs": 62.60000002384186,
+            "totalMs": 63.80000001192093,
+            "checkpointMs": 0.10000002384185791,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0.800000011920929,
+            "firstTextMs": 63.5,
+            "totalMs": 66.10000002384186,
+            "checkpointMs": 0.20000004768371582,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0.699999988079071,
+            "firstTextMs": 64.80000001192093,
+            "totalMs": 68.89999997615814,
+            "checkpointMs": 0.19999998807907104,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 1.5,
+            "firstTextMs": 59.40000003576279,
+            "totalMs": 63.200000047683716,
+            "checkpointMs": 0.20000004768371582,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0.800000011920929,
+            "firstTextMs": 65.60000002384186,
+            "totalMs": 69.60000002384186,
+            "checkpointMs": 0.20000004768371582,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 2.299999952316284,
+            "firstTextMs": 68.69999998807907,
+            "totalMs": 72.69999998807907,
+            "checkpointMs": 0.10000002384185791,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0.7999999523162842,
+            "firstTextMs": 65.69999998807907,
+            "totalMs": 69.5,
+            "checkpointMs": 0.10000002384185791,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 2.600000023841858,
+            "firstTextMs": 69.10000002384186,
+            "totalMs": 73.20000004768372,
+            "checkpointMs": 0.30000001192092896,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0.800000011920929,
+            "firstTextMs": 63.40000003576279,
+            "totalMs": 66.60000002384186,
+            "checkpointMs": 0.10000002384185791,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 2,
+            "firstTextMs": 68.39999997615814,
+            "totalMs": 75.10000002384186,
+            "checkpointMs": 0.40000003576278687,
+            "calls": 1,
+            "tools": 0
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "tool",
+      "providerDelayMs": 0,
+      "original": {
+        "readyMs": {
+          "median": 0,
+          "p95": 0,
+          "min": 0,
+          "max": 0
+        },
+        "firstTextMs": {
+          "median": 0.20000004768371582,
+          "p95": 0.30000001192092896,
+          "min": 0.10000002384185791,
+          "max": 0.30000001192092896
+        },
+        "totalMs": {
+          "median": 0.30000001192092896,
+          "p95": 0.40000003576278687,
+          "min": 0.19999998807907104,
+          "max": 0.40000003576278687
+        },
+        "checkpointMs": {
+          "median": 0,
+          "p95": 0,
+          "min": 0,
+          "max": 0
+        },
+        "calls": 2,
+        "tools": 1,
+        "samples": [
+          {
+            "readyMs": 0,
+            "firstTextMs": 0.19999998807907104,
+            "totalMs": 0.30000001192092896,
+            "checkpointMs": 0,
+            "calls": 2,
+            "tools": 1
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 0.30000001192092896,
+            "totalMs": 0.3999999761581421,
+            "checkpointMs": 0,
+            "calls": 2,
+            "tools": 1
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 0.10000002384185791,
+            "totalMs": 0.20000004768371582,
+            "checkpointMs": 0,
+            "calls": 2,
+            "tools": 1
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 0.30000001192092896,
+            "totalMs": 0.40000003576278687,
+            "checkpointMs": 0,
+            "calls": 2,
+            "tools": 1
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 0.19999998807907104,
+            "totalMs": 0.30000001192092896,
+            "checkpointMs": 0,
+            "calls": 2,
+            "tools": 1
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 0.2999999523162842,
+            "totalMs": 0.2999999523162842,
+            "checkpointMs": 0,
+            "calls": 2,
+            "tools": 1
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 0.20000004768371582,
+            "totalMs": 0.30000001192092896,
+            "checkpointMs": 0,
+            "calls": 2,
+            "tools": 1
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 0.2999999523162842,
+            "totalMs": 0.3999999761581421,
+            "checkpointMs": 0,
+            "calls": 2,
+            "tools": 1
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 0.10000002384185791,
+            "totalMs": 0.19999998807907104,
+            "checkpointMs": 0,
+            "calls": 2,
+            "tools": 1
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 0.19999998807907104,
+            "totalMs": 0.2999999523162842,
+            "checkpointMs": 0,
+            "calls": 2,
+            "tools": 1
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 0.20000004768371582,
+            "totalMs": 0.30000001192092896,
+            "checkpointMs": 0,
+            "calls": 2,
+            "tools": 1
+          }
+        ]
+      },
+      "cleanup": {
+        "readyMs": {
+          "median": 0.30000001192092896,
+          "p95": 0.40000003576278687,
+          "min": 0.19999998807907104,
+          "max": 0.40000003576278687
+        },
+        "firstTextMs": {
+          "median": 2,
+          "p95": 2.300000011920929,
+          "min": 1.699999988079071,
+          "max": 2.300000011920929
+        },
+        "totalMs": {
+          "median": 3.100000023841858,
+          "p95": 3.400000035762787,
+          "min": 2.699999988079071,
+          "max": 3.400000035762787
+        },
+        "checkpointMs": {
+          "median": 0.09999996423721313,
+          "p95": 0.10000002384185791,
+          "min": 0,
+          "max": 0.10000002384185791
+        },
+        "calls": 2,
+        "tools": 1,
+        "samples": [
+          {
+            "readyMs": 0.30000001192092896,
+            "firstTextMs": 2,
+            "totalMs": 3.199999988079071,
+            "checkpointMs": 0.09999996423721313,
+            "calls": 2,
+            "tools": 1
+          },
+          {
+            "readyMs": 0.3999999761581421,
+            "firstTextMs": 1.800000011920929,
+            "totalMs": 3,
+            "checkpointMs": 0.10000002384185791,
+            "calls": 2,
+            "tools": 1
+          },
+          {
+            "readyMs": 0.30000001192092896,
+            "firstTextMs": 1.899999976158142,
+            "totalMs": 3,
+            "checkpointMs": 0.10000002384185791,
+            "calls": 2,
+            "tools": 1
+          },
+          {
+            "readyMs": 0.30000001192092896,
+            "firstTextMs": 2.199999988079071,
+            "totalMs": 3.399999976158142,
+            "checkpointMs": 0.09999996423721313,
+            "calls": 2,
+            "tools": 1
+          },
+          {
+            "readyMs": 0.30000001192092896,
+            "firstTextMs": 2.099999964237213,
+            "totalMs": 3.199999988079071,
+            "checkpointMs": 0.10000002384185791,
+            "calls": 2,
+            "tools": 1
+          },
+          {
+            "readyMs": 0.40000003576278687,
+            "firstTextMs": 2.300000011920929,
+            "totalMs": 3.400000035762787,
+            "checkpointMs": 0.10000002384185791,
+            "calls": 2,
+            "tools": 1
+          },
+          {
+            "readyMs": 0.40000003576278687,
+            "firstTextMs": 2.200000047683716,
+            "totalMs": 3.300000011920929,
+            "checkpointMs": 0,
+            "calls": 2,
+            "tools": 1
+          },
+          {
+            "readyMs": 0.30000001192092896,
+            "firstTextMs": 2,
+            "totalMs": 3.100000023841858,
+            "checkpointMs": 0,
+            "calls": 2,
+            "tools": 1
+          },
+          {
+            "readyMs": 0.30000001192092896,
+            "firstTextMs": 1.7000000476837158,
+            "totalMs": 2.700000047683716,
+            "checkpointMs": 0,
+            "calls": 2,
+            "tools": 1
+          },
+          {
+            "readyMs": 0.19999998807907104,
+            "firstTextMs": 1.699999988079071,
+            "totalMs": 2.800000011920929,
+            "checkpointMs": 0.10000002384185791,
+            "calls": 2,
+            "tools": 1
+          },
+          {
+            "readyMs": 0.19999998807907104,
+            "firstTextMs": 1.699999988079071,
+            "totalMs": 2.699999988079071,
+            "checkpointMs": 0,
+            "calls": 2,
+            "tools": 1
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "tool",
+      "providerDelayMs": 50,
+      "original": {
+        "readyMs": {
+          "median": 0,
+          "p95": 0.10000002384185791,
+          "min": 0,
+          "max": 0.10000002384185791
+        },
+        "firstTextMs": {
+          "median": 117.5,
+          "p95": 129,
+          "min": 112.60000002384186,
+          "max": 129
+        },
+        "totalMs": {
+          "median": 117.90000003576279,
+          "p95": 129.30000001192093,
+          "min": 113.10000002384186,
+          "max": 129.30000001192093
+        },
+        "checkpointMs": {
+          "median": 0,
+          "p95": 0,
+          "min": 0,
+          "max": 0
+        },
+        "calls": 2,
+        "tools": 1,
+        "samples": [
+          {
+            "readyMs": 0,
+            "firstTextMs": 117.5,
+            "totalMs": 117.89999997615814,
+            "checkpointMs": 0,
+            "calls": 2,
+            "tools": 1
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 121,
+            "totalMs": 121.80000001192093,
+            "checkpointMs": 0,
+            "calls": 2,
+            "tools": 1
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 112.69999998807907,
+            "totalMs": 114.59999996423721,
+            "checkpointMs": 0,
+            "calls": 2,
+            "tools": 1
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 124.79999995231628,
+            "totalMs": 125.39999997615814,
+            "checkpointMs": 0,
+            "calls": 2,
+            "tools": 1
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 129,
+            "totalMs": 129.30000001192093,
+            "checkpointMs": 0,
+            "calls": 2,
+            "tools": 1
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 124.70000004768372,
+            "totalMs": 125.5,
+            "checkpointMs": 0,
+            "calls": 2,
+            "tools": 1
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 115.90000003576279,
+            "totalMs": 116.10000002384186,
+            "checkpointMs": 0,
+            "calls": 2,
+            "tools": 1
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 112.60000002384186,
+            "totalMs": 113.10000002384186,
+            "checkpointMs": 0,
+            "calls": 2,
+            "tools": 1
+          },
+          {
+            "readyMs": 0.10000002384185791,
+            "firstTextMs": 121.5,
+            "totalMs": 123.69999998807907,
+            "checkpointMs": 0,
+            "calls": 2,
+            "tools": 1
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 114.69999998807907,
+            "totalMs": 115.29999995231628,
+            "checkpointMs": 0,
+            "calls": 2,
+            "tools": 1
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 117.20000004768372,
+            "totalMs": 117.90000003576279,
+            "checkpointMs": 0,
+            "calls": 2,
+            "tools": 1
+          }
+        ]
+      },
+      "cleanup": {
+        "readyMs": {
+          "median": 1,
+          "p95": 5.099999964237213,
+          "min": 0.699999988079071,
+          "max": 5.099999964237213
+        },
+        "firstTextMs": {
+          "median": 128.80000001192093,
+          "p95": 136.5,
+          "min": 108,
+          "max": 136.5
+        },
+        "totalMs": {
+          "median": 133.19999998807907,
+          "p95": 140.5999999642372,
+          "min": 110.80000001192093,
+          "max": 140.5999999642372
+        },
+        "checkpointMs": {
+          "median": 0.2999999523162842,
+          "p95": 0.3999999761581421,
+          "min": 0.19999998807907104,
+          "max": 0.3999999761581421
+        },
+        "calls": 2,
+        "tools": 1,
+        "samples": [
+          {
+            "readyMs": 1,
+            "firstTextMs": 136.5,
+            "totalMs": 140.5999999642372,
+            "checkpointMs": 0.19999998807907104,
+            "calls": 2,
+            "tools": 1
+          },
+          {
+            "readyMs": 1,
+            "firstTextMs": 131,
+            "totalMs": 134.69999998807907,
+            "checkpointMs": 0.30000001192092896,
+            "calls": 2,
+            "tools": 1
+          },
+          {
+            "readyMs": 2.5,
+            "firstTextMs": 127.5,
+            "totalMs": 131.29999995231628,
+            "checkpointMs": 0.2999999523162842,
+            "calls": 2,
+            "tools": 1
+          },
+          {
+            "readyMs": 0.9000000357627869,
+            "firstTextMs": 123,
+            "totalMs": 125.70000004768372,
+            "checkpointMs": 0.20000004768371582,
+            "calls": 2,
+            "tools": 1
+          },
+          {
+            "readyMs": 5.099999964237213,
+            "firstTextMs": 128.80000001192093,
+            "totalMs": 133.19999998807907,
+            "checkpointMs": 0.3999999761581421,
+            "calls": 2,
+            "tools": 1
+          },
+          {
+            "readyMs": 0.8999999761581421,
+            "firstTextMs": 126.69999998807907,
+            "totalMs": 129.29999995231628,
+            "checkpointMs": 0.19999998807907104,
+            "calls": 2,
+            "tools": 1
+          },
+          {
+            "readyMs": 1.199999988079071,
+            "firstTextMs": 131.60000002384186,
+            "totalMs": 135.5,
+            "checkpointMs": 0.19999998807907104,
+            "calls": 2,
+            "tools": 1
+          },
+          {
+            "readyMs": 0.699999988079071,
+            "firstTextMs": 126.19999998807907,
+            "totalMs": 130.69999998807907,
+            "checkpointMs": 0.3999999761581421,
+            "calls": 2,
+            "tools": 1
+          },
+          {
+            "readyMs": 2.199999988079071,
+            "firstTextMs": 132.5,
+            "totalMs": 134.80000001192093,
+            "checkpointMs": 0.30000001192092896,
+            "calls": 2,
+            "tools": 1
+          },
+          {
+            "readyMs": 0.699999988079071,
+            "firstTextMs": 108,
+            "totalMs": 110.80000001192093,
+            "checkpointMs": 0.20000004768371582,
+            "calls": 2,
+            "tools": 1
+          },
+          {
+            "readyMs": 1.800000011920929,
+            "firstTextMs": 131.10000002384186,
+            "totalMs": 134.20000004768372,
+            "checkpointMs": 0.30000001192092896,
+            "calls": 2,
+            "tools": 1
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "followup",
+      "providerDelayMs": 0,
+      "original": {
+        "readyMs": {
+          "median": 0,
+          "p95": 0,
+          "min": 0,
+          "max": 0
+        },
+        "firstTextMs": {
+          "median": 0.09999996423721313,
+          "p95": 0.20000004768371582,
+          "min": 0,
+          "max": 0.20000004768371582
+        },
+        "totalMs": {
+          "median": 0.19999998807907104,
+          "p95": 0.20000004768371582,
+          "min": 0,
+          "max": 0.20000004768371582
+        },
+        "checkpointMs": {
+          "median": 0,
+          "p95": 0,
+          "min": 0,
+          "max": 0
+        },
+        "calls": 1,
+        "tools": 0,
+        "samples": [
+          {
+            "readyMs": 0,
+            "firstTextMs": 0.10000002384185791,
+            "totalMs": 0.20000004768371582,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 0.09999996423721313,
+            "totalMs": 0.09999996423721313,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 0.10000002384185791,
+            "totalMs": 0.20000004768371582,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 0.19999998807907104,
+            "totalMs": 0.19999998807907104,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 0.20000004768371582,
+            "totalMs": 0.20000004768371582,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 0.09999996423721313,
+            "totalMs": 0.19999998807907104,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 0.09999996423721313,
+            "totalMs": 0.19999998807907104,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 0,
+            "totalMs": 0.10000002384185791,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 0,
+            "totalMs": 0,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 0.10000002384185791,
+            "totalMs": 0.19999998807907104,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 0.09999996423721313,
+            "totalMs": 0.09999996423721313,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          }
+        ]
+      },
+      "cleanup": {
+        "readyMs": {
+          "median": 0.3999999761581421,
+          "p95": 0.5,
+          "min": 0.19999998807907104,
+          "max": 0.5
+        },
+        "firstTextMs": {
+          "median": 1.100000023841858,
+          "p95": 2,
+          "min": 0.7999999523162842,
+          "max": 2
+        },
+        "totalMs": {
+          "median": 2.100000023841858,
+          "p95": 3.599999964237213,
+          "min": 1.899999976158142,
+          "max": 3.599999964237213
+        },
+        "checkpointMs": {
+          "median": 0.10000002384185791,
+          "p95": 0.19999998807907104,
+          "min": 0,
+          "max": 0.19999998807907104
+        },
+        "calls": 1,
+        "tools": 0,
+        "samples": [
+          {
+            "readyMs": 0.3999999761581421,
+            "firstTextMs": 2,
+            "totalMs": 3.599999964237213,
+            "checkpointMs": 0.10000002384185791,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0.5,
+            "firstTextMs": 1.2000000476837158,
+            "totalMs": 2.200000047683716,
+            "checkpointMs": 0.10000002384185791,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0.40000003576278687,
+            "firstTextMs": 1,
+            "totalMs": 2,
+            "checkpointMs": 0.09999996423721313,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0.5,
+            "firstTextMs": 1.399999976158142,
+            "totalMs": 2.800000011920929,
+            "checkpointMs": 0.10000002384185791,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0.3999999761581421,
+            "firstTextMs": 1.100000023841858,
+            "totalMs": 2.100000023841858,
+            "checkpointMs": 0.10000002384185791,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0.3999999761581421,
+            "firstTextMs": 1.0999999642372131,
+            "totalMs": 2,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0.40000003576278687,
+            "firstTextMs": 1.100000023841858,
+            "totalMs": 2.100000023841858,
+            "checkpointMs": 0.19999998807907104,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0.3999999761581421,
+            "firstTextMs": 0.8999999761581421,
+            "totalMs": 2,
+            "checkpointMs": 0.10000002384185791,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0.19999998807907104,
+            "firstTextMs": 0.7999999523162842,
+            "totalMs": 1.899999976158142,
+            "checkpointMs": 0.19999998807907104,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0.3999999761581421,
+            "firstTextMs": 1.699999988079071,
+            "totalMs": 2.899999976158142,
+            "checkpointMs": 0.10000002384185791,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0.5,
+            "firstTextMs": 1.0999999642372131,
+            "totalMs": 2,
+            "checkpointMs": 0.10000002384185791,
+            "calls": 1,
+            "tools": 0
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "followup",
+      "providerDelayMs": 50,
+      "original": {
+        "readyMs": {
+          "median": 0,
+          "p95": 0,
+          "min": 0,
+          "max": 0
+        },
+        "firstTextMs": {
+          "median": 60.19999998807907,
+          "p95": 61.69999998807907,
+          "min": 50.80000001192093,
+          "max": 61.69999998807907
+        },
+        "totalMs": {
+          "median": 60.39999997615814,
+          "p95": 62.39999997615814,
+          "min": 51,
+          "max": 62.39999997615814
+        },
+        "checkpointMs": {
+          "median": 0,
+          "p95": 0,
+          "min": 0,
+          "max": 0
+        },
+        "calls": 1,
+        "tools": 0,
+        "samples": [
+          {
+            "readyMs": 0,
+            "firstTextMs": 57.69999998807907,
+            "totalMs": 58.09999996423721,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 61.69999998807907,
+            "totalMs": 62.39999997615814,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 54.09999996423721,
+            "totalMs": 54.80000001192093,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 58.80000001192093,
+            "totalMs": 59.60000002384186,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 56.90000003576279,
+            "totalMs": 57.40000003576279,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 61.200000047683716,
+            "totalMs": 62.10000002384186,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 61.10000002384186,
+            "totalMs": 61.60000002384186,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 50.80000001192093,
+            "totalMs": 51,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 60.80000001192093,
+            "totalMs": 61.10000002384186,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 60.19999998807907,
+            "totalMs": 60.39999997615814,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0,
+            "firstTextMs": 60.299999952316284,
+            "totalMs": 60.799999952316284,
+            "checkpointMs": 0,
+            "calls": 1,
+            "tools": 0
+          }
+        ]
+      },
+      "cleanup": {
+        "readyMs": {
+          "median": 0.9000000357627869,
+          "p95": 1.199999988079071,
+          "min": 0.699999988079071,
+          "max": 1.199999988079071
+        },
+        "firstTextMs": {
+          "median": 65.09999996423721,
+          "p95": 66.5,
+          "min": 57,
+          "max": 66.5
+        },
+        "totalMs": {
+          "median": 69,
+          "p95": 70.30000001192093,
+          "min": 58.5,
+          "max": 70.30000001192093
+        },
+        "checkpointMs": {
+          "median": 0.19999998807907104,
+          "p95": 0.30000001192092896,
+          "min": 0.09999996423721313,
+          "max": 0.30000001192092896
+        },
+        "calls": 1,
+        "tools": 0,
+        "samples": [
+          {
+            "readyMs": 1.199999988079071,
+            "firstTextMs": 59.69999998807907,
+            "totalMs": 64.19999998807907,
+            "checkpointMs": 0.19999998807907104,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0.800000011920929,
+            "firstTextMs": 62.30000001192093,
+            "totalMs": 64.69999998807907,
+            "checkpointMs": 0.09999996423721313,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 1,
+            "firstTextMs": 66.19999998807907,
+            "totalMs": 69.60000002384186,
+            "checkpointMs": 0.30000001192092896,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0.7999999523162842,
+            "firstTextMs": 65.09999996423721,
+            "totalMs": 69,
+            "checkpointMs": 0.30000001192092896,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 1.100000023841858,
+            "firstTextMs": 65.70000004768372,
+            "totalMs": 69.60000002384186,
+            "checkpointMs": 0.19999998807907104,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0.9000000357627869,
+            "firstTextMs": 59.40000003576279,
+            "totalMs": 61.90000003576279,
+            "checkpointMs": 0.10000002384185791,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 1.0999999642372131,
+            "firstTextMs": 66.5,
+            "totalMs": 70,
+            "checkpointMs": 0.10000002384185791,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0.699999988079071,
+            "firstTextMs": 63.39999997615814,
+            "totalMs": 65.39999997615814,
+            "checkpointMs": 0.19999998807907104,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 1,
+            "firstTextMs": 65.89999997615814,
+            "totalMs": 70.30000001192093,
+            "checkpointMs": 0.30000001192092896,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0.9000000357627869,
+            "firstTextMs": 57,
+            "totalMs": 58.5,
+            "checkpointMs": 0.09999996423721313,
+            "calls": 1,
+            "tools": 0
+          },
+          {
+            "readyMs": 0.699999988079071,
+            "firstTextMs": 66.30000001192093,
+            "totalMs": 69.10000002384186,
+            "checkpointMs": 0.30000001192092896,
+            "calls": 1,
+            "tools": 0
+          }
+        ]
+      }
+    }
+  ]
+}

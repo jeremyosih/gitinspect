@@ -38,14 +38,14 @@ We use **Vercel** (hosting) and **OneDollar Stats** for **aggregate** traffic an
 ## How it works
 
 - **Research agent** — Pick a repository, chat in natural language; answers are grounded in the code.
-- **Stack** — [fx/libfx](https://fx.sh/) owns the agent loop and conversation checkpoints. [Effect](https://effect.website/) owns runtime resource scopes, serialized operations, HTTP concurrency and cancellation. The existing read-only [just-bash](https://github.com/vercel-labs/just-bash) shell uses `@gitinspect/vfs`.
-- **Browser storage** — The app stores opaque fx checkpoints in a Dexie table, atomically with turn completion. Fx supplies checkpoint bytes; the host owns IndexedDB persistence. Transcript hashes and repository identity prevent restoring stale checkpoints. Existing conversations retain their UI transcript and seed fx with historical context on their first new turn.
-- **Providers** — Host fetch adapts fx's AI SDK v4 protocol to provider SDKs. No AI Gateway account is required. ChatGPT subscription login uses the existing OAuth flow, refresh token and ChatGPT account ID against the Codex Responses endpoint; it is separate from an OpenAI API key. The CLI's four-provider login helper still uses the upstream OAuth utility; Pi is absent from the browser agent runtime.
+- **Stack** — [Pi Durable](https://github.com/earendil-works/pi) runs the agent: model turns, tool calls and the conversation. The app drives it through [effect-pi-durable](https://github.com/jeremyosih/effect-pi-durable), so the harness, its tools and its model access are [Effect](https://effect.website/) layers, services and streams. Effect also owns resource scopes, serialized operations, HTTP concurrency and cancellation. The existing read-only [just-bash](https://github.com/vercel-labs/just-bash) shell uses `@gitinspect/vfs`.
+- **Browser storage** — The transcript in IndexedDB is a conversation's durable state. Each session's Pi harness keeps its conversation in memory; a new worker starts the conversation from the transcript, so the model reads earlier turns as the messages they were. There are no engine checkpoints to keep in step with the transcript. An interrupted answer stays a draft and is not sent back to the model.
+- **Providers** — [Pi AI](https://github.com/earendil-works/pi/tree/main/packages/ai) speaks each provider's API with the user's own key or subscription, read from the app's credential store; requests go through the configured proxy only for credentials that need it. ChatGPT subscription login uses the existing OAuth flow against the Codex Responses endpoint; it is separate from an OpenAI API key. Gemini CLI subscriptions use a small Cloud Code Assist adapter in this repository, because Pi AI 1.0 has none.
 - **Workers** — Agent work and durable turn writes run in a per-tab DedicatedWorker. The main thread manages leases, observes IndexedDB, and repairs interrupted sessions. Workers do not guarantee background-tab execution.
 - **Snapshots** — All repository reads use one immutable commit. A new snapshot resolves a changed branch; refreshing its caches keeps the same commit. Completed conversations retain the commit across worker restarts.
 - **Trees** — Concurrent tree loads share one request. Complete trees have indexed directory children. Truncated recursive responses fall back to complete non-recursive directory trees, fetched lazily, so missing entries never become false `ENOENT` results.
 - **Blobs** — Canonical bytes cached by SHA serve both text and binary reads. In-flight fetches are shared; cancelling one reader does not cancel other readers. The final cancellation aborts HTTP. The cache refuses oversized entries. Four retained worker snapshots have a combined 50 MiB content budget; active snapshots have the same individual bounds. Files default to a 10 MiB read limit and API responses to 32 MiB.
-- **Compatibility** — Browser fx requires WebAssembly JSPI (check `supportsJspi()`); unsupported browsers receive a clear runtime error. `libfx` is pinned at 0.0.12 because its SDK is experimental. No claim of faster model inference is implied by this migration.
+- **Compatibility** — The agent is plain JavaScript and needs no WebAssembly JSPI. Pi Durable is experimental and pinned at 1.0.1. `effect-pi-durable` is not on npm yet; [`vendor/`](vendor/README.md) holds the build this app uses. No claim of faster model inference is implied by this migration.
 
 Inspired by [Sitegeist](https://sitegeist.ai), [btca](https://github.com/davis7dotsh/better-context) & [repogrep](https://repogrep.com).
 
@@ -53,7 +53,7 @@ Inspired by [Sitegeist](https://sitegeist.ai), [btca](https://github.com/davis7d
 
 ## Performance measurements
 
-[Reproducible benchmarks and results](benchmarks/README.md) compare this cleanup with the original commit. The VFS improves repeated reads and indexed directory listings, but cold reads and bursts of different files can be slower. FX adds a few milliseconds of warm agent overhead in the controlled browser benchmark; this migration is not a model-inference speedup.
+[Reproducible benchmarks and results](benchmarks/README.md) compare this cleanup with the original commit. The VFS improves repeated reads and indexed directory listings, but cold reads and bursts of different files can be slower. The Pi Durable agent adds a few milliseconds of warm overhead per turn in the controlled browser benchmark, about what the fx engine it replaced added; this migration is not a model-inference speedup.
 
 ## Public sharing service
 

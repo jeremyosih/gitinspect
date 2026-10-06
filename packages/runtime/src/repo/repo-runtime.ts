@@ -31,6 +31,10 @@ const MAX_RETAINED_SNAPSHOTS = 4;
 function snapshotKey(source: ResolvedRepoSource, sha: string): string {
   return `${source.owner}/${source.repo}@${sha}`;
 }
+/** What a pinned commit belongs to: a different repository or ref starts a new snapshot. */
+export function repoSnapshotIdentity(source: ResolvedRepoSource): string {
+  return JSON.stringify({ owner: source.owner, repo: source.repo, ref: source.resolvedRef });
+}
 export async function retainRepoSnapshot(
   runtime: RepoRuntime,
   signal?: AbortSignal,
